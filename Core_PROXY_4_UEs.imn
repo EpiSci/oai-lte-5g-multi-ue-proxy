@@ -1,0 +1,139 @@
+node n1 {
+    type router
+    model mdr
+    network-config {
+	hostname eNB
+	!
+	interface eth0
+	 ip address 10.0.0.1/32
+	!
+    }
+    canvas c1
+    iconcoords {450.0 150.0}
+    labelcoords {450.0 190.0}
+    interface-peer {eth0 n6}
+}
+
+node n2 {
+    type router
+    model mdr
+    network-config {
+	hostname UE1
+	!
+	interface eth0
+	 ip address 10.0.0.2/32
+	!
+    }
+    canvas c1
+    iconcoords {100.0 250.0}
+    labelcoords {100.0 290.0}
+    interface-peer {eth0 n6}
+}
+
+node n3 {
+    type router
+    model mdr
+    network-config {
+	hostname UE2
+	!
+	interface eth0
+	 ip address 10.0.0.3/32
+	!
+    }
+    canvas c1
+    iconcoords {250.0 250.0}
+    labelcoords {250.0 290.0}
+    interface-peer {eth0 n6}
+}
+
+node n4 {
+    type router
+    model mdr
+    network-config {
+	hostname UE3
+	!
+	interface eth0
+	 ip address 10.0.0.4/32
+	!
+    }
+    canvas c1
+    iconcoords {400.0 250.0}
+    labelcoords {400.0 290.0}
+    interface-peer {eth0 n6}
+}
+
+node n5 {
+    type router
+    model mdr
+    network-config {
+	hostname UE4
+	!
+	interface eth0
+	 ip address 10.0.0.5/32
+	!
+    }
+    canvas c1
+    iconcoords {550.0 250.0}
+    labelcoords {550.0 290.0}
+    interface-peer {eth0 n6}
+}
+
+node n6 {
+    type wlan
+    network-config {
+	hostname PROXY
+	!
+	interface wireless
+	 ip address 10.0.0.0/32
+	!
+    }
+    canvas c1
+    iconcoords {300.0 150.0}
+    labelcoords {300.0 190.0}
+    interface-peer {e0 n1}
+    interface-peer {e1 n2}
+    interface-peer {e2 n3}
+    interface-peer {e3 n4}
+    interface-peer {e4 n5}
+}
+
+link l1 {
+    nodes {n6 n1}
+}
+
+link l2 {
+    nodes {n6 n2}
+}
+
+link l3 {
+    nodes {n6 n3}
+}
+
+link l4 {
+    nodes {n6 n4}
+}
+
+link l5 {
+    nodes {n6 n5}
+}
+
+canvas c1 {
+    name {Canvas1}
+}
+
+option global {
+    interface_names no
+    ip_addresses yes
+    ipv6_addresses no
+    node_labels yes
+    link_labels yes
+    show_api no
+    background_images no
+    annotations yes
+    grid yes
+    traffic_start 0
+}
+
+option session {
+}
+
