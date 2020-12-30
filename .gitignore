@@ -1,0 +1,30 @@
+# autotools
+Makefile.in
+*.o
+.dirstamp
+
+# object files/dependencies
+*.la
+*.lo
+*.o
+**/.deps
+**/.libs
+
+# python byte code
+*.pyc
+
+# deb
+.debbuild
+
+# man pages
+*.1
+
+#build output
+build/
+
+.vscode/
+
+*.log
+*~
+
+
