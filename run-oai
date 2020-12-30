@@ -1,0 +1,72 @@
+#!/bin/bash
+
+# Edit this file to enable these options
+use_strace=false
+use_valgrind=false
+
+emane_dir=$(dirname "$0")        # e.g., ~/emane
+
+cd "$emane_dir/../openairinterface5g" || exit
+source oaienv
+cd cmake_targets || exit
+
+# Enable extra run-time checking in malloc/free.  See malopt(3)
+export MALLOC_CHECK_=3
+
+case "${NODE_NUMBER?}" in
+    (1)
+        echo "Node $NODE_NUMBER: eNB"
+        cmd=(
+            # Keep the eNB on processor 1 (the second processor) by default
+            taskset --cpu-list 1
+
+            ./ran_build/build/lte-softmodem
+            -O ../ci-scripts/conf_files/rcc.band7.tm1.nfapi.conf
+            --noS1
+        )
+        ;;
+    (*)
+        echo "Node $NODE_NUMBER: UE"
+
+        # First processor (#0) is for emane.
+        # Second processor (#1) is for eNB.
+        # Remaining processors (#2-N) are for the UEs, one UE per processor or
+        # as best we can if there are more UEs than processors
+        num_cpus=$(grep -c ^processor /proc/cpuinfo)
+        cpu=$(( (NODE_NUMBER - 2) % (num_cpus - 2) + 2 ))
+        echo "Using CPU $cpu of $num_cpus for UE$((NODE_NUMBER - 1))"
+
+        cmd=(
+            taskset --cpu-list "$cpu"
+            ./ran_build/build/lte-uesoftmodem
+            -O ../ci-scripts/conf_files/ue.nfapi.conf
+            --L2-emul 5 --num-ues 1 --noS1 --nokrnmod 1
+        )
+        ;;
+esac
+
+if $use_strace; then
+    cmd=(
+        strace
+        -f                      # trace child processes
+        -o "strace-$NODE_NUMBER.out"
+        "${cmd[@]}"
+    )
+fi
+
+if $use_valgrind; then
+    cmd=(
+        valgrind
+        --trace-children=yes
+        --track-origins=yes
+        --log-file="valgrind-$NODE_NUMBER.out"
+        "${cmd[@]}"
+    )
+fi
+
+# In case we're running with gprof profiling enabled.
+# https://stackoverflow.com/questions/464116/any-way-to-specify-the-location-of-profile-data
+export GMON_OUT_PREFIX=gmon-$NODE_NUMBER.out
+
+set -x
+sudo -E "${cmd[@]}" "$@"
