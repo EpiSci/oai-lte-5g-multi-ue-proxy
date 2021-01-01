@@ -441,9 +441,6 @@ const char *hexdump(const void *data, size_t data_len, char *out, size_t out_len
     return out;
 }
 
-// TODO: What are we actually checking here?
-// And what does the return value mean?
-// Consider renaming this function to make these things clearer.
 int checkMsgType(nfapi_message_id_e header)
 {
     switch (header)

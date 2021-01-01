@@ -40,7 +40,7 @@ case "${NODE_NUMBER?}" in
             taskset --cpu-list "$cpu"
             ./ran_build/build/lte-uesoftmodem
             -O ../ci-scripts/conf_files/ue.nfapi.conf
-            --L2-emul 5 --num-ues 1 --noS1 --nokrnmod 1
+            --L2-emul 5 --num-ues 1 --noS1 --nokrnmod 1 --node-number "$NODE_NUMBER"
         )
         ;;
 esac
