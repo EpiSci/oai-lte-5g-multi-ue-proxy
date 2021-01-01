@@ -147,6 +147,11 @@ uint16_t nfapi_get_sfnsf(const void *msg, size_t length);
 
 #ifdef __cplusplus
 }
+#endif
+
+
+/*
+#ifdef __cplusplus
 
 #include <string>
 
@@ -169,3 +174,4 @@ inline std::string hexdumpP7(const void *data, size_t data_len)
 }
 
 #endif // __cplusplus
+*/

@@ -1,0 +1,109 @@
+#!/bin/bash
+#
+# Run the proxy test script for a scenario of a specifed number of UEs.
+# See `--help` for more information.
+#
+
+this_script=${0##*/}
+
+this_dir=$(dirname "$0")
+proxy_testscript=$this_dir/proxy_testscript.py
+
+validate=true
+num_runs=1
+log_dir=$HOME
+
+while (( $# > 0 )) && [[ $1 = -* ]]; do
+    arg=$1; shift
+    case "$arg" in
+        (--validate=*)
+            validate=${arg#*=}
+            ;;
+        (--log-dir=*)
+            log_dir=${arg#*=}
+            ;;
+        (--repeat=*)
+            num_runs=${arg#*=}
+            if ! (( num_runs > 0 )); then
+                echo >&2 "$this_script: invalid repeat count '$arg'"
+                exit 1
+            fi
+            ;;
+        (--help)
+            cat <<EOF
+Usage: $this_script [options] NUM-UES [proxy_testscript args]"
+
+NUM-UES           Number of UEs
+
+options:
+--repeat=N        Run the test this many times (default: 1)
+--log-dir=DIR     Where to store the logs.  Default is \$HOME
+--validate=CMD    Invoke CMD after each test iteration.  If CMD
+                  fails (e.g., exit 1), stop immediately
+
+See also: $proxy_testscript --help
+EOF
+            exit 0
+            ;;
+        (*)
+            echo >&2 "$this: unknown option '$arg', try --help"
+            exit 1
+            ;;
+    esac
+done
+
+if (( $# < 1 )); then
+    echo >&2 "$this_script: wrong usage, try --help"
+    exit 1
+fi
+num_ues=$1; shift
+
+if ! (( num_ues > 0 )); then
+    echo >&2 "$this_script: Invalid number of UEs '$num_ues'"
+    exit 1
+fi
+
+scenario=$this_dir/Core_PROXY_${num_ues}_UEs.imn
+if ! [ -e "$scenario" ]; then
+    echo >&2 "$this_script: No scenario for $num_ues UEs: $scenario"
+    echo >&2 "$this_script: To create it: $this_dir/generate-imn.py $num_ues >$scenario"
+    exit 1
+fi
+
+log_base=$log_dir/logs-$(date +%Y-%m-%d-%H%M%S)
+mkdir -p "$log_base" || exit
+echo "Logs: $log_base"
+ln -nsf "${log_base##*/}" "$log_dir/latest"
+
+num_pass=0
+num_fail=0
+for i in $(seq $num_runs); do
+    echo "------------------------- RUN $i of $num_runs -------------------------"
+
+    log_dir=$log_base/$(printf "%04d" $i)
+    mkdir "$log_dir" || exit
+
+    run_cmd=(
+        "$proxy_testscript"
+        --scenario="$scenario"
+        --log-dir="$log_dir"
+        "$@"
+    )
+
+    if "${run_cmd[@]}"; then
+        (( num_pass += 1 ))
+    else
+        (( num_fail += 1 ))
+    fi
+    echo "run: $i, pass: $num_pass, fail: $num_fail"
+
+    if ! $validate "$log_dir"; then
+        echo "*** Validation failed, stopping"
+        exit 1
+    fi
+done
+
+if (( num_fail != 0 )); then
+    exit 1
+fi
+exit 0

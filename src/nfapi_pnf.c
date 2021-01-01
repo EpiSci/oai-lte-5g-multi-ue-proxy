@@ -691,7 +691,7 @@ int start_request(nfapi_pnf_config_t *config, nfapi_pnf_phy_config_t *phy, nfapi
     dummy_tx_req.tx_request_body.number_of_pdus = 0;
     dummy_tx_req.tx_request_body.tl.tag = NFAPI_TX_REQUEST_BODY_TAG;
     dummy_subframe.dl_config_req = &dummy_dl_config_req;
-    dummy_subframe.tx_req = 0;//&dummy_tx_req;
+    dummy_subframe.tx_req = 0;
     dummy_subframe.ul_config_req = 0;
     dummy_subframe.hi_dci0_req = 0;
     dummy_subframe.lbt_dl_config_req = 0;
@@ -703,7 +703,7 @@ int start_request(nfapi_pnf_config_t *config, nfapi_pnf_phy_config_t *phy, nfapi
     {
         NFAPI_TRACE(NFAPI_TRACE_ERROR, "[PNF] pthread_create: %s\n", strerror(errno));
     }
-    if (pthread_setname_np(p7_thread, "emane:pnf-p7") != 0)
+    if (pthread_setname_np(p7_thread, "PNF_P7") != 0)
     {
         NFAPI_TRACE(NFAPI_TRACE_ERROR, "pthread_setname_np: %s\n", strerror(errno));
     }
@@ -1005,7 +1005,7 @@ void configure_nfapi_pnf(const char *vnf_ip_addr, int vnf_p5_port, const char *p
     {
         NFAPI_TRACE(NFAPI_TRACE_ERROR, "pthread_create: %s\n", strerror(errno));
     }
-    if (pthread_setname_np(pnf_start_pthread, "emane:nfapi-pnf") != 0)
+    if (pthread_setname_np(pnf_start_pthread, "NFAPI_PNF") != 0)
     {
         NFAPI_TRACE(NFAPI_TRACE_ERROR, "pthread_setname_np: %s\n", strerror(errno));
     }
@@ -2077,7 +2077,7 @@ void oai_subframe_handle_msg_from_ue(const void *msg, size_t len, uint16_t nem_i
         return;
     }
     uint16_t sfn_sf = nfapi_get_sfnsf(msg, len);
-    nfapi_info("(EMANE eNB) Adding %s uplink message to queue prior to sending to eNB. Frame: %d, Subframe: %d",
+    nfapi_info("(Proxy) Adding %s uplink message to queue prior to sending to eNB. Frame: %d, Subframe: %d",
                 nfapi_get_message_id(msg, len), NFAPI_SFNSF2SFN(sfn_sf), NFAPI_SFNSF2SF(sfn_sf));
 
     int i = (int)nem_id - MIN_UE_NEM_ID;
@@ -2128,7 +2128,7 @@ int oai_nfapi_harq_indication(nfapi_harq_indication_t *harq_ind)
     return retval;
 }
 
-int oai_nfapi_crc_indication(nfapi_crc_indication_t *crc_ind) // msg 3
+int oai_nfapi_crc_indication(nfapi_crc_indication_t *crc_ind)
 {
 
     crc_ind->header.phy_id = 1; // DJP HACK TODO FIXME - need to pass this around!!!!
@@ -2137,7 +2137,7 @@ int oai_nfapi_crc_indication(nfapi_crc_indication_t *crc_ind) // msg 3
     return nfapi_pnf_p7_crc_ind(p7_config_g, crc_ind);
 }
 
-int oai_nfapi_cqi_indication(nfapi_cqi_indication_t *ind) // maybe msg 3
+int oai_nfapi_cqi_indication(nfapi_cqi_indication_t *ind)
 {
     ind->header.phy_id = 1; // DJP HACK TODO FIXME - need to pass this around!!!!
     ind->header.message_id = NFAPI_RX_CQI_INDICATION;
@@ -2214,7 +2214,7 @@ int oai_nfapi_sr_indication(nfapi_sr_indication_t *ind)
     return retval;
 }
 
-//DUMMY Functions to help integrate into emane
+//DUMMY Functions to help integrate into proxy
 
 void handle_nfapi_dci_dl_pdu(PHY_VARS_eNB *eNB,
                              int frame,
