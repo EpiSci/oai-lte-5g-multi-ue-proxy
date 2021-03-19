@@ -68,5 +68,9 @@ fi
 # https://stackoverflow.com/questions/464116/any-way-to-specify-the-location-of-profile-data
 export GMON_OUT_PREFIX=gmon-$NODE_NUMBER.out
 
+# Enable core dumps.  You may want to set core_pattern:
+#  sudo sh -c 'echo /tmp/coredump-%P > /proc/sys/kernel/core_pattern'
+ulimit -c unlimited
+
 set -x
 sudo -E "${cmd[@]}" "$@"
