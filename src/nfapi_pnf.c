@@ -27,6 +27,11 @@ extern "C" {
 #include "nfapi.h"
 #include "queue.h"
 #include <inttypes.h>
+#include <assert.h>
+
+#ifdef NDEBUG
+#  warning assert is disabled
+#endif
 
 char uecap_xer_in;
 
@@ -642,7 +647,6 @@ nfapi_pnf_p7_subframe_buffer_t dummy_subframe;
 int start_request(nfapi_pnf_config_t *config, nfapi_pnf_phy_config_t *phy, nfapi_start_request_t *req)
 {
     printf("[PNF] Received NFAPI_START_REQ phy_id:%d\n", req->header.phy_id);
-    nfapi_set_trace_level(NFAPI_TRACE_INFO);
     epi_pnf_info *pnf = (epi_pnf_info *)(config->user_data);
     epi_phy_info *epi_phy_info = pnf->phys;
     nfapi_pnf_p7_config_t *p7_config = nfapi_pnf_p7_config_create();
@@ -659,7 +663,6 @@ int start_request(nfapi_pnf_config_t *config, nfapi_pnf_phy_config_t *phy, nfapi
     p7_config->free = &pnf_deallocate;
     p7_config->codec_config.allocate = &pnf_allocate;
     p7_config->codec_config.deallocate = &pnf_deallocate;
-    p7_config->trace = &epi_pnf_nfapi_trace;
     p7_config->dl_config_req = NULL;
     p7_config->hi_dci0_req = NULL;
     p7_config->tx_req = NULL;
@@ -691,7 +694,7 @@ int start_request(nfapi_pnf_config_t *config, nfapi_pnf_phy_config_t *phy, nfapi
     dummy_tx_req.tx_request_body.number_of_pdus = 0;
     dummy_tx_req.tx_request_body.tl.tag = NFAPI_TX_REQUEST_BODY_TAG;
     dummy_subframe.dl_config_req = &dummy_dl_config_req;
-    dummy_subframe.tx_req = 0;
+    dummy_subframe.tx_req = 0;//&dummy_tx_req;
     dummy_subframe.ul_config_req = 0;
     dummy_subframe.hi_dci0_req = 0;
     dummy_subframe.lbt_dl_config_req = 0;
@@ -997,7 +1000,6 @@ void configure_nfapi_pnf(const char *vnf_ip_addr, int vnf_p5_port, const char *p
     config->system_information_schedule_req = &system_information_schedule_request;
     config->system_information_req = &system_information_request;
     config->nmm_stop_req = &nmm_stop_request;
-    config->trace = &epi_pnf_nfapi_trace;
     config->user_data = &pnf;
     // To allow custom vendor extentions to be added to nfapi
     NFAPI_TRACE(NFAPI_TRACE_INFO, "[PNF] Creating PNF NFAPI start thread %s\n", __FUNCTION__);
@@ -1022,16 +1024,16 @@ void oai_subframe_ind(uint16_t sfn, uint16_t sf)
         {
             struct timespec ts;
             clock_gettime(CLOCK_MONOTONIC, &ts);
-            NFAPI_TRACE(NFAPI_TRACE_INFO, "[PNF] %s %d.%d (sfn:%u sf:%u) SFN/SF(TX):%u\n", __FUNCTION__, ts.tv_sec, ts.tv_nsec, sfn,
-                        sf, NFAPI_SFNSF2DEC(sfn_sf_tx));
+            NFAPI_TRACE(NFAPI_TRACE_INFO, "[PNF] %ld.%ld (sfn:%u sf:%u) SFN/SF(TX):%u\n",
+                        ts.tv_sec, ts.tv_nsec, sfn, sf, NFAPI_SFNSF2DEC(sfn_sf_tx));
         }
 
         int subframe_ret = nfapi_pnf_p7_subframe_ind(p7_config_g, p7_config_g->phy_id, sfn_sf_tx);
 
         if (subframe_ret)
         {
-            NFAPI_TRACE(NFAPI_TRACE_INFO, "[PNF] %s(frame:%u subframe:%u) SFN/SF(TX):%u - PROBLEM with pnf_p7_subframe_ind()\n",
-                        __FUNCTION__, sfn, sf, sfn_sf_tx, NFAPI_SFNSF2DEC(sfn_sf_tx));
+            NFAPI_TRACE(NFAPI_TRACE_INFO, "[PNF] (frame:%u subframe:%u) SFN/SF(TX):%u - PROBLEM with pnf_p7_subframe_ind()\n",
+                        sfn, sf, sfn_sf_tx);
         }
         else
         {
@@ -1060,6 +1062,7 @@ static uint16_t get_message_id(message_buffer_t *msg)
     uint16_t message_id = ~0;
     uint8_t *in = msg->data;
     uint8_t *end = msg->data + msg->length;
+    assert(end <= msg->data + sizeof(msg->data));
     pull16(&in, &phy_id, end);
     pull16(&in, &message_id, end);
     return message_id;
@@ -1069,13 +1072,14 @@ static bool get_sfnsf(message_buffer_t *msg, uint16_t *sfnsf)
 {
     uint8_t *in = msg->data;
     uint8_t *end = msg->data + msg->length;
+    assert(end <= msg->data + sizeof(msg->data));
 
     uint16_t phy_id;
     uint16_t message_id;
     if (!pull16(&in, &phy_id, end) ||
         !pull16(&in, &message_id, end))
     {
-        nfapi_error("could not retrieve message_id");
+        NFAPI_TRACE(NFAPI_TRACE_ERROR, "could not retrieve message_id");
         return false;
     }
 
@@ -1089,14 +1093,14 @@ static bool get_sfnsf(message_buffer_t *msg, uint16_t *sfnsf)
     case NFAPI_RX_SR_INDICATION:
         break;
     default:
-        nfapi_error("Message_id is unknown %u", message_id);
+        NFAPI_TRACE(NFAPI_TRACE_ERROR, "Message_id is unknown %u", message_id);
         return false;
     }
 
     in = msg->data + sizeof(nfapi_p7_message_header_t);
     if (!pull16(&in, sfnsf, end))
     {
-        nfapi_error("could not retrieve sfn_sf");
+        NFAPI_TRACE(NFAPI_TRACE_ERROR, "could not retrieve sfn_sf");
         return false;
     }
     return true;
@@ -1113,11 +1117,11 @@ static void warn_if_different(const char *label,
         agg_header->m_segment_sequence != ind_header->m_segment_sequence ||
         agg_sfn_sf != ind_sfn_sf)
     {
-        nfapi_logfile(label, "WARN", "mismatch phy_id %u,%u message_id %u,%u m_seg_sequence %u,%u sfn_sf %u,%u",
-                      agg_header->phy_id, ind_header->phy_id,
-                      agg_header->message_id, ind_header->message_id,
-                      agg_header->m_segment_sequence, ind_header->m_segment_sequence,
-                      agg_sfn_sf, ind_sfn_sf);
+        NFAPI_TRACE(NFAPI_TRACE_ERROR, "Mismatch phy_id %u,%u message_id %u,%u m_seg_sequence %u,%u sfn_sf %u,%u (%s)",
+                    agg_header->phy_id, ind_header->phy_id,
+                    agg_header->message_id, ind_header->message_id,
+                    agg_header->m_segment_sequence, ind_header->m_segment_sequence,
+                    agg_sfn_sf, ind_sfn_sf, label);
     }
 }
 
@@ -1163,10 +1167,11 @@ static void oai_subframe_aggregate_rach_ind(subframe_msgs_t *msgs)
     {
         message_buffer_t *msg = msgs->msgs[i];
         nfapi_rach_indication_t ind;
+        assert(msg->length <= sizeof(msg->data));
 
         if (nfapi_p7_message_unpack(msg->data, msg->length, &ind, sizeof(ind), NULL) < 0)
         {
-            nfapi_error("rach unpack failed");
+            NFAPI_TRACE(NFAPI_TRACE_ERROR, "rach unpack failed");
             continue;
         }
         ind.sfn_sf = sfn_sf_add(ind.sfn_sf, 5);
@@ -1215,9 +1220,10 @@ static void oai_subframe_aggregate_crc_ind(subframe_msgs_t *msgs)
     {
         nfapi_crc_indication_t ind;
         message_buffer_t *msg = msgs->msgs[n];
+        assert(msg->length <= sizeof(msg->data));
         if (nfapi_p7_message_unpack(msg->data, msg->length, &ind, sizeof(ind), NULL) < 0)
         {
-            nfapi_error("crc indication unpack failed, msg[%zu]", n);
+            NFAPI_TRACE(NFAPI_TRACE_ERROR, "crc indication unpack failed, msg[%zu]", n);
             free(agg.crc_indication_body.crc_pdu_list);
             return;
         }
@@ -1237,7 +1243,7 @@ static void oai_subframe_aggregate_crc_ind(subframe_msgs_t *msgs)
         {
             if (pduIndex == NFAPI_CRC_IND_MAX_PDU)
             {
-                nfapi_error("Too many PDUs to aggregate");
+                NFAPI_TRACE(NFAPI_TRACE_ERROR, "Too many PDUs to aggregate");
                 break;
             }
             agg.crc_indication_body.crc_pdu_list[pduIndex] = ind.crc_indication_body.crc_pdu_list[i];
@@ -1293,34 +1299,34 @@ static void oai_subframe_aggregate_crc_ind(subframe_msgs_t *msgs)
 
 // static void print_rx_ind(nfapi_rx_indication_t *p)
 // {
-//   nfapi_info("Printing RX_IND fields");
-//   nfapi_info("header.message_id: %u", p->header.message_id);
-//   nfapi_info("header.phy_id: %u", p->header.phy_id);
-//   nfapi_info("header.message_id: %u", p->header.message_id);
-//   nfapi_info("header.m_segment_sequence: %u", p->header.m_segment_sequence);
-//   nfapi_info("header.checksum: %u", p->header.checksum);
-//   nfapi_info("header.transmit_timestamp: %u", p->header.transmit_timestamp);
-//   nfapi_info("sfn_sf: %u", p->sfn_sf);
-//   nfapi_info("rx_indication_body.tl.tag: 0x%x", p->rx_indication_body.tl.tag);
-//   nfapi_info("rx_indication_body.tl.length: %u", p->rx_indication_body.tl.length);
-//   nfapi_info("rx_indication_body.number_of_pdus: %u", p->rx_indication_body.number_of_pdus);
+//   NFAPI_TRACE(NFAPI_TRACE_INFO, "Printing RX_IND fields");
+//   NFAPI_TRACE(NFAPI_TRACE_INFO, "header.message_id: %u", p->header.message_id);
+//   NFAPI_TRACE(NFAPI_TRACE_INFO, "header.phy_id: %u", p->header.phy_id);
+//   NFAPI_TRACE(NFAPI_TRACE_INFO, "header.message_id: %u", p->header.message_id);
+//   NFAPI_TRACE(NFAPI_TRACE_INFO, "header.m_segment_sequence: %u", p->header.m_segment_sequence);
+//   NFAPI_TRACE(NFAPI_TRACE_INFO, "header.checksum: %u", p->header.checksum);
+//   NFAPI_TRACE(NFAPI_TRACE_INFO, "header.transmit_timestamp: %u", p->header.transmit_timestamp);
+//   NFAPI_TRACE(NFAPI_TRACE_INFO, "sfn_sf: %u", p->sfn_sf);
+//   NFAPI_TRACE(NFAPI_TRACE_INFO, "rx_indication_body.tl.tag: 0x%x", p->rx_indication_body.tl.tag);
+//   NFAPI_TRACE(NFAPI_TRACE_INFO, "rx_indication_body.tl.length: %u", p->rx_indication_body.tl.length);
+//   NFAPI_TRACE(NFAPI_TRACE_INFO, "rx_indication_body.number_of_pdus: %u", p->rx_indication_body.number_of_pdus);
 
 //   nfapi_rx_indication_pdu_t *pdu = p->rx_indication_body.rx_pdu_list;
 //   for (int i = 0; i < p->rx_indication_body.number_of_pdus; i++)
 //   {
-//     nfapi_info("pdu %d nfapi_rx_ue_information.tl.tag: 0x%x", i, pdu->rx_ue_information.tl.tag);
-//     nfapi_info("pdu %d nfapi_rx_ue_information.tl.length: %u", i, pdu->rx_ue_information.tl.length);
-//     nfapi_info("pdu %d nfapi_rx_ue_information.handle: %u", i, pdu->rx_ue_information.handle);
-//     nfapi_info("pdu %d nfapi_rx_ue_information.rnti: %u", i, pdu->rx_ue_information.rnti);
-//     nfapi_info("pdu %d nfapi_rx_indication_rel8.tl.tag: 0x%x", i, pdu->rx_indication_rel8.tl.tag);
-//     nfapi_info("pdu %d nfapi_rx_indication_rel8.tl.length: %u", i, pdu->rx_indication_rel8.tl.length);
-//     nfapi_info("pdu %d nfapi_rx_indication_rel8.length: %u", i, pdu->rx_indication_rel8.length);
-//     nfapi_info("pdu %d nfapi_rx_indication_rel8.offset: %u", i, pdu->rx_indication_rel8.offset);
-//     nfapi_info("pdu %d nfapi_rx_indication_rel8.ul_cqi: %u", i, pdu->rx_indication_rel8.ul_cqi);
-//     nfapi_info("pdu %d nfapi_rx_indication_rel8.timing_advance: %u", i, pdu->rx_indication_rel8.timing_advance);
-//     nfapi_info("pdu %d nfapi_rx_indication_rel9.tl.tag: 0x%x", i, pdu->rx_indication_rel9.tl.tag);
-//     nfapi_info("pdu %d nfapi_rx_indication_rel9.tl.length: %u", i, pdu->rx_indication_rel9.tl.length);
-//     nfapi_info("pdu %d nfapi_rx_indication_rel9.timing_advance_r9: %u", i, pdu->rx_indication_rel9.timing_advance_r9);
+//     NFAPI_TRACE(NFAPI_TRACE_INFO, "pdu %d nfapi_rx_ue_information.tl.tag: 0x%x", i, pdu->rx_ue_information.tl.tag);
+//     NFAPI_TRACE(NFAPI_TRACE_INFO, "pdu %d nfapi_rx_ue_information.tl.length: %u", i, pdu->rx_ue_information.tl.length);
+//     NFAPI_TRACE(NFAPI_TRACE_INFO, "pdu %d nfapi_rx_ue_information.handle: %u", i, pdu->rx_ue_information.handle);
+//     NFAPI_TRACE(NFAPI_TRACE_INFO, "pdu %d nfapi_rx_ue_information.rnti: %u", i, pdu->rx_ue_information.rnti);
+//     NFAPI_TRACE(NFAPI_TRACE_INFO, "pdu %d nfapi_rx_indication_rel8.tl.tag: 0x%x", i, pdu->rx_indication_rel8.tl.tag);
+//     NFAPI_TRACE(NFAPI_TRACE_INFO, "pdu %d nfapi_rx_indication_rel8.tl.length: %u", i, pdu->rx_indication_rel8.tl.length);
+//     NFAPI_TRACE(NFAPI_TRACE_INFO, "pdu %d nfapi_rx_indication_rel8.length: %u", i, pdu->rx_indication_rel8.length);
+//     NFAPI_TRACE(NFAPI_TRACE_INFO, "pdu %d nfapi_rx_indication_rel8.offset: %u", i, pdu->rx_indication_rel8.offset);
+//     NFAPI_TRACE(NFAPI_TRACE_INFO, "pdu %d nfapi_rx_indication_rel8.ul_cqi: %u", i, pdu->rx_indication_rel8.ul_cqi);
+//     NFAPI_TRACE(NFAPI_TRACE_INFO, "pdu %d nfapi_rx_indication_rel8.timing_advance: %u", i, pdu->rx_indication_rel8.timing_advance);
+//     NFAPI_TRACE(NFAPI_TRACE_INFO, "pdu %d nfapi_rx_indication_rel9.tl.tag: 0x%x", i, pdu->rx_indication_rel9.tl.tag);
+//     NFAPI_TRACE(NFAPI_TRACE_INFO, "pdu %d nfapi_rx_indication_rel9.tl.length: %u", i, pdu->rx_indication_rel9.tl.length);
+//     NFAPI_TRACE(NFAPI_TRACE_INFO, "pdu %d nfapi_rx_indication_rel9.timing_advance_r9: %u", i, pdu->rx_indication_rel9.timing_advance_r9);
 //   }
 // }
 
@@ -1341,29 +1347,30 @@ static void oai_subframe_aggregate_rx_ind(subframe_msgs_t *msgs)
         message_buffer_t *first_msg = msgs->msgs[0];
         if (!get_sfnsf(first_msg, &sfn_sf_val))
         {
-            nfapi_error("Something went very wrong");
+            NFAPI_TRACE(NFAPI_TRACE_ERROR, "Something went very wrong");
             abort();
         }
-        nfapi_info("We are aggregating %zu rx_ind's for SFN.SF %u.%u "
-                   "trying to aggregate",
-                   msgs->num_msgs, sfn_sf_val >> 4,
-                   sfn_sf_val & 15);
+        NFAPI_TRACE(NFAPI_TRACE_INFO, "We are aggregating %zu rx_ind's for SFN.SF %u.%u "
+                    "trying to aggregate",
+                    msgs->num_msgs, sfn_sf_val >> 4,
+                    sfn_sf_val & 15);
     }
 
     for (size_t n = 0; n < msgs->num_msgs; ++n)
     {
         nfapi_rx_indication_t ind;
         message_buffer_t *msg = msgs->msgs[n];
+        assert(msg->length <= sizeof(msg->data));
         if (nfapi_p7_message_unpack(msg->data, msg->length, &ind, sizeof(ind), NULL) < 0)
         {
-            nfapi_error("rx indication unpack failed, msg[%zu]", n);
+            NFAPI_TRACE(NFAPI_TRACE_ERROR, "rx indication unpack failed, msg[%zu]", n);
             free(agg.rx_indication_body.rx_pdu_list);
             return;
         }
 
         if (ind.rx_indication_body.number_of_pdus == 0)
         {
-            nfapi_error("empty rx message");
+            NFAPI_TRACE(NFAPI_TRACE_ERROR, "empty rx message");
             abort();
         }
 
@@ -1380,7 +1387,7 @@ static void oai_subframe_aggregate_rx_ind(subframe_msgs_t *msgs)
         }
         if (found)
         {
-            nfapi_error("two rx for single UE rnti: %x", rnti);
+            NFAPI_TRACE(NFAPI_TRACE_ERROR, "two rx for single UE rnti: %x", rnti);
         }
 
         // Header, sfn_sf, and tl assumed to be same across msgs
@@ -1392,16 +1399,16 @@ static void oai_subframe_aggregate_rx_ind(subframe_msgs_t *msgs)
         agg.sfn_sf = ind.sfn_sf;
         assert(!ind.vendor_extension); // TODO ignoring vendor_extension for now
         agg.rx_indication_body.tl = ind.rx_indication_body.tl;
-        nfapi_info("agg.tl.tag: %x agg.tl.length: %d ind.tl.tag: %x ind.tl.length: %u",
-                agg.rx_indication_body.tl.tag,agg.rx_indication_body.tl.length,
-                ind.rx_indication_body.tl.tag, ind.rx_indication_body.tl.length);
+        NFAPI_TRACE(NFAPI_TRACE_INFO, "agg.tl.tag: %x agg.tl.length: %d ind.tl.tag: %x ind.tl.length: %u",
+                    agg.rx_indication_body.tl.tag,agg.rx_indication_body.tl.length,
+                    ind.rx_indication_body.tl.tag, ind.rx_indication_body.tl.length);
         agg.rx_indication_body.number_of_pdus += ind.rx_indication_body.number_of_pdus;
 
         for (size_t i = 0; i < ind.rx_indication_body.number_of_pdus; ++i)
         {
             if (pduIndex == NFAPI_RX_IND_MAX_PDU)
             {
-                nfapi_error("Too many PDUs to aggregate");
+                NFAPI_TRACE(NFAPI_TRACE_ERROR, "Too many PDUs to aggregate");
                 break;
             }
             agg.rx_indication_body.rx_pdu_list[pduIndex] = ind.rx_indication_body.rx_pdu_list[i];
@@ -1477,9 +1484,10 @@ static void oai_subframe_aggregate_cqi_ind(subframe_msgs_t *msgs)
     {
         nfapi_cqi_indication_t ind;
         message_buffer_t *msg = msgs->msgs[n];
+        assert(msg->length <= sizeof(msg->data));
         if (nfapi_p7_message_unpack(msg->data, msg->length, &ind, sizeof(ind), NULL) < 0)
         {
-            nfapi_error("cqi indication unpack failed, msg[%zu]", n);
+            NFAPI_TRACE(NFAPI_TRACE_ERROR, "cqi indication unpack failed, msg[%zu]", n);
             free(agg.cqi_indication_body.cqi_pdu_list);
             free(agg.cqi_indication_body.cqi_raw_pdu_list);
             return;
@@ -1487,7 +1495,7 @@ static void oai_subframe_aggregate_cqi_ind(subframe_msgs_t *msgs)
 
         if (ind.cqi_indication_body.number_of_cqis == 0)
         {
-            nfapi_error("empty cqi message");
+            NFAPI_TRACE(NFAPI_TRACE_ERROR, "empty cqi message");
             abort();
         }
 
@@ -1504,7 +1512,7 @@ static void oai_subframe_aggregate_cqi_ind(subframe_msgs_t *msgs)
         }
         if (found)
         {
-            nfapi_error("two cqis for single UE rnti: %x", rnti);
+            NFAPI_TRACE(NFAPI_TRACE_ERROR, "two cqis for single UE rnti: %x", rnti);
         }
 
         // Header, sfn_sf, and tl assumed to be same across msgs
@@ -1522,7 +1530,7 @@ static void oai_subframe_aggregate_cqi_ind(subframe_msgs_t *msgs)
         {
             if (pduIndex == NFAPI_CQI_IND_MAX_PDU)
             {
-                nfapi_error("Too many PDUs to aggregate");
+                NFAPI_TRACE(NFAPI_TRACE_ERROR, "Too many PDUs to aggregate");
                 break;
             }
 
@@ -1648,9 +1656,10 @@ static void oai_subframe_aggregate_harq_ind(subframe_msgs_t *msgs)
     {
         nfapi_harq_indication_t ind;
         message_buffer_t *msg = msgs->msgs[n];
+        assert(msg->length <= sizeof(msg->data));
         if (nfapi_p7_message_unpack(msg->data, msg->length, &ind, sizeof(ind), NULL) < 0)
         {
-            nfapi_error("harq indication unpack failed, msg[%zu]", n);
+            NFAPI_TRACE(NFAPI_TRACE_ERROR, "harq indication unpack failed, msg[%zu]", n);
             free(agg.harq_indication_body.harq_pdu_list);
             return;
         }
@@ -1670,7 +1679,7 @@ static void oai_subframe_aggregate_harq_ind(subframe_msgs_t *msgs)
         {
             if (pduIndex == NFAPI_HARQ_IND_MAX_PDU)
             {
-                nfapi_error("Too many PDUs to aggregate");
+                NFAPI_TRACE(NFAPI_TRACE_ERROR, "Too many PDUs to aggregate");
                 break;
             }
             agg.harq_indication_body.harq_pdu_list[pduIndex] = ind.harq_indication_body.harq_pdu_list[i];
@@ -1726,9 +1735,10 @@ static void oai_subframe_aggregate_sr_ind(subframe_msgs_t *msgs)
     {
         nfapi_sr_indication_t ind;
         message_buffer_t *msg = msgs->msgs[n];
+        assert(msg->length <= sizeof(msg->data));
         if (nfapi_p7_message_unpack(msg->data, msg->length, &ind, sizeof(ind), NULL) < 0)
         {
-            nfapi_error("sr indication unpack failed, msg[%zu]", n);
+            NFAPI_TRACE(NFAPI_TRACE_ERROR, "sr indication unpack failed, msg[%zu]", n);
             free(agg.sr_indication_body.sr_pdu_list);
             return;
         }
@@ -1748,7 +1758,7 @@ static void oai_subframe_aggregate_sr_ind(subframe_msgs_t *msgs)
         {
             if (pduIndex == NFAPI_SR_IND_MAX_PDU)
             {
-                nfapi_error("Too many PDUs to aggregate");
+                NFAPI_TRACE(NFAPI_TRACE_ERROR, "Too many PDUs to aggregate");
                 break;
             }
             agg.sr_indication_body.sr_pdu_list[pduIndex] = ind.sr_indication_body.sr_pdu_list[i];
@@ -1767,8 +1777,11 @@ static void oai_subframe_aggregate_sr_ind(subframe_msgs_t *msgs)
 
 static void oai_subframe_aggregate_message_id(uint16_t msg_id, subframe_msgs_t *msgs)
 {
+    assert(msgs->num_msgs > 0);
+    assert(msgs->msgs[0] != NULL);
+    assert(msgs->msgs[0]->length <= sizeof(msgs->msgs[0]->data));
     uint16_t sfn_sf = nfapi_get_sfnsf(msgs->msgs[0]->data, msgs->msgs[0]->length);
-    nfapi_info("(EMANE eNB) Aggregating collection of %s uplink messages prior to sending to eNB. Frame: %d, Subframe: %d",
+    NFAPI_TRACE(NFAPI_TRACE_INFO, "(eNB) Aggregating collection of %s uplink messages prior to sending to eNB. Frame: %d, Subframe: %d",
                 nfapi_get_message_id(msgs->msgs[0]->data, msgs->msgs[0]->length), NFAPI_SFNSF2SFN(sfn_sf), NFAPI_SFNSF2SF(sfn_sf));
     // Aggregate these messages and send the resulting message to the eNB
     switch (msg_id)
@@ -1828,7 +1841,7 @@ static void oai_subframe_aggregate_messages(subframe_msgs_t *subframe_msgs)
                     subframe_msgs[i].msgs[j] = NULL;
                     if (msgs_by_id.num_msgs == MAX_SUBFRAME_MSGS)
                     {
-                        nfapi_error("Too many msgs");
+                        NFAPI_TRACE(NFAPI_TRACE_ERROR, "Too many msgs");
                         msg->magic = 0;
                         free(msg);
                         continue;
@@ -1892,7 +1905,7 @@ uint16_t sfn_sf_add(uint16_t a, uint16_t add_val)
 //             uint16_t sfn_sf_j;
 //             if (!get_sfnsf(msg_j, &sfn_sf_j))
 //             {
-//                 nfapi_error("Something went horribly wrong in dequer");
+//                 NFAPI_TRACE(NFAPI_TRACE_ERROR, "Something went horribly wrong in dequer");
 //                 abort();
 //             }
 //             for (int k = j + 1; k < subframe_msgs[i].num_msgs; ++k)
@@ -1901,7 +1914,7 @@ uint16_t sfn_sf_add(uint16_t a, uint16_t add_val)
 //                 uint16_t sfn_sf_k;
 //                 if (!get_sfnsf(msg_k, &sfn_sf_k))
 //                 {
-//                     nfapi_error("Something went horribly wrong in dequer");
+//                     NFAPI_TRACE(NFAPI_TRACE_ERROR, "Something went horribly wrong in dequer");
 //                     abort();
 //                 }
 
@@ -1915,7 +1928,7 @@ uint16_t sfn_sf_add(uint16_t a, uint16_t add_val)
 //         if (is_mismatch)
 //         {
 //             total_mismatches += msg_mismatch_count;
-//             nfapi_error("UE's have mismatched sfn_sfs in their message buffers "
+//             NFAPI_TRACE(NFAPI_TRACE_ERROR, "UE's have mismatched sfn_sfs in their message buffers "
 //                         "msg_mismatch_count = %d , total mismatches = %d",
 //                         msg_mismatch_count,
 //                         total_mismatches);
@@ -1970,7 +1983,7 @@ bool dequeue_ue_msgs(subframe_msgs_t *subframe_msgs, uint16_t sfn_sf_tx)
             int sf_delta = get_sf_delta(sfn_sf_tx, msg_sfn_sf);
             if (sf_delta > 2)
             {
-                nfapi_error("sfn_sf not correct %u.%u - %u.%u = %d message id: %d", sfn_sf_tx >> 4,
+                NFAPI_TRACE(NFAPI_TRACE_ERROR, "sfn_sf not correct %u.%u - %u.%u = %d message id: %d", sfn_sf_tx >> 4,
                             sfn_sf_tx & 0XF, msg_sfn_sf >> 4, msg_sfn_sf & 0XF, sf_delta, get_message_id(msg));
                 msg->magic = 0;
                 free(msg);
@@ -1979,13 +1992,13 @@ bool dequeue_ue_msgs(subframe_msgs_t *subframe_msgs, uint16_t sfn_sf_tx)
             subframe_msgs_t *p = &subframe_msgs[i];
             if (p->num_msgs == MAX_SUBFRAME_MSGS)
             {
-                nfapi_error("Too many msgs from ue");
+                NFAPI_TRACE(NFAPI_TRACE_ERROR, "Too many msgs from ue");
                 msg->magic = 0;
                 free(msg);
                 continue;
             }
             p->msgs[p->num_msgs++] = msg;
-            nfapi_info("p->num_msgs = %zu", p->num_msgs);
+            NFAPI_TRACE(NFAPI_TRACE_INFO, "p->num_msgs = %zu", p->num_msgs);
         }
     }
 
@@ -1994,7 +2007,7 @@ bool dequeue_ue_msgs(subframe_msgs_t *subframe_msgs, uint16_t sfn_sf_tx)
 
 void add_sleep_time(uint64_t start, uint64_t poll, uint64_t send, uint64_t agg)
 {
-    nfapi_info("polling took %" PRIu64 "usec, subframe ind took %" PRIu64 "usec, aggreg took %" PRIu64 "usec",
+    NFAPI_TRACE(NFAPI_TRACE_INFO, "polling took %" PRIu64 "usec, subframe ind took %" PRIu64 "usec, aggreg took %" PRIu64 "usec",
                 poll - start,
                 send - poll,
                 agg - send);
@@ -2008,7 +2021,7 @@ void add_sleep_time(uint64_t start, uint64_t poll, uint64_t send, uint64_t agg)
     }
     else
     {
-        nfapi_info("Subframe loop took too long by %" PRIu64 "usec",
+        NFAPI_TRACE(NFAPI_TRACE_INFO, "Subframe loop took too long by %" PRIu64 "usec",
                     elapsed_usec - 1000);
     }
 }
@@ -2040,9 +2053,9 @@ void *oai_subframe_task(void *context)
 
         uint64_t iteration_start = clock_usec();
 
-        transfer_downstream_sfn_sf_to_emane(sfn_sf_tx); // send to oai UE
-        nfapi_info("Frame %u Subframe %u sent to OAI ue", sfn_sf_tx >> 4,
-                   sfn_sf_tx & 0XF);
+        transfer_downstream_sfn_sf_to_proxy(sfn_sf_tx); // send to oai UE
+        NFAPI_TRACE(NFAPI_TRACE_INFO, "Frame %u Subframe %u sent to OAI ue", sfn_sf_tx >> 4,
+                    sfn_sf_tx & 0XF);
 
         if (are_queues_empty)
         {
@@ -2077,13 +2090,13 @@ void oai_subframe_handle_msg_from_ue(const void *msg, size_t len, uint16_t nem_i
         return;
     }
     uint16_t sfn_sf = nfapi_get_sfnsf(msg, len);
-    nfapi_info("(Proxy) Adding %s uplink message to queue prior to sending to eNB. Frame: %d, Subframe: %d",
+    NFAPI_TRACE(NFAPI_TRACE_INFO, "(eNB) Adding %s uplink message to queue prior to sending to eNB. Frame: %d, Subframe: %d",
                 nfapi_get_message_id(msg, len), NFAPI_SFNSF2SFN(sfn_sf), NFAPI_SFNSF2SF(sfn_sf));
 
     int i = (int)nem_id - MIN_UE_NEM_ID;
     if (i < 0 || i >= num_ues)
     {
-        nfapi_error("nem_id out of range: %d", nem_id);
+        NFAPI_TRACE(NFAPI_TRACE_ERROR, "nem_id out of range: %d", nem_id);
         return;
     }
 
@@ -2091,6 +2104,7 @@ void oai_subframe_handle_msg_from_ue(const void *msg, size_t len, uint16_t nem_i
     assert(p != NULL);
     p->magic = MESSAGE_BUFFER_MAGIC;
     p->length = len;
+    assert(len < sizeof(p->data));
     memcpy(p->data, msg, len);
 
     if (!put_queue(&msgs_from_ue[i], p))
@@ -2105,7 +2119,7 @@ int oai_nfapi_rach_ind(nfapi_rach_indication_t *rach_ind)
 
     rach_ind->header.phy_id = 1; // DJP HACK TODO FIXME - need to pass this around!!!!
 
-    nfapi_info("Sent the rach to eNB sf: %u sfn : %u num of preambles: %u",
+    NFAPI_TRACE(NFAPI_TRACE_INFO, "Sent the rach to eNB sf: %u sfn : %u num of preambles: %u",
                rach_ind->sfn_sf & 0xF, rach_ind->sfn_sf >> 4, rach_ind->rach_indication_body.number_of_preambles);
 
     return nfapi_pnf_p7_rach_ind(p7_config_g, rach_ind);
@@ -2115,20 +2129,21 @@ int oai_nfapi_harq_indication(nfapi_harq_indication_t *harq_ind)
 {
     harq_ind->header.phy_id = 1; // DJP HACK TODO FIXME - need to pass this around!!!!
     harq_ind->header.message_id = NFAPI_HARQ_INDICATION;
-    nfapi_info("sfn_sf:%d number_of_harqs:%d\n", NFAPI_SFNSF2DEC(harq_ind->sfn_sf),
+    NFAPI_TRACE(NFAPI_TRACE_INFO, "sfn_sf:%d number_of_harqs:%d\n", NFAPI_SFNSF2DEC(harq_ind->sfn_sf),
                harq_ind->harq_indication_body.number_of_harqs);
     int retval = nfapi_pnf_p7_harq_ind(p7_config_g, harq_ind);
 
     if (retval != 0)
     {
-        nfapi_error("sfn_sf:%d number_of_harqs:%d nfapi_pnf_p7_harq_ind()=%d\n", NFAPI_SFNSF2DEC(harq_ind->sfn_sf),
+        NFAPI_TRACE(NFAPI_TRACE_ERROR, "sfn_sf:%d number_of_harqs:%d nfapi_pnf_p7_harq_ind()=%d\n",
+                    NFAPI_SFNSF2DEC(harq_ind->sfn_sf),
                     harq_ind->harq_indication_body.number_of_harqs, retval);
     }
 
     return retval;
 }
 
-int oai_nfapi_crc_indication(nfapi_crc_indication_t *crc_ind)
+int oai_nfapi_crc_indication(nfapi_crc_indication_t *crc_ind) // msg 3
 {
 
     crc_ind->header.phy_id = 1; // DJP HACK TODO FIXME - need to pass this around!!!!
@@ -2137,7 +2152,7 @@ int oai_nfapi_crc_indication(nfapi_crc_indication_t *crc_ind)
     return nfapi_pnf_p7_crc_ind(p7_config_g, crc_ind);
 }
 
-int oai_nfapi_cqi_indication(nfapi_cqi_indication_t *ind)
+int oai_nfapi_cqi_indication(nfapi_cqi_indication_t *ind) // maybe msg 3
 {
     ind->header.phy_id = 1; // DJP HACK TODO FIXME - need to pass this around!!!!
     ind->header.message_id = NFAPI_RX_CQI_INDICATION;
@@ -2151,7 +2166,7 @@ int oai_nfapi_cqi_indication(nfapi_cqi_indication_t *ind)
             int rnti_j = ind->cqi_indication_body.cqi_pdu_list[j].rx_ue_information.rnti;
             if (rnti_i == rnti_j)
             {
-                nfapi_error("two cqis for single UE");
+                NFAPI_TRACE(NFAPI_TRACE_ERROR, "two cqis for single UE");
             }
         }
     }
@@ -2166,14 +2181,13 @@ int oai_nfapi_rx_ind(nfapi_rx_indication_t *ind) // msg 3
     ind->header.message_id = NFAPI_RX_ULSCH_INDICATION;
 
     // pack and unpack test of aggregated packets
-    char foo[1024];
-    char buffer[1024];
+    char buffer[8192];
     int encoded_size = nfapi_p7_message_pack(ind, buffer, sizeof(buffer), NULL);
-    nfapi_error("C. %s", hexdump(buffer, encoded_size, foo, sizeof(foo)));
     if (encoded_size <= 0)
     {
-        nfapi_error("Failed to pack aggregated RX_IND for SFN.SF %u.%u",
+        NFAPI_TRACE(NFAPI_TRACE_ERROR, "Failed to pack aggregated RX_IND for SFN.SF %u.%u",
                     ind->sfn_sf >> 4, ind->sfn_sf & 15);
+        return -1;
     }
 
     nfapi_rx_indication_t test_ind;
@@ -2181,11 +2195,17 @@ int oai_nfapi_rx_ind(nfapi_rx_indication_t *ind) // msg 3
 
     if (nfapi_p7_message_unpack(buffer, encoded_size, &test_ind, sizeof(test_ind), NULL) != 0)
     {
-        nfapi_error("Failed to unpack aggregated RX_IND for SFN.SF %u.%u",
+        NFAPI_TRACE(NFAPI_TRACE_ERROR, "Failed to unpack aggregated RX_IND for SFN.SF %u.%u",
                     ind->sfn_sf >> 4, ind->sfn_sf & 15);
+        return -1;
     }
 
-    int retval = nfapi_pnf_p7_rx_ind(p7_config_g, ind);
+    if (nfapi_pnf_p7_rx_ind(p7_config_g, ind) != 0)
+    {
+        NFAPI_TRACE(NFAPI_TRACE_ERROR, "Failed to send the RX_IND for SFN.SF %u.%u",
+                    ind->sfn_sf >> 4, ind->sfn_sf & 15);
+        return -1;
+    }
 
     uint16_t num_rx = ind->rx_indication_body.number_of_pdus;
     for (int i = 0; i < num_rx; ++i)
@@ -2196,14 +2216,13 @@ int oai_nfapi_rx_ind(nfapi_rx_indication_t *ind) // msg 3
             int rnti_j = ind->rx_indication_body.rx_pdu_list[j].rx_ue_information.rnti;
             if (rnti_i == rnti_j)
             {
-                nfapi_error("two rx for a single UE rnti: %x", rnti_i);
+                NFAPI_TRACE(NFAPI_TRACE_ERROR, "two rx for a single UE rnti: %x", rnti_i);
             }
         }
-        nfapi_info("rel8 tag[%d]: %x length %u", i, ind->rx_indication_body.rx_pdu_list[i].rx_indication_rel8.tl.tag,
-                   ind->rx_indication_body.rx_pdu_list[i].rx_indication_rel8.length);
+        NFAPI_TRACE(NFAPI_TRACE_INFO, "rel8 tag[%d]: %x length %u", i, ind->rx_indication_body.rx_pdu_list[i].rx_indication_rel8.tl.tag,
+                    ind->rx_indication_body.rx_pdu_list[i].rx_indication_rel8.length);
     }
-
-    return retval;
+    return 0;
 }
 
 int oai_nfapi_sr_indication(nfapi_sr_indication_t *ind)
@@ -2227,7 +2246,7 @@ void handle_nfapi_dci_dl_pdu(PHY_VARS_eNB *eNB,
     (void)subframe;
     (void)proc;
     (void)dl_config_pdu;
-    nfapi_info("TODO implement me");
+    NFAPI_TRACE(NFAPI_TRACE_ERROR, "TODO implement me");
 }
 
 void handle_nfapi_ul_pdu(PHY_VARS_eNB *eNB,
@@ -2243,7 +2262,7 @@ void handle_nfapi_ul_pdu(PHY_VARS_eNB *eNB,
     (void)frame;
     (void)subframe;
     (void)srs_present;
-    nfapi_info("TODO implement me");
+    NFAPI_TRACE(NFAPI_TRACE_ERROR, "TODO implement me");
 }
 
 void handle_nfapi_dlsch_pdu(PHY_VARS_eNB *eNB,
@@ -2261,7 +2280,7 @@ void handle_nfapi_dlsch_pdu(PHY_VARS_eNB *eNB,
     (void)dl_config_pdu;
     (void)codeword_index;
     (void)sdu;
-    nfapi_info("TODO implement me");
+    NFAPI_TRACE(NFAPI_TRACE_ERROR, "TODO implement me");
 }
 
 void handle_nfapi_hi_dci0_dci_pdu(
@@ -2276,7 +2295,7 @@ void handle_nfapi_hi_dci0_dci_pdu(
     (void)subframe;
     (void)proc;
     (void)hi_dci0_config_pdu;
-    nfapi_info("TODO implement me");
+    NFAPI_TRACE(NFAPI_TRACE_ERROR, "TODO implement me");
 }
 
 void handle_nfapi_bch_pdu(PHY_VARS_eNB *eNB,
@@ -2288,7 +2307,7 @@ void handle_nfapi_bch_pdu(PHY_VARS_eNB *eNB,
     (void)proc;
     (void)dl_config_pdu;
     (void)sdu;
-    nfapi_info("TODO implement me");
+    NFAPI_TRACE(NFAPI_TRACE_ERROR, "TODO implement me");
 }
 
 #ifdef __cplusplus

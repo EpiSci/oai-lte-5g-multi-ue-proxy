@@ -4,10 +4,10 @@
 
 #ifdef UNITTEST
 #include <stdio.h>
-#define LOG_ERROR(MSG) printf(MSG "\n")
+#define LOG_ERROR(MSG) printf("%s: %s\n", __func__, MSG)
 #else
-#include "nfapiutils.h"
-#define LOG_ERROR nfapi_error
+#include "debug.h"
+#define LOG_ERROR(MSG) NFAPI_TRACE(NFAPI_TRACE_ERROR, "%s\n", MSG)
 #endif
 
 void init_queue(queue_t *q)
@@ -21,14 +21,14 @@ bool put_queue(queue_t *q, void *item)
     assert(item != NULL);
     if (pthread_mutex_lock(&q->mutex) != 0)
     {
-        LOG_ERROR("put_queue: mutex_lock failed");
+        LOG_ERROR("mutex_lock failed");
         return false;
     }
 
     bool queued;
     if (q->num_items >= MAX_QUEUE_SIZE)
     {
-        LOG_ERROR("put_queue: queue is full");
+        LOG_ERROR("queue is full");
         queued = false;
     }
     else
@@ -49,7 +49,7 @@ void *get_queue(queue_t *q)
     void *item = NULL;
     if (pthread_mutex_lock(&q->mutex) != 0)
     {
-        LOG_ERROR("get_queue: mutex_lock failed");
+        LOG_ERROR("mutex_lock failed");
         return NULL;
     }
 
@@ -71,14 +71,14 @@ bool requeue(queue_t *q, void *item)
     assert(item != NULL);
     if (pthread_mutex_lock(&q->mutex) != 0)
     {
-        LOG_ERROR("requeue: mutex_lock failed");
+        LOG_ERROR("mutex_lock failed");
         return false;
     }
 
     bool queued;
     if (q->num_items >= MAX_QUEUE_SIZE)
     {
-        LOG_ERROR("requeue: queue is full");
+        LOG_ERROR("queue is full");
         queued = false;
     }
     else
@@ -98,7 +98,7 @@ void *unqueue(queue_t *q)
 {
     void *item = NULL;
     if (pthread_mutex_lock(&q->mutex) != 0) {
-        LOG_ERROR("unqueue: mutex_lock failed");
+        LOG_ERROR("mutex_lock failed");
         return NULL;
     }
 
@@ -117,7 +117,7 @@ void *unqueue_matching(queue_t *q, size_t max_depth, queue_matcher_t *matcher, v
 {
     if (pthread_mutex_lock(&q->mutex) != 0)
     {
-        LOG_ERROR("unqueue_matching: mutex_lock failed");
+        LOG_ERROR("mutex_lock failed");
         return NULL;
     }
 

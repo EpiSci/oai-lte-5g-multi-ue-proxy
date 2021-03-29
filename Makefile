@@ -1,6 +1,6 @@
 
 CC = gcc
-CFLAGS = -g -O2
+CFLAGS = -g -O2 -Wall -Werror
 CXX = g++ -std=c++11
 CXXFLAGS = -g -O3 -Wall -Wextra -Werror
 

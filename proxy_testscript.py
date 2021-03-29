@@ -74,6 +74,9 @@ def redirect_output(cmd, filename):
     return cmd
 
 def compress(from_name, to_name=None, remove_original=False):
+    if not os.path.exists(from_name):
+        LOGGER.warning('No file: %s', from_name)
+        return
     if to_name is None:
         to_name = from_name
     if not to_name.endswith('.bz2'):
@@ -380,10 +383,10 @@ def get_analysis_messages(filename):
     with bz2.open(filename, 'rt') as filehandler:
         for line in filehandler:
             # Log messages have a header like the following:
-            # '4789629.289157 [MAC] A Message...'
+            # '4789629.289157 00018198 [MAC] A Message...'
             # The 'A' indicates this is a LOG_A message intended for automated analysis.
-            fields = line.split(maxsplit=3)
-            if len(fields) == 4 and fields[2] == 'A':
+            fields = line.split(maxsplit=4)
+            if len(fields) == 5 and fields[3] == 'A':
                 yield line
 
 def main():

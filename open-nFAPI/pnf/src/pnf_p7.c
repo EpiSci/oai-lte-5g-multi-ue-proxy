@@ -444,7 +444,7 @@ int pnf_p7_pack_and_send_p7_message(pnf_p7_t* pnf_p7, nfapi_p7_message_header_t*
 	// Need to guard against different threads calling the encode function at the same time
 	if(pthread_mutex_lock(&(pnf_p7->pack_mutex)) != 0)
 	{
-		NFAPI_TRACE(NFAPI_TRACE_INFO, "failed to lock mutex\n");
+		NFAPI_TRACE(NFAPI_TRACE_ERROR, "failed to lock mutex\n");
 		return -1;
 	}
 
@@ -454,7 +454,7 @@ int pnf_p7_pack_and_send_p7_message(pnf_p7_t* pnf_p7, nfapi_p7_message_header_t*
 	{
 		if(pthread_mutex_unlock(&(pnf_p7->pack_mutex)) != 0)
 		{
-			NFAPI_TRACE(NFAPI_TRACE_INFO, "failed to unlock mutex\n");
+			NFAPI_TRACE(NFAPI_TRACE_ERROR, "failed to unlock mutex\n");
 			return -1;
 		}
 		
@@ -520,7 +520,7 @@ int pnf_p7_pack_and_send_p7_message(pnf_p7_t* pnf_p7, nfapi_p7_message_header_t*
 	
 	if(pthread_mutex_unlock(&(pnf_p7->pack_mutex)) != 0)
 	{
-		NFAPI_TRACE(NFAPI_TRACE_INFO, "failed to unlock mutex\n");
+		NFAPI_TRACE(NFAPI_TRACE_ERROR, "failed to unlock mutex\n");
 		return -1;
 	}
 
@@ -612,7 +612,7 @@ int pnf_p7_subframe_ind(pnf_p7_t* pnf_p7, uint16_t phy_id, uint16_t sfn_sf)
 	// todo : consider a more efficent lock mechasium
 	if(pthread_mutex_lock(&(pnf_p7->mutex)) != 0)
 	{
-		NFAPI_TRACE(NFAPI_TRACE_INFO, "failed to lock mutex\n");
+		NFAPI_TRACE(NFAPI_TRACE_ERROR, "failed to lock mutex\n");
 		return -1;
 	}
 
@@ -702,8 +702,8 @@ int pnf_p7_subframe_ind(pnf_p7_t* pnf_p7, uint16_t phy_id, uint16_t sfn_sf)
 				{
 					if (tx_subframe_buffer->dl_config_req->dl_config_request_body.number_pdu > 0)
 					{
-						nfapi_debug("dl_config_req before sending to downstream Frame: %d Subframe: %d",
-							tx_subframe_buffer->dl_config_req->sfn_sf >> 4, tx_subframe_buffer->dl_config_req->sfn_sf);
+						NFAPI_TRACE(NFAPI_TRACE_DEBUG, "dl_config_req before sending to downstream Frame: %d Subframe: %d",
+                                                            tx_subframe_buffer->dl_config_req->sfn_sf >> 4, tx_subframe_buffer->dl_config_req->sfn_sf);
 					}
 					(pnf_p7->_public.dl_config_req)(&(pnf_p7->_public), tx_subframe_buffer->dl_config_req);
 				}
@@ -874,10 +874,10 @@ int pnf_p7_subframe_ind(pnf_p7_t* pnf_p7, uint16_t phy_id, uint16_t sfn_sf)
 	{
 
 		NFAPI_TRACE(NFAPI_TRACE_INFO, "[PNF P7:%d] (ONTIME/LATE) DL:(%d/%d) UL:(%d/%d) HI:(%d/%d) TX:(%d/%d)\n", pnf_p7->_public.phy_id,
-					pnf_p7->stats.dl_conf_ontime, pnf_p7->stats.dl_conf_late, 
-					pnf_p7->stats.ul_conf_ontime, pnf_p7->stats.ul_conf_late, 
-					pnf_p7->stats.hi_dci0_ontime, pnf_p7->stats.hi_dci0_late, 
-					pnf_p7->stats.tx_ontime, pnf_p7->stats.tx_late);
+                            pnf_p7->stats.dl_conf_ontime, pnf_p7->stats.dl_conf_late,
+                            pnf_p7->stats.ul_conf_ontime, pnf_p7->stats.ul_conf_late,
+                            pnf_p7->stats.hi_dci0_ontime, pnf_p7->stats.hi_dci0_late,
+                            pnf_p7->stats.tx_ontime, pnf_p7->stats.tx_late);
 		pnf_p7->tick = 0;
 		memset(&pnf_p7->stats, 0, sizeof(pnf_p7->stats));
 	}
@@ -886,7 +886,7 @@ int pnf_p7_subframe_ind(pnf_p7_t* pnf_p7, uint16_t phy_id, uint16_t sfn_sf)
 
 	if(pthread_mutex_unlock(&(pnf_p7->mutex)) != 0)
 	{
-		NFAPI_TRACE(NFAPI_TRACE_INFO, "failed to unlock mutex\n");
+		NFAPI_TRACE(NFAPI_TRACE_ERROR, "failed to unlock mutex\n");
 		return -1;
 	}
 
@@ -960,7 +960,7 @@ void pnf_handle_dl_config_request(void* pRecvMsg, int recvMsgLen, pnf_p7_t* pnf_
 
 	if(req == NULL)
 	{
-		NFAPI_TRACE(NFAPI_TRACE_INFO, "%s failed to alloced nfapi_dl_config_request structure\n");
+		NFAPI_TRACE(NFAPI_TRACE_ERROR, "failed to alloced nfapi_dl_config_request structure\n");
 		return;
 	}
 
@@ -970,12 +970,12 @@ void pnf_handle_dl_config_request(void* pRecvMsg, int recvMsgLen, pnf_p7_t* pnf_
 	{
 		if(pthread_mutex_lock(&(pnf_p7->mutex)) != 0)
 		{
-			NFAPI_TRACE(NFAPI_TRACE_INFO, "failed to lock mutex\n");
+			NFAPI_TRACE(NFAPI_TRACE_ERROR, "failed to lock mutex\n");
 			return;
 		}
 		// print dl_config_req and check timing
-		nfapi_info("dl_config_req after unpacking Frame: %d Subframe %d num_pdus: %u",
-			req->sfn_sf >> 4, req->sfn_sf & 15, req->dl_config_request_body.number_pdu);
+		NFAPI_TRACE(NFAPI_TRACE_INFO, "dl_config_req after unpacking Frame: %d Subframe %d num_pdus: %u",
+                            req->sfn_sf >> 4, req->sfn_sf & 15, req->dl_config_request_body.number_pdu);
 
                 if (
                     0 && 
@@ -1000,7 +1000,7 @@ void pnf_handle_dl_config_request(void* pRecvMsg, int recvMsgLen, pnf_p7_t* pnf_
                         struct timespec t;
                         clock_gettime(CLOCK_MONOTONIC, &t);
 
-                  NFAPI_TRACE(NFAPI_TRACE_INFO,"%s() %ld.%09ld POPULATE DL_CONFIG_REQ sfn_sf:%d buffer_index:%d\n", __FUNCTION__, t.tv_sec, t.tv_nsec, sfn_sf_dec, buffer_index);
+                        NFAPI_TRACE(NFAPI_TRACE_INFO,"%s() %ld.%09ld POPULATE DL_CONFIG_REQ sfn_sf:%d buffer_index:%d\n", __FUNCTION__, t.tv_sec, t.tv_nsec, sfn_sf_dec, buffer_index);
 
 			// if there is already an dl_config_req make sure we free it.
 			if(pnf_p7->subframe_buffer[buffer_index].dl_config_req != 0)
@@ -1013,7 +1013,7 @@ void pnf_handle_dl_config_request(void* pRecvMsg, int recvMsgLen, pnf_p7_t* pnf_
 			}
 
 			// saving dl_config_request in subframe buffer
-			transfer_downstream_nfapi_msg_to_emane((void *)req);
+			transfer_downstream_nfapi_msg_to_proxy((void *)req);
 			pnf_p7->subframe_buffer[buffer_index].sfn_sf = req->sfn_sf;
 			pnf_p7->subframe_buffer[buffer_index].dl_config_req = req;
 
@@ -1035,7 +1035,7 @@ void pnf_handle_dl_config_request(void* pRecvMsg, int recvMsgLen, pnf_p7_t* pnf_
 
 		if(pthread_mutex_unlock(&(pnf_p7->mutex)) != 0)
 		{
-			NFAPI_TRACE(NFAPI_TRACE_INFO, "failed to unlock mutex\n");
+			NFAPI_TRACE(NFAPI_TRACE_ERROR, "failed to unlock mutex\n");
 			return;
 		}
 	}
@@ -1054,7 +1054,7 @@ void pnf_handle_ul_config_request(void* pRecvMsg, int recvMsgLen, pnf_p7_t* pnf_
 
 	if(req == NULL)
 	{
-		NFAPI_TRACE(NFAPI_TRACE_INFO, "%s failed to alloced nfapi_ul_config_request structure\n");
+		NFAPI_TRACE(NFAPI_TRACE_ERROR, "failed to alloced nfapi_ul_config_request structure\n");
 		return;
 	}
 
@@ -1064,11 +1064,11 @@ void pnf_handle_ul_config_request(void* pRecvMsg, int recvMsgLen, pnf_p7_t* pnf_
 	{
 		if(pthread_mutex_lock(&(pnf_p7->mutex)) != 0)
 		{
-			NFAPI_TRACE(NFAPI_TRACE_INFO, "failed to lock mutex\n");
+			NFAPI_TRACE(NFAPI_TRACE_ERROR, "failed to lock mutex\n");
 			return;
 		}
-		nfapi_info("ul_config_req after unpacking Frame: %d Subframe %d num_pdus: %u",
-			req->sfn_sf >> 4, req->sfn_sf & 15, req->ul_config_request_body.number_of_pdus);
+		NFAPI_TRACE(NFAPI_TRACE_INFO, "ul_config_req after unpacking Frame: %d Subframe %d num_pdus: %u",
+                            req->sfn_sf >> 4, req->sfn_sf & 15, req->ul_config_request_body.number_of_pdus);
 
 		if(is_p7_request_in_window(req->sfn_sf, "ul_config_request", pnf_p7))
 		{
@@ -1088,7 +1088,7 @@ void pnf_handle_ul_config_request(void* pRecvMsg, int recvMsgLen, pnf_p7_t* pnf_
 
 				deallocate_nfapi_ul_config_request(pnf_p7->subframe_buffer[buffer_index].ul_config_req, pnf_p7);
 			}
-			transfer_downstream_nfapi_msg_to_emane((void *)req);
+			transfer_downstream_nfapi_msg_to_proxy((void *)req);
 			pnf_p7->subframe_buffer[buffer_index].sfn_sf = req->sfn_sf;
 			pnf_p7->subframe_buffer[buffer_index].ul_config_req = req;
 			
@@ -1109,7 +1109,7 @@ void pnf_handle_ul_config_request(void* pRecvMsg, int recvMsgLen, pnf_p7_t* pnf_
 
 		if(pthread_mutex_unlock(&(pnf_p7->mutex)) != 0)
 		{
-			NFAPI_TRACE(NFAPI_TRACE_INFO, "failed to unlock mutex\n");
+			NFAPI_TRACE(NFAPI_TRACE_ERROR, "failed to unlock mutex\n");
 			return;
 		}
 	}
@@ -1128,7 +1128,7 @@ void pnf_handle_hi_dci0_request(void* pRecvMsg, int recvMsgLen, pnf_p7_t* pnf_p7
 
 	if(req == NULL)
 	{
-		NFAPI_TRACE(NFAPI_TRACE_INFO, "%s failed to alloced nfapi_hi_dci0_request structure\n");
+		NFAPI_TRACE(NFAPI_TRACE_ERROR, "failed to alloced nfapi_hi_dci0_request structure\n");
 		return;
 	}
 
@@ -1138,7 +1138,7 @@ void pnf_handle_hi_dci0_request(void* pRecvMsg, int recvMsgLen, pnf_p7_t* pnf_p7
 	{
 		if(pthread_mutex_lock(&(pnf_p7->mutex)) != 0)
 		{
-			NFAPI_TRACE(NFAPI_TRACE_INFO, "failed to lock mutex\n");
+			NFAPI_TRACE(NFAPI_TRACE_ERROR, "failed to lock mutex\n");
 			return;
 		}
 
@@ -1155,7 +1155,7 @@ void pnf_handle_hi_dci0_request(void* pRecvMsg, int recvMsgLen, pnf_p7_t* pnf_p7
 
 				deallocate_nfapi_hi_dci0_request(pnf_p7->subframe_buffer[buffer_index].hi_dci0_req, pnf_p7);
 			}
-			transfer_downstream_nfapi_msg_to_emane((void *)req);
+			transfer_downstream_nfapi_msg_to_proxy((void *)req);
 			pnf_p7->subframe_buffer[buffer_index].sfn_sf = req->sfn_sf;
 			pnf_p7->subframe_buffer[buffer_index].hi_dci0_req = req;
 
@@ -1177,7 +1177,7 @@ void pnf_handle_hi_dci0_request(void* pRecvMsg, int recvMsgLen, pnf_p7_t* pnf_p7
 
 		if(pthread_mutex_unlock(&(pnf_p7->mutex)) != 0)
 		{
-			NFAPI_TRACE(NFAPI_TRACE_INFO, "failed to unlock mutex\n");
+			NFAPI_TRACE(NFAPI_TRACE_ERROR, "failed to unlock mutex\n");
 			return;
 		}
 	}
@@ -1196,7 +1196,7 @@ void pnf_handle_tx_request(void* pRecvMsg, int recvMsgLen, pnf_p7_t* pnf_p7)
 
 	if(req == NULL)
 	{
-		NFAPI_TRACE(NFAPI_TRACE_INFO, "%s failed to alloced nfapi_tx_request structure\n");
+		NFAPI_TRACE(NFAPI_TRACE_ERROR, "failed to alloced nfapi_tx_request structure\n");
 		return;
 	}
 
@@ -1205,7 +1205,7 @@ void pnf_handle_tx_request(void* pRecvMsg, int recvMsgLen, pnf_p7_t* pnf_p7)
 	{
 		if(pthread_mutex_lock(&(pnf_p7->mutex)) != 0)
 		{
-			NFAPI_TRACE(NFAPI_TRACE_INFO, "failed to lock mutex\n");
+			NFAPI_TRACE(NFAPI_TRACE_ERROR, "failed to lock mutex\n");
 			return;
 		}
 
@@ -1232,7 +1232,7 @@ void pnf_handle_tx_request(void* pRecvMsg, int recvMsgLen, pnf_p7_t* pnf_p7)
 
 				deallocate_nfapi_tx_request(pnf_p7->subframe_buffer[buffer_index].tx_req, pnf_p7);
 			}
-			transfer_downstream_nfapi_msg_to_emane((void *)req);
+			transfer_downstream_nfapi_msg_to_proxy((void *)req);
 			pnf_p7->subframe_buffer[buffer_index].sfn_sf = req->sfn_sf;
 			pnf_p7->subframe_buffer[buffer_index].tx_req = req;
 
@@ -1254,7 +1254,7 @@ void pnf_handle_tx_request(void* pRecvMsg, int recvMsgLen, pnf_p7_t* pnf_p7)
 
 		if(pthread_mutex_unlock(&(pnf_p7->mutex)) != 0)
 		{
-			NFAPI_TRACE(NFAPI_TRACE_INFO, "failed to unlock mutex\n");
+			NFAPI_TRACE(NFAPI_TRACE_ERROR, "failed to unlock mutex\n");
 			return;
 		}
 	}
@@ -1270,7 +1270,7 @@ void pnf_handle_lbt_dl_config_request(void* pRecvMsg, int recvMsgLen, pnf_p7_t* 
 
 	if(req == NULL)
 	{
-		NFAPI_TRACE(NFAPI_TRACE_INFO, "%s failed to alloced nfapi_lbt_dl_config_request structure\n");
+		NFAPI_TRACE(NFAPI_TRACE_ERROR, "failed to alloced nfapi_lbt_dl_config_request structure\n");
 		return;
 	}
 
@@ -1280,7 +1280,7 @@ void pnf_handle_lbt_dl_config_request(void* pRecvMsg, int recvMsgLen, pnf_p7_t* 
 	{
 		if(pthread_mutex_lock(&(pnf_p7->mutex)) != 0)
 		{
-			NFAPI_TRACE(NFAPI_TRACE_INFO, "failed to lock mutex\n");
+			NFAPI_TRACE(NFAPI_TRACE_ERROR, "failed to lock mutex\n");
 			return;
 		}
 
@@ -1313,7 +1313,7 @@ void pnf_handle_lbt_dl_config_request(void* pRecvMsg, int recvMsgLen, pnf_p7_t* 
 
 		if(pthread_mutex_unlock(&(pnf_p7->mutex)) != 0)
 		{
-			NFAPI_TRACE(NFAPI_TRACE_INFO, "failed to unlock mutex\n");
+			NFAPI_TRACE(NFAPI_TRACE_ERROR, "failed to unlock mutex\n");
 			return;
 		}
 	}
@@ -1333,7 +1333,7 @@ void pnf_handle_p7_vendor_extension(void* pRecvMsg, int recvMsgLen, pnf_p7_t* pn
 
 		if(msg == 0)
 		{
-			NFAPI_TRACE(NFAPI_TRACE_INFO, "%s failed to allocate vendor extention structure\n");
+			NFAPI_TRACE(NFAPI_TRACE_ERROR, "failed to allocate vendor extention structure\n");
 			return;
 		}
 
@@ -1357,7 +1357,7 @@ void pnf_handle_ue_release_request(void* pRecvMsg, int recvMsgLen, pnf_p7_t* pnf
     nfapi_ue_release_request_t* req = allocate_nfapi_ue_release_request(pnf_p7);
     if(req == NULL)
     {
-        NFAPI_TRACE(NFAPI_TRACE_ERROR, "%s failed to alloced nfapi_ue_release_request structure\n");
+        NFAPI_TRACE(NFAPI_TRACE_ERROR, "failed to alloced nfapi_ue_release_request structure\n");
         return;
     }
 
@@ -1482,7 +1482,7 @@ void pnf_handle_dl_node_sync(void *pRecvMsg, int recvMsgLen, pnf_p7_t* pnf_p7, u
 
 	if(pthread_mutex_lock(&(pnf_p7->mutex)) != 0)
 	{
-		NFAPI_TRACE(NFAPI_TRACE_INFO, "failed to lock mutex\n");
+		NFAPI_TRACE(NFAPI_TRACE_ERROR, "failed to lock mutex\n");
 		return;
 	}
 
@@ -1504,7 +1504,7 @@ void pnf_handle_dl_node_sync(void *pRecvMsg, int recvMsgLen, pnf_p7_t* pnf_p7, u
 
 	if(pthread_mutex_unlock(&(pnf_p7->mutex)) != 0)
 	{
-		NFAPI_TRACE(NFAPI_TRACE_INFO, "failed to unlock mutex\n");
+		NFAPI_TRACE(NFAPI_TRACE_ERROR, "failed to unlock mutex\n");
 		return;
 	}
 
@@ -1532,7 +1532,7 @@ void pnf_dispatch_p7_message(void *pRecvMsg, int recvMsgLen, pnf_p7_t* pnf_p7,  
 	// ensure the message is sensible
 	if (recvMsgLen < 8 || pRecvMsg == NULL)
 	{
-		NFAPI_TRACE(NFAPI_TRACE_WARN, "Invalid message size: %d, ignoring\n", recvMsgLen);
+		NFAPI_TRACE(NFAPI_TRACE_ERROR, "Invalid message size: %d, ignoring\n", recvMsgLen);
 		return;
 	}
 
@@ -1589,7 +1589,7 @@ void pnf_handle_p7_message(void *pRecvMsg, int recvMsgLen, pnf_p7_t* pnf_p7,  ui
 	// validate the input params
 	if(pRecvMsg == NULL || recvMsgLen < 4 || pnf_p7 == NULL)
 	{
-		NFAPI_TRACE(NFAPI_TRACE_ERROR, "pnf_handle_p7_message: invalid input params (%d %d %d)\n", pRecvMsg, recvMsgLen, pnf_p7);
+		NFAPI_TRACE(NFAPI_TRACE_ERROR, "invalid input params (%p %d %p)\n", pRecvMsg, recvMsgLen, pnf_p7);
 		return;
 	}
 
@@ -1620,7 +1620,7 @@ void pnf_handle_p7_message(void *pRecvMsg, int recvMsgLen, pnf_p7_t* pnf_p7,  ui
 		// ensure the message is sensible
 		if (recvMsgLen < 8 || pRecvMsg == NULL)
 		{
-			NFAPI_TRACE(NFAPI_TRACE_WARN, "Invalid message size: %d, ignoring\n", recvMsgLen);
+			NFAPI_TRACE(NFAPI_TRACE_ERROR, "Invalid message size: %d, ignoring\n", recvMsgLen);
 			return;
 		}
 
@@ -1714,12 +1714,19 @@ void pnf_nfapi_p7_read_dispatch_message(pnf_p7_t* pnf_p7, uint32_t now_hr_time)
 			}
 
 			// read the segment
-			recvfrom_result = recvfrom(pnf_p7->p7_sock, pnf_p7->rx_message_buffer, header.message_length, MSG_DONTWAIT, (struct sockaddr*)&remote_addr, &remote_addr_size);
+			recvfrom_result = recvfrom(pnf_p7->p7_sock, pnf_p7->rx_message_buffer, pnf_p7->rx_message_buffer_size,
+									   MSG_DONTWAIT | MSG_TRUNC, (struct sockaddr*)&remote_addr, &remote_addr_size);
 
 		now_hr_time = pnf_get_current_time_hr(); //DJP - moved to here - get closer timestamp???
 
 			if(recvfrom_result > 0)
 			{
+				if (recvfrom_result != header.message_length)
+				{
+					NFAPI_TRACE(NFAPI_TRACE_ERROR, "(%d) Received unexpected number of bytes. %d != %d",
+                                                    __LINE__, recvfrom_result, header.message_length);
+					break;
+				}
 				pnf_handle_p7_message(pnf_p7->rx_message_buffer, recvfrom_result, pnf_p7, now_hr_time);
 			}
 		}
@@ -1734,11 +1741,11 @@ void pnf_nfapi_p7_read_dispatch_message(pnf_p7_t* pnf_p7, uint32_t now_hr_time)
 			if(errno == EAGAIN || errno == EWOULDBLOCK)
 			{
 				// return to the select
-				//NFAPI_TRACE(NFAPI_TRACE_WARN, "%s recvfrom would block :%d\n", __FUNCTION__, errno);
+				//NFAPI_TRACE(NFAPI_TRACE_ERROR, "%s recvfrom would block :%d\n", __FUNCTION__, errno);
 			}
 			else
 			{
-				NFAPI_TRACE(NFAPI_TRACE_WARN, "%s recvfrom failed errno:%d\n", __FUNCTION__, errno);
+				NFAPI_TRACE(NFAPI_TRACE_ERROR, "%s recvfrom failed errno:%d\n", __FUNCTION__, errno);
 			}
 		}
 
@@ -1810,7 +1817,7 @@ int pnf_p7_message_pump(pnf_p7_t* pnf_p7)
 		//addr.sin_addr.s_addr = inet_addr(pnf_p7->_public.local_p7_addr);
 		if(inet_aton(pnf_p7->_public.local_p7_addr, &addr.sin_addr) == -1)
 		{
-			NFAPI_TRACE(NFAPI_TRACE_INFO, "inet_aton failed\n");
+			NFAPI_TRACE(NFAPI_TRACE_ERROR, "inet_aton failed\n");
 		}
 	}
 
@@ -1848,12 +1855,12 @@ int pnf_p7_message_pump(pnf_p7_t* pnf_p7)
 		else if (selectRetval == -1 && (errno == EINTR))
 		{
 			// interrupted by signal
-			NFAPI_TRACE(NFAPI_TRACE_WARN, "PNF P7 Signal Interrupt %d\n", errno);
+			NFAPI_TRACE(NFAPI_TRACE_ERROR, "PNF P7 signal interrupt %s\n", ERR);
 			continue;
 		}
 		else if (selectRetval == -1)
 		{
-			NFAPI_TRACE(NFAPI_TRACE_WARN, "PNF P7 select() failed\n");
+			NFAPI_TRACE(NFAPI_TRACE_ERROR, "PNF P7 select failed: %s\n", ERR);
 			sleep(1);
 			continue;
 		}

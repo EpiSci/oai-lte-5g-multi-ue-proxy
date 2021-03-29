@@ -81,14 +81,6 @@ typedef struct nfapi_pnf_config
 	 */
 	void (*free)(void* ptr);
 
-	/*! A user define callback to handle trace from the pnf 
-	 * \param level The trace level 
-	 * \param message The trace string
-	 * 
-	 * This is a vardic function.
-	 */
-	void (*trace)(nfapi_trace_level_t  level, const char* message, ...);
-
 	/*! The ip address of the VNF 
 	 *
 	 */
@@ -569,12 +561,6 @@ typedef struct nfapi_pnf_p7_config
 	 * If not set free will be used
 	 */
 	void (*free)(void* ptr);
-
-	/*! A user define callback to handle trace from the pnf
-	 * \param level The trace level
-	 * \param message The message string
-	 */
-	void (*trace)(nfapi_trace_level_t  level, const char* message, ...);
 
 	/*! The PHY id*/
 	uint16_t phy_id;

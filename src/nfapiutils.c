@@ -1,17 +1,18 @@
 #define _GNU_SOURCE
 
+#include <stdbool.h>
 #include <string.h>
 #include <sys/time.h>
 #include <time.h>
-#include "nfapiutils.h"
 #include <sched.h>
-
 #include <stdlib.h>
 #include <unistd.h>
 #include <execinfo.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#include "nfapiutils.h"
+#include "debug.h"
 
 const char *nfapi_get_message_id(const void *msg, size_t length)
 {
@@ -32,7 +33,7 @@ const char *nfapi_get_message_id(const void *msg, size_t length)
     case NFAPI_RX_SR_INDICATION: return "SR";
     case 0: return "Dummy";
     default:
-        nfapi_error("Message_id is unknown %u", message_id);
+        NFAPI_TRACE(NFAPI_TRACE_ERROR, "Message_id is unknown %u", message_id);
         return "Unknown";
     }
 }
@@ -47,7 +48,7 @@ uint16_t nfapi_get_sfnsf(const void *msg, size_t length)
     if (!pull16(&in, &phy_id, end) ||
         !pull16(&in, &message_id, end))
     {
-        nfapi_error("could not retrieve message_id");
+        NFAPI_TRACE(NFAPI_TRACE_ERROR, "could not retrieve message_id");
         return ~0;
     }
 
@@ -62,7 +63,7 @@ uint16_t nfapi_get_sfnsf(const void *msg, size_t length)
     case 0:
         break;
     default:
-        nfapi_error("Message_id is unknown %u", message_id);
+        NFAPI_TRACE(NFAPI_TRACE_ERROR, "Message_id is unknown %u", message_id);
         return ~0;
     }
 
@@ -70,7 +71,7 @@ uint16_t nfapi_get_sfnsf(const void *msg, size_t length)
     uint16_t sfn_sf;
     if (!pull16(&in, &sfn_sf, end))
     {
-        nfapi_error("could not retrieve sfn_sf");
+        NFAPI_TRACE(NFAPI_TRACE_ERROR, "could not retrieve sfn_sf");
         return ~0;
     }
     return sfn_sf;
@@ -86,7 +87,7 @@ pnf_config_phy_t *find_pnf_phy_config(pnf_config_t *config,
             return &config->phys[i];
         }
     }
-    nfapi_error("No pnf phy found - phy_id %d", phy_id);
+    NFAPI_TRACE(NFAPI_TRACE_ERROR, "No pnf phy found - phy_id %d", phy_id);
     return NULL;
 }
 
@@ -96,20 +97,20 @@ void log_scheduler(const char* label)
     struct sched_param param;
     if (sched_getparam(0, &param) == -1)
     {
-        nfapi_error("sched_getparam: %s", strerror(errno));
+        NFAPI_TRACE(NFAPI_TRACE_ERROR, "sched_getparam: %s", strerror(errno));
         abort();
     }
 
     cpu_set_t cpu_set;
     if (sched_getaffinity(0, sizeof(cpu_set), &cpu_set) == -1)
     {
-        nfapi_error("sched_getaffinity: %s", strerror(errno));
+        NFAPI_TRACE(NFAPI_TRACE_ERROR, "sched_getaffinity: %s", strerror(errno));
         abort();
     }
     int num_cpus = sysconf(_SC_NPROCESSORS_ONLN);
     if (num_cpus < 1)
     {
-        nfapi_error("sysconf(_SC_NPROCESSORS_ONLN): %s", strerror(errno));
+        NFAPI_TRACE(NFAPI_TRACE_ERROR, "sysconf(_SC_NPROCESSORS_ONLN): %s", strerror(errno));
         abort();
     }
     char buffer[num_cpus];
@@ -118,13 +119,13 @@ void log_scheduler(const char* label)
         buffer[i] = CPU_ISSET(i, &cpu_set) ? 'Y' : '-';
     }
 
-    nfapi_info("Scheduler policy=%d priority=%d affinity=[%d]%.*s label=%s",
-               policy,
-               param.sched_priority,
-               num_cpus,
-               num_cpus,
-               buffer,
-               label);
+    NFAPI_TRACE(NFAPI_TRACE_INFO, "Scheduler policy=%d priority=%d affinity=[%d]%.*s label=%s",
+                policy,
+                param.sched_priority,
+                num_cpus,
+                num_cpus,
+                buffer,
+                label);
 }
 
 int create_p5_listen_socket(pnf_config_t *config)
@@ -132,7 +133,7 @@ int create_p5_listen_socket(pnf_config_t *config)
     int sd = socket(AF_INET, SOCK_STREAM, IPPROTO_SCTP);
     if (sd == -1)
     {
-        nfapi_error("socket: %s", ERR);
+        NFAPI_TRACE(NFAPI_TRACE_ERROR, "socket: %s", ERR);
         abort();
     }
 
@@ -143,15 +144,15 @@ int create_p5_listen_socket(pnf_config_t *config)
     if (bind(sd, (struct sockaddr *)&config->p5_tx_sockaddr,
              sizeof(config->p5_tx_sockaddr)) < 0)
     {
-        nfapi_error("bind: %s", ERR);
+        NFAPI_TRACE(NFAPI_TRACE_ERROR, "bind: %s", ERR);
         close(sd);
         return -1;
     }
 
-    nfapi_info("Bind for %s %s:%d",
-               config->name,
-               inet_ntoa(config->p5_tx_sockaddr.sin_addr),
-               ntohs(config->p5_tx_sockaddr.sin_port));
+    NFAPI_TRACE(NFAPI_TRACE_INFO, "Bind for %s %s:%d",
+                config->name,
+                inet_ntoa(config->p5_tx_sockaddr.sin_addr),
+                ntohs(config->p5_tx_sockaddr.sin_port));
     return sd;
 }
 
@@ -160,52 +161,52 @@ void pnf_create_p5_sock(pnf_config_t *config)
     int sd = socket(AF_INET, SOCK_STREAM, IPPROTO_SCTP);
     if (sd == -1)
     {
-        nfapi_error("socket: %s", ERR);
+        NFAPI_TRACE(NFAPI_TRACE_ERROR, "socket: %s", ERR);
         abort();
     }
     config->p5_sock = sd;
     config->p5_tx_sockaddr.sin_family = AF_INET;
     config->p5_tx_sockaddr.sin_port = htons(config->vnf_p5_port);
     config->p5_tx_sockaddr.sin_addr.s_addr = inet_addr(config->vnf_p5_addr);
-    nfapi_info("Got socket for %s %s:%d",
-               config->name,
-               inet_ntoa(config->p5_tx_sockaddr.sin_addr),
-               ntohs(config->p5_tx_sockaddr.sin_port));
+    NFAPI_TRACE(NFAPI_TRACE_INFO, "Got socket for %s %s:%d",
+                config->name,
+                inet_ntoa(config->p5_tx_sockaddr.sin_addr),
+                ntohs(config->p5_tx_sockaddr.sin_port));
 }
 
 int pnf_p5_connect(pnf_config_t *config)
 {
-    nfapi_info("connect %d to %s:%d...",
-               config->p5_sock,
-               inet_ntoa(config->p5_tx_sockaddr.sin_addr),
-               ntohs(config->p5_tx_sockaddr.sin_port));
+    NFAPI_TRACE(NFAPI_TRACE_INFO, "connect %d to %s:%d...",
+                config->p5_sock,
+                inet_ntoa(config->p5_tx_sockaddr.sin_addr),
+                ntohs(config->p5_tx_sockaddr.sin_port));
     int sd = connect(config->p5_sock,
                      (struct sockaddr *)&config->p5_tx_sockaddr,
                      sizeof(config->p5_tx_sockaddr));
     if (sd == -1)
     {
-        nfapi_error("connect: %s", ERR);
+        NFAPI_TRACE(NFAPI_TRACE_ERROR, "connect: %s", ERR);
         return -1;
     }
-    nfapi_info("connect...done: %d", sd);
+    NFAPI_TRACE(NFAPI_TRACE_INFO, "connect...done: %d", sd);
     return sd;
 }
 
 void create_p7_rx_socket(pnf_config_t *config, int phy_id, int port)
 {
-    nfapi_info("phy id=%d port=%d", phy_id, port);
+    NFAPI_TRACE(NFAPI_TRACE_INFO, "phy id=%d port=%d", phy_id, port);
 
     pnf_config_phy_t *phy = find_pnf_phy_config(config, phy_id);
     if (!phy)
     {
-        nfapi_error("find_pnf_phy_config");
+        NFAPI_TRACE(NFAPI_TRACE_ERROR, "find_pnf_phy_config");
         return;
     }
 
     // If connection was already created, don't repeat
     if (phy->started)
     {
-        nfapi_info("already started");
+        NFAPI_TRACE(NFAPI_TRACE_INFO, "already started");
         return;
     }
 
@@ -214,7 +215,7 @@ void create_p7_rx_socket(pnf_config_t *config, int phy_id, int port)
     phy->p7_rx_sock = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
     if (phy->p7_rx_sock < 0)
     {
-        nfapi_error("socket: %s", ERR);
+        NFAPI_TRACE(NFAPI_TRACE_ERROR, "socket: %s", ERR);
         return;
     }
 
@@ -222,7 +223,7 @@ void create_p7_rx_socket(pnf_config_t *config, int phy_id, int port)
     if (setsockopt(phy->p7_rx_sock, SOL_SOCKET, SO_REUSEADDR,
                    &reuseaddr_enable, sizeof(reuseaddr_enable)) < 0)
     {
-        nfapi_error("setsockopt: %s", ERR);
+        NFAPI_TRACE(NFAPI_TRACE_ERROR, "setsockopt: %s", ERR);
         return;
     }
 
@@ -234,31 +235,31 @@ void create_p7_rx_socket(pnf_config_t *config, int phy_id, int port)
     if (bind(phy->p7_rx_sock, (struct sockaddr *)&phy->p7_rx_sockaddr,
              sizeof(phy->p7_rx_sockaddr)) < 0)
     {
-        nfapi_error("bind: %s", ERR);
+        NFAPI_TRACE(NFAPI_TRACE_ERROR, "bind: %s", ERR);
         return;
     }
 
-    nfapi_info("Got socket for phy %d %s %s:%d",
-               phy_id, config->name,
-               inet_ntoa(phy->p7_rx_sockaddr.sin_addr),
-               ntohs(phy->p7_rx_sockaddr.sin_port));
+    NFAPI_TRACE(NFAPI_TRACE_INFO, "Got socket for phy %d %s %s:%d",
+                phy_id, config->name,
+                inet_ntoa(phy->p7_rx_sockaddr.sin_addr),
+                ntohs(phy->p7_rx_sockaddr.sin_port));
 }
 
 void create_p7_tx_socket(pnf_config_t *config, int phy_id, int port)
 {
-    nfapi_info("phy id=%d port=%d", phy_id, port);
+    NFAPI_TRACE(NFAPI_TRACE_INFO, "phy id=%d port=%d", phy_id, port);
 
     pnf_config_phy_t *phy = find_pnf_phy_config(config, phy_id);
     if (!phy)
     {
-        nfapi_error("find_pnf_phy_config");
+        NFAPI_TRACE(NFAPI_TRACE_ERROR, "find_pnf_phy_config");
         return;
     }
 
     int sd = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
     if (sd < 0)
     {
-        nfapi_error("socket: %s", ERR);
+        NFAPI_TRACE(NFAPI_TRACE_ERROR, "socket: %s", ERR);
         return;
     }
 
@@ -267,49 +268,26 @@ void create_p7_tx_socket(pnf_config_t *config, int phy_id, int port)
     phy->p7_tx_sockaddr.sin_port = htons(port);
     phy->p7_tx_sockaddr.sin_addr.s_addr = inet_addr("127.0.0.1");  // TODO: Is this the right IP?
 
-    nfapi_info("Got socket for %s on %s:%d",
-               config->name,
-               inet_ntoa(phy->p7_tx_sockaddr.sin_addr),
-               ntohs(phy->p7_tx_sockaddr.sin_port));
+    NFAPI_TRACE(NFAPI_TRACE_INFO, "Got socket for %s on %s:%d",
+                config->name,
+                inet_ntoa(phy->p7_tx_sockaddr.sin_addr),
+                ntohs(phy->p7_tx_sockaddr.sin_port));
 }
 
+static const char log_name[] = "nfapi.log";
+
 #define MSG( X ) r = write(fd, X, sizeof(X) - 1)
+
 void show_backtrace(void)
 {
     void *buffer[100];
     __attribute__((unused)) int r;
     int nptrs = backtrace(buffer, sizeof(buffer) / sizeof(buffer[0]));
-    int fd = open("nfapi.log", O_APPEND|O_CREAT|O_WRONLY, 0666);
+    int fd = open(log_name, O_APPEND|O_CREAT|O_WRONLY, 0666);
     MSG("---stack trace---\n");
     backtrace_symbols_fd(buffer, nptrs, fd);
     MSG("---end stack trace---\n");
     close(fd);
-}
-
-// TODO: Use EMANE logging
-void nfapi_logfile(char const *caller,
-                   char const *label,
-                   char const *format, ...)
-{
-    static const char log_name[] = "nfapi.log";
-    FILE *fp = fopen(log_name, "a");
-    if (fp == NULL)
-    {
-        fprintf(stderr, "open %s: %s\n", log_name, ERR);
-        abort();
-    }
-    struct timespec ts;
-	clock_gettime(CLOCK_MONOTONIC, &ts);
-    fprintf(fp, "%ld%06ld [%.1s] ",
-		    ts.tv_sec,
-		    ts.tv_nsec / 1000,
-            label);
-    va_list ap;
-    va_start(ap, format);
-    vfprintf(fp, format, ap);
-    va_end(ap);
-    fprintf(fp, " [%s]\n", caller);
-    fclose(fp);
 }
 
 #define X(ID) case NFAPI_ ## ID: return #ID
@@ -441,6 +419,9 @@ const char *hexdump(const void *data, size_t data_len, char *out, size_t out_len
     return out;
 }
 
+// TODO: What are we actually checking here?
+// And what does the return value mean?
+// Consider renaming this function to make these things clearer.
 int checkMsgType(nfapi_message_id_e header)
 {
     switch (header)
@@ -482,7 +463,7 @@ void close_pnf_p5_socket(pnf_config_t *config, int sd)
 {
     if (sd != config->p5_sock)
     {
-        nfapi_error("wrong socket %d != %d", sd, config->p5_sock);
+        NFAPI_TRACE(NFAPI_TRACE_ERROR, "wrong socket %d != %d", sd, config->p5_sock);
         return;
     }
     config->p5_sock = -1;
@@ -496,20 +477,20 @@ void close_pnf_p7_socket(pnf_config_t *config, int sd)
         pnf_config_phy_t *phy = &config->phys[i];
         if (sd == phy->p7_rx_sock)
         {
-            nfapi_error("close p7_rx_sock %d", sd);
+            NFAPI_TRACE(NFAPI_TRACE_ERROR, "close p7_rx_sock %d", sd);
             phy->p7_rx_sock = -1;
             close(sd);
             return;
         }
         if (sd == phy->p7_tx_sock)
         {
-            nfapi_error("close p7_tx_sock %d", sd);
+            NFAPI_TRACE(NFAPI_TRACE_ERROR, "close p7_tx_sock %d", sd);
             phy->p7_tx_sock = -1;
             close(sd);
             return;
         }
     }
-    nfapi_error("wrong socket %d", sd);
+    NFAPI_TRACE(NFAPI_TRACE_ERROR, "wrong socket %d", sd);
 }
 
 int Get_p7_rnti(nfapi_p7_message_header_t *header, uint8_t *buffer, size_t bufferLen)
@@ -518,14 +499,14 @@ int Get_p7_rnti(nfapi_p7_message_header_t *header, uint8_t *buffer, size_t buffe
 
     if (nfapi_p7_message_unpack(buffer, bufferLen, lBuffer, sizeof(lBuffer), 0) < 0)
     {
-        nfapi_error("Message Unpack Error");
+        NFAPI_TRACE(NFAPI_TRACE_ERROR, "Message Unpack Error");
         return -1;
     }
 
     switch (header->message_id)
     {
     default:
-        nfapi_error("P7 GetRNTI Error - Unkown msg id: %d", header->message_id);
+        NFAPI_TRACE(NFAPI_TRACE_ERROR, "P7 GetRNTI Error - Unkown msg id: %d", header->message_id);
         return -1;
 
     case NFAPI_DL_CONFIG_REQUEST:
@@ -537,8 +518,8 @@ int Get_p7_rnti(nfapi_p7_message_header_t *header, uint8_t *buffer, size_t buffe
     case NFAPI_UL_CONFIG_REQUEST:
     {
         nfapi_ul_config_request_t *ul_config = (nfapi_ul_config_request_t *)lBuffer;
-        nfapi_info("ulsch_pdu: %d", ul_config->ul_config_request_body.ul_config_pdu_list->ulsch_pdu.ulsch_pdu_rel8.rnti);
-        nfapi_info("srs_pdu: %d", ul_config->ul_config_request_body.ul_config_pdu_list->srs_pdu.srs_pdu_rel8.rnti);
+        NFAPI_TRACE(NFAPI_TRACE_INFO, "ulsch_pdu: %d", ul_config->ul_config_request_body.ul_config_pdu_list->ulsch_pdu.ulsch_pdu_rel8.rnti);
+        NFAPI_TRACE(NFAPI_TRACE_INFO, "srs_pdu: %d", ul_config->ul_config_request_body.ul_config_pdu_list->srs_pdu.srs_pdu_rel8.rnti);
         return 0;
     }
 
@@ -558,7 +539,7 @@ int Get_p7_rnti(nfapi_p7_message_header_t *header, uint8_t *buffer, size_t buffe
         // Don't see a RNTI field
     {
         nfapi_rach_indication_t *rach_ind = (nfapi_rach_indication_t *)lBuffer;
-        nfapi_info("rach indic: %d", rach_ind->rach_indication_body.preamble_list->preamble_rel8.rnti);
+        NFAPI_TRACE(NFAPI_TRACE_INFO, "rach indic: %d", rach_ind->rach_indication_body.preamble_list->preamble_rel8.rnti);
 
         return 0;
     }
