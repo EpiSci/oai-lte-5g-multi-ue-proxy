@@ -10,6 +10,7 @@ import logging
 import subprocess
 import time
 import re
+import glob
 import bz2
 import signal
 
@@ -373,6 +374,9 @@ class Scenario:
                     jobs.compress('{}/{}.log'.format(OPTS.log_dir, ue_hostname), remove_original=True)
             jobs.wait()
 
+        if save_core_files():
+            passed = False
+
         return passed
 
 def get_analysis_messages(filename):
@@ -383,11 +387,56 @@ def get_analysis_messages(filename):
     with bz2.open(filename, 'rt') as filehandler:
         for line in filehandler:
             # Log messages have a header like the following:
-            # '4789629.289157 00018198 [MAC] A Message...'
+            # '4789629.289157 000000fd [MAC] A Message...'
             # The 'A' indicates this is a LOG_A message intended for automated analysis.
             fields = line.split(maxsplit=4)
             if len(fields) == 5 and fields[3] == 'A':
                 yield line
+
+def set_core_pattern():
+    # Set the core_pattern so we can save the core files from any crashes.
+    #
+    # On Ubuntu, the pattern is normally `|/usr/share/apport/apport %p %s %c %d %P %E`
+    #
+    # If you want to restore the default pattern, do the following:
+    #
+    # sudo sh -c 'echo > /proc/sys/kernel/core_pattern "|/usr/share/apport/apport %p %s %c %d %P %E"'
+    #
+    # Doing that will allow Ubuntu to report any application crashes.
+    # Or just reboot.
+    #
+    # See also the core(5) man page.
+
+    # Remove any existing core files
+    core_files = glob.glob('/tmp/coredump-*')
+    if core_files:
+        subprocess.run(['sudo', 'rm', '-fv'] + core_files)
+
+    pattern_file = '/proc/sys/kernel/core_pattern'
+    LOGGER.info('Core pattern was: %r', open(pattern_file, 'rt').read())
+    subprocess.run(['sudo', 'sh', '-c',
+                    'echo /tmp/coredump-%P > {}'.format(pattern_file)])
+
+def save_core_files():
+    core_files = glob.glob('/tmp/coredump-*')
+    if not core_files:
+        LOGGER.info('No core files')
+        return False
+    LOGGER.error('Found %d core file%s', len(core_files),
+                 '' if len(core_files) == 1 else 's')
+
+    # Core files tend to be owned by root and not readable by others.
+    # Change the ownership so we can both read them and then remove them.
+    subprocess.run(['sudo', 'chown', str(os.getuid())] + core_files)
+
+    jobs = CompressJobs()
+    for core_file in core_files:
+        jobs.compress(core_file,
+                      '{}/{}'.format(OPTS.log_dir, os.path.basename(core_file)),
+                      remove_original=True)
+    jobs.wait()
+
+    return True
 
 def main():
     scenario = Scenario(OPTS.scenario)
@@ -396,6 +445,8 @@ def main():
                 scenario.enb_node_id,
                 '' if len(scenario.ue_node_id) == 1 else 's',
                 ' '.join(map(str, scenario.ue_node_id.values())))
+
+    set_core_pattern()
 
     passed = True
 

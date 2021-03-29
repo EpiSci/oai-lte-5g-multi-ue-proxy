@@ -4,7 +4,7 @@
 use_strace=false
 use_valgrind=false
 
-proxy_dir=$(dirname "$0")        # e.g., ~/proxy
+proxy_dir=$(dirname "$0")        # e.g., ~/oai-lte-multi-ue-proxy
 
 cd "$proxy_dir/../openairinterface5g" || exit
 source oaienv
@@ -67,6 +67,10 @@ fi
 # In case we're running with gprof profiling enabled.
 # https://stackoverflow.com/questions/464116/any-way-to-specify-the-location-of-profile-data
 export GMON_OUT_PREFIX=gmon-$NODE_NUMBER.out
+
+# Enable core dumps.  You may want to set core_pattern:
+#  sudo sh -c 'echo /tmp/coredump-%P > /proc/sys/kernel/core_pattern'
+ulimit -c unlimited
 
 set -x
 sudo -E "${cmd[@]}" "$@"
