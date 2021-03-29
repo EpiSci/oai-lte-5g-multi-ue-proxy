@@ -102,13 +102,6 @@ typedef struct
     int header_id;
 } nf_msg;
 
-void nfapi_logfile(char const *caller, char const *label,
-                   const char *format, ...)
-__attribute__((format(printf, 3, 4)));
-#define nfapi_error(...) nfapi_logfile(__func__, "ERROR", __VA_ARGS__)
-#define nfapi_info(...) nfapi_logfile(__func__, "INFO", __VA_ARGS__)
-#define nfapi_debug(...) nfapi_logfile(__func__, "DEBUG", __VA_ARGS__)
-
 void show_backtrace(void);
 
 pnf_config_phy_t *find_pnf_phy_config(pnf_config_t *config, uint16_t phy_id);
@@ -148,30 +141,3 @@ uint16_t nfapi_get_sfnsf(const void *msg, size_t length);
 #ifdef __cplusplus
 }
 #endif
-
-
-/*
-#ifdef __cplusplus
-
-#include <string>
-
-inline std::string hexdump(const void *data, size_t data_len)
-{
-    char buf[512];
-    return hexdump(data, data_len, buf, sizeof(buf));
-}
-
-inline std::string hexdumpP5(const void *data, size_t data_len)
-{
-    char buf[512];
-    return hexdumpP5(data, data_len, buf, sizeof(buf));
-}
-
-inline std::string hexdumpP7(const void *data, size_t data_len)
-{
-    char buf[512];
-    return hexdumpP7(data, data_len, buf, sizeof(buf));
-}
-
-#endif // __cplusplus
-*/
