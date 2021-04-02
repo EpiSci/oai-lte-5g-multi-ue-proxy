@@ -55,6 +55,11 @@ parser.add_argument('--no-run', '-n', action='store_true', help="""
 Don't run the scenario, only examine the logs in the --log-dir
 directory from a previous run of the scenario
 """)
+parser.add_argument('--nfapi-trace-level', '-N',
+                    choices='none error warn note info debug'.split(),
+                    help="""
+Set the NFAPI trace level
+""")
 parser.add_argument('--debug', action='store_true', help="""
 Enable debug logging
 """)
@@ -64,6 +69,9 @@ del parser
 logging.basicConfig(level=logging.DEBUG if OPTS.debug else logging.INFO,
                     format='>>> %(name)s: %(levelname)s: %(message)s')
 LOGGER = logging.getLogger(os.path.basename(sys.argv[0]))
+
+if OPTS.nfapi_trace_level:
+    os.environ['NFAPI_TRACE_LEVEL'] = OPTS.nfapi_trace_level
 
 # ----------------------------------------------------------------------------
 
