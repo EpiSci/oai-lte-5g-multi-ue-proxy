@@ -1,8 +1,29 @@
 #!/bin/bash
 
-# Edit this file to enable these options
 use_strace=false
 use_valgrind=false
+
+while (( $# > 0 )); do
+    case "$1" in
+      (--strace)
+          use_strace=true
+          shift
+          ;;
+      (--valgrind)
+          use_valgrind=true
+          shift
+          ;;
+      (*)
+          break
+          ;;
+    esac
+done
+
+if (( $# == 0 )); then
+    echo >&2 "usage: ${0##*/} enb|ue|gnb|nrue [softmodem-args...]"
+    exit 1
+fi
+node_type=$1; shift
 
 proxy_dir=$(dirname "$0")        # e.g., ~/oai-lte-multi-ue-proxy
 
@@ -13,8 +34,8 @@ cd cmake_targets || exit
 # Enable extra run-time checking in malloc/free.  See malopt(3)
 export MALLOC_CHECK_=3
 
-case "${NODE_NUMBER?}" in
-    (1)
+case "$node_type" in
+    (enb)
         echo "Node $NODE_NUMBER: eNB"
         cmd=(
             # Keep the eNB on processor 1 (the second processor) by default
@@ -25,13 +46,26 @@ case "${NODE_NUMBER?}" in
             --noS1
         )
         ;;
-    (*)
+
+    (gnb)
+        echo "Node $NODE_NUMBER: gNB"
+        cmd=(
+            # Keep the gNB on processor 1 (the second processor) by default
+            taskset --cpu-list 1
+
+            ./ran_build/build/lte-nrsoftmodem
+            -O ../ci-scripts/conf_files/rcc.band7.tm1.nfapi.conf
+            --noS1
+        )
+        ;;
+
+    (ue)
         echo "Node $NODE_NUMBER: UE"
 
         # First processor (#0) is for proxy.
-        # Second processor (#1) is for eNB.
-        # Remaining processors (#2-N) are for the UEs, one UE per processor or
-        # as best we can if there are more UEs than processors
+        # Second processor (#1) is for eNB and gNB.
+        # Remaining processors (#2-N) are for the UEs and NRUEs, one (pair) per processor or
+        # as best we can if there are more UE/NR pairs than processors
         num_cpus=$(grep -c ^processor /proc/cpuinfo)
         cpu=$(( (NODE_NUMBER - 2) % (num_cpus - 2) + 2 ))
         echo "Using CPU $cpu of $num_cpus for UE$((NODE_NUMBER - 1))"
@@ -40,8 +74,40 @@ case "${NODE_NUMBER?}" in
             taskset --cpu-list "$cpu"
             ./ran_build/build/lte-uesoftmodem
             -O ../ci-scripts/conf_files/ue.nfapi.conf
-            --L2-emul 5 --num-ues 1 --noS1 --nokrnmod 1 --node-number "$NODE_NUMBER"
+            --L2-emul 5
+            --nokrnmod 1
+            --num-ues 1
+            --noS1
+            --node-number "$NODE_NUMBER"
         )
+        ;;
+
+    (nrue)
+        echo "Node $NODE_NUMBER: NRUE"
+
+        # First processor (#0) is for emane.
+        # Second processor (#1) is for eNB and gNB.
+        # Remaining processors (#2-N) are for the UEs and NRUEs, one (pair) per processor or
+        # as best we can if there are more UE/NR pairs than processors
+        num_cpus=$(grep -c ^processor /proc/cpuinfo)
+        cpu=$(( (NODE_NUMBER - 2) % (num_cpus - 2) + 2 ))
+        echo "Using CPU $cpu of $num_cpus for NRUE$((NODE_NUMBER - 1))"
+
+        cmd=(
+            taskset --cpu-list "$cpu"
+            ./ran_build/build/lte-nruesoftmodem
+            -O ../ci-scripts/conf_files/ue.nfapi.conf
+            --L2-emul 5
+            --nokrnmod 1
+            --num-ues 1
+            --noS1
+            --node-number "$NODE_NUMBER"
+        )
+        ;;
+
+    (*)
+        echo >&2 "${0##*/}: Invalid node type '$node_type'"
+        exit 1
         ;;
 esac
 
