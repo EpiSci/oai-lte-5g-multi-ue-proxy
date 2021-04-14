@@ -25,9 +25,9 @@
 class Multi_UE_Proxy
 {
 public:
-    Multi_UE_Proxy(int num_of_ues);
+    Multi_UE_Proxy(int num_of_ues, std::string enb_ip, std::string proxy_ip, std::string ue_ip);
     ~Multi_UE_Proxy() = default;
-    void configure();
+    void configure(std::string enb_ip, std::string proxy_ip, std::string ue_ip);
     int init_oai_socket(const char *addr, int tx_port, int rx_port, int ue_idx);
     void oai_enb_downlink_nfapi_task(void *msg);
     void testcode_tx_packet_to_UE( int ue_tx_socket_);

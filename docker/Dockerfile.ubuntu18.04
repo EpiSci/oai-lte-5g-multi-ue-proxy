@@ -1,0 +1,44 @@
+FROM ubuntu:bionic as proxy-builder
+
+ENV DEBIAN_FRONTEND=noninteractive
+ENV TZ=Europe
+
+RUN apt-get update && \
+    DEBIAN_FRONTEND=noninteractive apt-get upgrade --yes && \
+    DEBIAN_FRONTEND=noninteractive apt-get install --yes \
+      build-essential \
+      libsctp1 \
+      libsctp-dev \
+      libz-dev \
+      psmisc \
+      git && \
+    rm -rf /var/lib/apt/lists/*
+
+# Copy the workspace as is
+WORKDIR /oai-lte-multi-ue-proxy
+COPY . .
+RUN make
+
+RUN ldd build/proxy
+
+FROM ubuntu:bionic as oai-lte-multi-ue-proxy
+
+ENV DEBIAN_FRONTEND=noninteractive
+ENV TZ=Europe/Paris
+# We install some debug tools for the moment in addition of mandatory libraries
+RUN apt-get update && \
+    DEBIAN_FRONTEND=noninteractive apt-get upgrade --yes && \
+    DEBIAN_FRONTEND=noninteractive apt-get install --yes \
+      net-tools \
+      tzdata \
+      psmisc \
+      libasan4 \
+      libsctp1 && \
+    rm -rf /var/lib/apt/lists/*
+
+WORKDIR /oai-lte-multi-ue-proxy/bin
+COPY --from=proxy-builder /oai-lte-multi-ue-proxy/build/proxy .
+
+RUN ldd proxy
+
+CMD ["sleep", "infinity"]
