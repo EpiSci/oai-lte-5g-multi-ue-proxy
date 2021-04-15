@@ -26,17 +26,32 @@ bool is_Numeric(char number[]);
 int main(int argc, char *argv[])
 {
     int ues = 0;
+    std::string oai_ue_ipaddr;
+    std::string vnf_ipaddr;
+    std::string pnf_ipaddr;
     if (argc < 2)
     {
         ues = 1;
     }
-    else if((argc == 2) && (is_Numeric(argv[1])))
+    else if((argc >= 2) && (is_Numeric(argv[1])))
     {
         ues = atoi(argv[1]);
     }
+    if (argc == 5)
+    {
+        vnf_ipaddr = argv[2];
+        pnf_ipaddr = argv[3];
+        oai_ue_ipaddr = argv[4];
+    }
+    else
+    {
+        vnf_ipaddr = "127.0.0.1";
+        pnf_ipaddr = "127.0.0.1";
+        oai_ue_ipaddr = "127.0.0.1";
+    }
     if ( ues > 0 )
     {
-        Multi_UE_Proxy multi_ue_proxy(ues);
+        Multi_UE_Proxy multi_ue_proxy(ues, vnf_ipaddr, pnf_ipaddr, oai_ue_ipaddr);
     }
     else
     {
@@ -47,8 +62,13 @@ int main(int argc, char *argv[])
 
 void usage()
 {
-    std::cout<<"usage: ./proxy number_of_UEs"<<std::endl;
+    std::cout<<"usage: ./proxy number_of_UEs eNB_IP_addr proxy_IP_addr UE_IP_addr"<<std::endl;
+    std::cout<<"  Mandatory:"<<std::endl;
     std::cout<<"       number_of_UEs needs to be a positive interger, with default number_of_UEs = 1."<<std::endl;
+    std::cout<<"  Optional: (if not used, loopback will be used)"<<std::endl;
+    std::cout<<"       eNB_IP_addr shall be a valid IP address"<<std::endl;
+    std::cout<<"       proxy_IP_addr shall be a valid IP address"<<std::endl;
+    std::cout<<"       UE_IP_addr shall be a valid IP address"<<std::endl;
 }
 
 bool is_Numeric(char number[]) 
@@ -69,7 +89,7 @@ inline bool exists (const std::string& filename)
     return (stat (filename.c_str(), &buffer) == 0);
 }
 
-Multi_UE_Proxy::Multi_UE_Proxy(int num_of_ues)
+Multi_UE_Proxy::Multi_UE_Proxy(int num_of_ues, std::string enb_ip, std::string proxy_ip, std::string ue_ip)
 {
     assert(instance == NULL);
     instance = this;
@@ -85,7 +105,7 @@ Multi_UE_Proxy::Multi_UE_Proxy(int num_of_ues)
         }
     }
 
-    configure();
+    configure(enb_ip, proxy_ip, ue_ip);
 
     // For eNB
     oai_subframe_init();
@@ -116,14 +136,18 @@ void Multi_UE_Proxy::start()
     }
 }
 
-void Multi_UE_Proxy::configure()
+void Multi_UE_Proxy::configure(std::string enb_ip, std::string proxy_ip, std::string ue_ip)
 {
-    oai_ue_ipaddr = "127.0.0.1";
-    vnf_ipaddr = "127.0.0.1";
-    pnf_ipaddr = "127.0.0.1";
+    oai_ue_ipaddr = ue_ip;
+    vnf_ipaddr = enb_ip;
+    pnf_ipaddr = proxy_ip;
     vnf_p5port = 50001;
     vnf_p7port = 50011;
     pnf_p7port = 50010;
+
+    std::cout<<"VNF is on IP Address "<<vnf_ipaddr<<std::endl;
+    std::cout<<"PNF is on IP Address "<<pnf_ipaddr<<std::endl;
+    std::cout<<"OAI-UE is on IP Address "<<oai_ue_ipaddr<<std::endl;
 
     for (int ue_idx = 0; ue_idx < num_ues; ue_idx++)
     {
