@@ -38,6 +38,28 @@ const char *nfapi_get_message_id(const void *msg, size_t length)
     }
 }
 
+const char *nfapi_nr_get_message_id(const void *msg, size_t length)
+{
+    uint16_t phy_id = ~0;
+    uint16_t message_id = ~0;
+    uint8_t *in = (void *)msg;
+    uint8_t *end = in + length;
+    pull16(&in, &phy_id, end);
+    pull16(&in, &message_id, end);
+
+    switch (message_id)
+    {
+    case NFAPI_NR_PHY_MSG_TYPE_RACH_INDICATION: return "RACH_NR";
+    case NFAPI_NR_PHY_MSG_TYPE_CRC_INDICATION: return "CRC_NR";
+    case NFAPI_NR_PHY_MSG_TYPE_RX_DATA_INDICATION: return "RX_DATA_NR";
+    case NFAPI_NR_PHY_MSG_TYPE_UCI_INDICATION: return "UCI_NR";
+    case NFAPI_NR_PHY_MSG_TYPE_SRS_INDICATION: return "SRS_NR";
+    case 0: return "Dummy";
+    default:
+        NFAPI_TRACE(NFAPI_TRACE_ERROR, "Message_id is unknown %u", message_id);
+        return "Unknown";
+    }
+}
 
 uint16_t nfapi_get_sfnsf(const void *msg, size_t length)
 {
@@ -75,6 +97,43 @@ uint16_t nfapi_get_sfnsf(const void *msg, size_t length)
         return ~0;
     }
     return sfn_sf;
+}
+
+uint16_t nfapi_get_sfnslot(const void *msg, size_t length)
+{
+    uint8_t *in = (void *)msg;
+    uint8_t *end = in + length;
+    uint16_t phy_id;
+    uint16_t message_id;
+    if (!pull16(&in, &phy_id, end) ||
+        !pull16(&in, &message_id, end))
+    {
+        NFAPI_TRACE(NFAPI_TRACE_ERROR, "could not retrieve message_id");
+        return ~0;
+    }
+
+    switch (message_id)
+    {
+    case NFAPI_NR_PHY_MSG_TYPE_RACH_INDICATION:
+    case NFAPI_NR_PHY_MSG_TYPE_CRC_INDICATION:
+    case NFAPI_NR_PHY_MSG_TYPE_RX_DATA_INDICATION:
+    case NFAPI_NR_PHY_MSG_TYPE_UCI_INDICATION:
+    case NFAPI_NR_PHY_MSG_TYPE_SRS_INDICATION:
+    case 0:
+        break;
+    default:
+        NFAPI_TRACE(NFAPI_TRACE_ERROR, "Message_id is unknown %u", message_id);
+        return ~0;
+    }
+
+    in = (uint8_t *)msg + sizeof(nfapi_p7_message_header_t);
+    uint16_t sfn_slot;
+    if (!pull16(&in, &sfn_slot, end))
+    {
+        NFAPI_TRACE(NFAPI_TRACE_ERROR, "could not retrieve sfn_slot");
+        return ~0;
+    }
+    return sfn_slot;
 }
 
 pnf_config_phy_t *find_pnf_phy_config(pnf_config_t *config,

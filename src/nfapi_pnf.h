@@ -37,6 +37,8 @@ extern "C" {
 
 #include "debug.h"
 #include "nfapi_pnf_interface.h"
+#include "nfapi_nr_interface.h"
+#include "nfapi_nr_interface_scf.h"
 #include "nfapiutils.h"
 
 #include "nfapi.h"
@@ -47,6 +49,7 @@ extern "C" {
 #include <arpa/inet.h>
 #include <pthread.h>
 #include <errno.h>
+#include "nfapi_interface.h"
 
 #include "fapi_stub.h"
 
@@ -54,6 +57,10 @@ extern "C" {
 // i.e., in the range [MIN_UE_NEM_ID..MIN_UE_NEM_ID+num_ues-1]
 #define MIN_UE_NEM_ID 2
 #define MAX_SUBFRAME_MSGS 8
+#define MAX_SLOT_MSGS 8
+
+//typedef int64_t openair0_timestamp;
+
 
 typedef struct
 {
@@ -68,62 +75,10 @@ typedef struct
 
 } PHY_VARS_eNB;
 
-typedef struct PHY_VARS_eNB_s
-{
-    // Module ID indicator for this instance
-} PHY_VARS_eNB_s;
-
 typedef struct
 {
-    // Component Carrier index
-    uint8_t CC_id;
-    // timestamp transmitted to HW
-    int64_t timestamp_tx;
-    int64_t timestamp_rx;
-    // subframe to act upon for transmission
-    int subframe_tx;
-    // subframe to act upon for reception
-    int subframe_rx;
-    // frame to act upon for transmission
-    int frame_tx;
-    // frame to act upon for reception
-    int frame_rx;
-    int frame_prach;
-    int subframe_prach;
-    int frame_prach_br;
-    int subframe_prach_br;
-    // \brief Instance count for RXn-TXnp4 processing thread.
-    // \internal This variable is protected by \ref mutex_rxtx.
-    int instance_cnt;
-    // pthread structure for RXn-TXnp4 processing thread
-    pthread_t pthread;
-    // pthread attributes for RXn-TXnp4 processing thread
-    pthread_attr_t attr;
-    // condition variable for tx processing thread
-    pthread_cond_t cond;
-    // mutex for RXn-TXnp4 processing thread
-    pthread_mutex_t mutex;
-    // scheduling parameters for RXn-TXnp4 thread
-    struct sched_param sched_param_rxtx;
 
-    // \internal This variable is protected by \ref mutex_RUs.
-    int instance_cnt_RUs;
-    // condition variable for tx processing thread
-    pthread_cond_t cond_RUs;
-    // mutex for RXn-TXnp4 processing thread
-    pthread_mutex_t mutex_RUs;
-    // tpool_t *threadPool; ** ASK Raymond about these
-    int nbEncode;
-    int nbDecode;
-    // notifiedFIFO_t *respEncode;
-    // notifiedFIFO_t *respDecode;
-    pthread_mutex_t mutex_emulateRF;
-    int instance_cnt_emulateRF;
-    pthread_t pthread_emulateRF;
-    pthread_attr_t attr_emulateRF;
-    pthread_cond_t cond_emulateRF;
-    int first_rx;
-} L1_rxtx_proc_t;
+} PHY_VARS_gNB;
 
 typedef struct
 {
@@ -158,7 +113,7 @@ typedef struct
     uint8_t timing_info_mode;
     uint8_t timing_info_period;
 
-} epi_phy_info;
+} phy_info;
 
 typedef struct
 {
@@ -172,14 +127,14 @@ typedef struct
     uint32_t max_downlink_frequency;
     uint32_t max_uplink_frequency;
     uint32_t min_uplink_frequency;
-} epi_rf_info;
+} rf_info;
 
 typedef struct
 {
 
     int release;
-    epi_phy_info phys[2];
-    epi_rf_info rfs[2];
+    phy_info phys[2];
+    rf_info rfs[2];
 
     uint8_t sync_mode;
     uint8_t location_mode;
@@ -200,22 +155,22 @@ typedef struct
 
     uint8_t wireshark_test_mode;
 
-} epi_pnf_info;
+} pnf_info;
 
 typedef struct
 {
     uint16_t phy_id;
     nfapi_pnf_config_t *config;
-    epi_phy_info *phy;
+    phy_info *phy;
     nfapi_pnf_p7_config_t *p7_config;
-} epi_pnf_phy_user_data_t;
+} pnf_phy_user_data_t;
 
 typedef struct message_buffer_t
 {
     uint32_t magic;             // for sanity checking
 #   define MESSAGE_BUFFER_MAGIC 0x45504953 // arbitrary value
     size_t length;              // number of valid bytes in .data[]
-    uint8_t data[1024];
+    uint8_t data[NFAPI_RX_IND_DATA_MAX];
 } message_buffer_t;
 
 // subframe_msgs_t holds all of the messages
@@ -226,6 +181,14 @@ typedef struct subframe_msgs_t
     message_buffer_t *msgs[MAX_SUBFRAME_MSGS];
 } subframe_msgs_t;
 
+// slot_msgs_t holds all of the messages
+// for a specific UE per sfn_sf
+typedef struct slot_msgs_t
+{
+    size_t num_msgs;
+    message_buffer_t *msgs[MAX_SLOT_MSGS];
+} slot_msgs_t;
+
 int oai_nfapi_rach_ind(nfapi_rach_indication_t *rach_ind);
 int oai_nfapi_harq_indication(nfapi_harq_indication_t *harq_ind);
 int oai_nfapi_crc_indication(nfapi_crc_indication_t *crc_ind);
@@ -234,9 +197,11 @@ int oai_nfapi_rx_ind(nfapi_rx_indication_t *ind);
 int oai_nfapi_sr_indication(nfapi_sr_indication_t *ind);
 
 void oai_subframe_ind(uint16_t sfn, uint16_t sf);
+void oai_slot_ind(uint16_t sfn, uint16_t slot);
 
 void configure_nfapi_pnf(const char *vnf_ip_addr, int vnf_p5_port, const char *pnf_ip_addr, int pnf_p7_port,
                          int vnf_p7_port);
+void configure_nr_nfapi_pnf(const char *vnf_ip_addr, int vnf_p5_port, const char *pnf_ip_addr, int pnf_p7_port, int vnf_p7_port);
 
 void init_eNB_afterRU(void);
 void init_UE_stub(int nb_inst, int, int);
@@ -254,19 +219,39 @@ void handle_nfapi_hi_dci0_hi_pdu(PHY_VARS_eNB *eNB, int frame, int subframe, L1_
 void handle_nfapi_bch_pdu(PHY_VARS_eNB *eNB, L1_rxtx_proc_t *proc, nfapi_dl_config_request_pdu_t *dl_config_pdu,
                           uint8_t *sdu);
 
+void handle_nfapi_nr_ul_dci_pdu(PHY_VARS_gNB *gNB,
+                   int frame, int slot,
+                   nfapi_nr_ul_dci_request_pdus_t *ul_dci_request_pdu);
+void handle_nfapi_nr_pdcch_pdu(PHY_VARS_gNB *gNB,
+                   int frame, int slot,
+                   nfapi_nr_dl_tti_pdcch_pdu *pdcch_pdu);
+void handle_nr_nfapi_pdsch_pdu(PHY_VARS_gNB *gNB,int frame,int slot,
+                            nfapi_nr_dl_tti_pdsch_pdu *pdsch_pdu,
+                            uint8_t *sdu);
+void handle_nr_nfapi_ssb_pdu(PHY_VARS_gNB *gNB,int frame,int slot,
+                             nfapi_nr_dl_tti_request_pdu_t *dl_tti_pdu);
+
 void *oai_subframe_task(void *context);
+void *oai_slot_task(void *context);
 void oai_subframe_init();
+void oai_slot_init();
 void oai_subframe_flush_msgs_from_ue();
 void oai_subframe_handle_msg_from_ue(const void *msg, size_t len, uint16_t nem_id);
+void oai_slot_handle_msg_from_ue(const void *msg, size_t len, uint16_t nem_id);
 
 void transfer_downstream_nfapi_msg_to_proxy(void *msg);
+void transfer_downstream_nfapi_msg_to_nr_proxy(void *msg);
 void transfer_downstream_sfn_sf_to_proxy(uint16_t sfn_sf);
+void transfer_downstream_sfn_slot_to_proxy(uint16_t sfn_slot);
 
 uint16_t sfn_sf_add(uint16_t a, uint16_t add_val);
+uint16_t sfn_slot_add(uint16_t a, uint16_t add_val);
 
 int get_sf_delta(uint16_t a, uint16_t b);
+int get_slot_delta(uint16_t a, uint16_t b);
 uint16_t sfn_sf_subtract(uint16_t a, uint16_t sub_val);
 uint16_t sfn_sf_add(uint16_t a, uint16_t add_val);
+uint16_t sfn_slot_add(uint16_t a, uint16_t add_val);
 
 
 bool dequeue_ue_msgs(subframe_msgs_t *subframe_msgs, uint16_t sfn_sf_tx);

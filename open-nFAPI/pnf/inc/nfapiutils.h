@@ -30,7 +30,7 @@ extern "C" {
 #define ERR strerror(errno)
 #define NUM_ITEMS(A) (sizeof(A) / sizeof((A)[0]))
 
-typedef struct phy_info
+typedef struct _phy_info
 {
     bool enabled;
     uint16_t phy_id;
@@ -48,7 +48,7 @@ typedef struct phy_info
 
 } phy_info_t;
 
-typedef struct pnf_info
+typedef struct _pnf_info
 {
     uint8_t num_phys;
     phy_info_t phys[8];
@@ -136,7 +136,9 @@ uint64_t clock_usec(void);
 void log_scheduler(const char* label);
 
 const char *nfapi_get_message_id(const void *msg, size_t length);
+const char *nfapi_nr_get_message_id(const void *msg, size_t length);
 uint16_t nfapi_get_sfnsf(const void *msg, size_t length);
+uint16_t nfapi_get_sfnslot(const void *msg, size_t length);
 
 #ifdef __cplusplus
 }
