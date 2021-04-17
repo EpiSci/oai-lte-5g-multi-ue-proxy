@@ -34,6 +34,8 @@ LIB_SOURCES = \
 
 SRCS = \
 	$(SRC_DIR)/proxy.cc \
+	$(SRC_DIR)/lte_proxy.cc \
+	$(SRC_DIR)/nr_proxy.cc \
 	$(SRC_DIR)/nfapiutils.c \
 	$(SRC_DIR)/nfapi_pnf.c \
 	$(SRC_DIR)/queue.c \

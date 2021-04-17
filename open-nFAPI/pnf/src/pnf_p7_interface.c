@@ -72,6 +72,21 @@ int nfapi_pnf_p7_start(nfapi_pnf_p7_config_t* config)
 	return 0;
 }
 
+int nfapi_nr_pnf_p7_start(nfapi_pnf_p7_config_t* config)
+{
+	// Verify that config is not null
+	if(config == 0)
+		return -1;
+
+	pnf_p7_t* _this = (pnf_p7_t*)(config);
+
+	NFAPI_TRACE(NFAPI_TRACE_INFO, "%s\n", __FUNCTION__);
+
+	pnf_nr_p7_message_pump(_this);
+
+	return 0;
+}
+
 int nfapi_pnf_p7_stop(nfapi_pnf_p7_config_t* config)
 {
 	// Verify that config is not null
@@ -84,6 +99,16 @@ int nfapi_pnf_p7_stop(nfapi_pnf_p7_config_t* config)
 	return 0;
 }
 
+int nfapi_pnf_p7_slot_ind(nfapi_pnf_p7_config_t* config, uint16_t phy_id, uint16_t sfn, uint16_t slot)
+{
+	// Verify that config is not null
+	if(config == 0)
+		return -1;
+	
+	pnf_p7_t* _this = (pnf_p7_t*)(config);
+
+	return pnf_p7_slot_ind(_this, phy_id, sfn, slot);
+}
 
 int nfapi_pnf_p7_subframe_ind(nfapi_pnf_p7_config_t* config, uint16_t phy_id, uint16_t sfn_sf)
 {

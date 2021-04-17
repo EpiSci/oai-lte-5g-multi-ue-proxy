@@ -13,6 +13,7 @@ import re
 import glob
 import bz2
 import signal
+import platform
 
 WORKSPACE_DIR = os.path.abspath(os.path.dirname(sys.argv[0]))
 
@@ -44,16 +45,12 @@ parser.add_argument('--log-dir', '-l', default=os.environ['HOME'],
                     help="""
 Where to store log files
 """)
-parser.add_argument('--run-mode', '-r', type=str, default='',
-                    help="""
-enb: run for enb, ue: run for ue, proxy: run for proxy, check: run result
-""")
-parser.add_argument('--tee', '-t', action='store_true', help="""
-Show logging output to the terminal as well as being captured to .log files
-""")
 parser.add_argument('--no-run', '-n', action='store_true', help="""
 Don't run the scenario, only examine the logs in the --log-dir
 directory from a previous run of the scenario
+""")
+parser.add_argument('--nsa', action='store_true', help="""
+Enable NSA (LTE and 5G) mode
 """)
 parser.add_argument('--nr', '--5g', '-5', action='store_true', help="""
 Enable NR/5G mode
@@ -69,6 +66,9 @@ Enable debug logging (for this script only)
 OPTS = parser.parse_args()
 del parser
 
+if OPTS.nr and OPTS.nsa:
+    raise Exception('Cannot do --nr and --nsa together')
+
 logging.basicConfig(level=logging.DEBUG if OPTS.debug else logging.INFO,
                     format='>>> %(name)s: %(levelname)s: %(message)s')
 LOGGER = logging.getLogger(os.path.basename(sys.argv[0]))
@@ -79,10 +79,7 @@ if OPTS.nfapi_trace_level:
 # ----------------------------------------------------------------------------
 
 def redirect_output(cmd, filename):
-    if OPTS.tee:
-        cmd += ' 2>&1 | tee {}'.format(filename)
-    else:
-        cmd += ' >{} 2>&1'.format(filename)
+    cmd += ' >{} 2>&1'.format(filename)
     return cmd
 
 def compress(from_name, to_name=None, remove_original=False):
@@ -149,16 +146,6 @@ class Scenario:
         self.parse_config()
 
     def parse_config(self):
-        ext = self.filename.split('.')[-1]
-        if ext == 'xml':
-            self.parse_config_xml()
-        elif  ext == 'imn':
-            self.parse_config_imn()
-        else:
-            print("Unknow input file format(imn or xml are supported)")
-            exit(0)
-
-    def parse_config_xml(self):
         """
         Scan the scenario file to determine node numbers, etc.
         """
@@ -170,86 +157,6 @@ class Scenario:
         self.gnb_node_id = None
         self.nrue_hostname = {}
         self.nrue_node_id = {}
-
-        node_re = re.compile(r'^\s*<(\S+) id="(\S+)" name="(\S+)" type=')
-
-        with open(self.filename, 'rt') as fh:
-            node_id = None
-            for line in fh:
-                match = node_re.match(line)
-                if match:
-                    node_type = match.group(1)
-                    if node_type not in ['network', 'device']:
-                        raise Exception('Bad node type: {}'.format(node_type))
-
-                    node_id = int(match.group(2))
-                    LOGGER.debug('node_id %r', node_id)
-
-                    hostname = match.group(3)
-                    LOGGER.debug('hostname %r', hostname)
-
-                    if not node_id:
-                        LOGGER.warning('No node ID for hostname %r', hostname)
-                        continue
-
-                    if hostname.lower() in ['proxy', 'lte']:
-                        LOGGER.debug('Network node is %s', node_id)
-                        continue
-
-                    if hostname.lower() == 'enb':
-                        LOGGER.debug('enb node is %s', node_id)
-                        self.enb_hostname = hostname
-                        self.enb_node_id = node_id
-                        continue
-
-                    if hostname.lower().startswith('ue'):
-                        ue_number = int(hostname[2:])
-                        LOGGER.debug('UE %d is node_id %s', ue_number, node_id)
-                        self.ue_hostname[ue_number] = hostname
-                        self.ue_node_id[ue_number] = node_id
-                        continue
-
-                    if OPTS.nr:
-
-                        if hostname.lower() == 'gnb':
-                            LOGGER.debug('gnb node is %s', node_id)
-                            self.gnb_hostname = hostname
-                            self.gnb_node_id = node_id
-                            continue
-
-                        if hostname.lower().startswith('nrue'):
-                            nrue_number = int(hostname[4:])
-                            LOGGER.debug('NRUE %d is node_id %s', nrue_number, node_id)
-                            self.nrue_hostname[nrue_number] = hostname
-                            self.nrue_node_id[nrue_number] = node_id
-                            continue
-
-                    LOGGER.warning('Skipping unknown hostname %r of node_id %r', hostname, node_id)
-                    continue
-
-                LOGGER.debug('Unmatched line %r', line)
-
-        if not self.enb_hostname:
-            raise Exception('No eNB node in scenario ' + self.filename)
-
-        if not self.ue_hostname:
-            raise Exception('No UE nodes in scenario ' + self.filename)
-
-        if OPTS.nr:
-            if not self.gnb_hostname:
-                raise Exception('No gNB node in scenario ' + self.filename)
-
-            if not self.nrue_hostname:
-                raise Exception('No NRUE nodes in scenario ' + self.filename)
-
-    def parse_config_imn(self):
-        """
-        Scan the scenario file to determine node numbers, etc.
-        """
-        self.enb_hostname = None
-        self.enb_node_id = None
-        self.ue_hostname = {}
-        self.ue_node_id = {}
 
         node_re = re.compile(r'^\s*node\s+(\S+)')
         hostname_re = re.compile(r'^\s*hostname\s+(\S+)')
@@ -292,16 +199,58 @@ class Scenario:
                         self.ue_node_id[ue_number] = node_id
                         continue
 
+                    if hostname.lower() == 'gnb':
+                        LOGGER.debug('gnb node is %s', node_id)
+                        self.gnb_hostname = hostname
+                        self.gnb_node_id = node_id
+                        continue
+
+                    if hostname.lower().startswith('nrue'):
+                        nrue_number = int(hostname[4:])
+                        LOGGER.debug('NRUE %d is node_id %s', nrue_number, node_id)
+                        self.nrue_hostname[nrue_number] = hostname
+                        self.nrue_node_id[nrue_number] = node_id
+                        continue
+
+                    if hostname.lower().startswith('nsaue'):
+                        nsaue_number = int(hostname[5:])
+                        LOGGER.debug('NSA-UE %d is node_id %s', nsaue_number, node_id)
+                        self.ue_hostname[nsaue_number] = hostname + '-lte'
+                        self.ue_node_id[nsaue_number] = node_id
+                        self.nrue_hostname[nsaue_number] = hostname + '-nr'
+                        self.nrue_node_id[nsaue_number] = node_id
+                        continue
+
                     LOGGER.warning('Skipping unknown hostname %r of node_id %r', hostname, node_id)
                     continue
 
                 LOGGER.debug('Unmatched line %r', line)
 
-        if not self.enb_hostname:
-            raise Exception('No eNB node in scenario ' + self.filename)
-
-        if not self.ue_hostname:
-            raise Exception('No UE nodes in scenario ' + self.filename)
+        if OPTS.nsa:
+            if not self.enb_hostname:
+                raise Exception('No eNB node in scenario ' + self.filename)
+            if not self.gnb_hostname:
+                raise Exception('No gNB node in scenario ' + self.filename)
+            if not self.nrue_hostname or not self.ue_hostname:
+                raise Exception('No NSA node in scenario ' + self.filename)
+        elif OPTS.nr:
+            if not self.gnb_hostname:
+                raise Exception('No gNB node in scenario ' + self.filename)
+            if not self.nrue_hostname:
+                raise Exception('No nr-UE node in scenario ' + self.filename)
+            if self.enb_hostname:
+                raise Exception('Unexpected eNB node in scenario ' + self.filename)
+            if self.ue_hostname:
+                raise Exception('Unexpected UE node in scenario ' + self.filename)
+        else:
+            if not self.enb_hostname:
+                raise Exception('No eNB node in scenario ' + self.filename)
+            if not self.ue_hostname:
+                raise Exception('No UE node in scenario ' + self.filename)
+            if self.gnb_hostname:
+                raise Exception('Unexpected gNB node in scenario ' + self.filename)
+            if self.nrue_hostname:
+                raise Exception('Unexpected nr-UE node in scenario ' + self.filename)
 
     def launch_enb(self):
         log_name = '{}/eNB.log'.format(OPTS.log_dir)
@@ -334,9 +283,9 @@ class Scenario:
             LOGGER.info('Launch UE%d: %s', num, log_name)
             cmd = 'NODE_NUMBER={NODE_ID} {WORKSPACE_DIR}/run-oai ue' \
                   .format(NODE_ID=self.ue_node_id[num], WORKSPACE_DIR=WORKSPACE_DIR)
+            if OPTS.nsa:
+                cmd += ' --nsa'
             output_cmd = redirect_output(cmd, log_name)
-            if OPTS.run_mode == 'ue' and OPTS.tee:
-                output_cmd = 'gnome-terminal -- sh -c "{}"'.format(output_cmd)
             procs[num] = subprocess.Popen(output_cmd, stdin=subprocess.PIPE, shell=True)
             # TODO: Sleep time needed so eNB and UEs don't start at the exact same time
             # When nodes start at the same time, occasionally eNB will only recognize one UE
@@ -347,7 +296,7 @@ class Scenario:
     def launch_gnb(self):
         log_name = '{}/gNB.log'.format(OPTS.log_dir)
         LOGGER.info('Launch gNB: %s', log_name)
-        cmd = 'NODE_NUMBER=1 {WORKSPACE_DIR}/run-oai gnb' \
+        cmd = 'NODE_NUMBER=0 {WORKSPACE_DIR}/run-oai gnb' \
               .format(WORKSPACE_DIR=WORKSPACE_DIR)
         proc = subprocess.Popen(redirect_output(cmd, log_name), shell=True)
 
@@ -362,12 +311,12 @@ class Scenario:
         procs = {}
         for num, hostname in self.nrue_hostname.items():
             log_name = '{}/{}.log'.format(OPTS.log_dir, hostname)
-            LOGGER.info('Launch UE%d: %s', num, log_name)
+            LOGGER.info('Launch nrUE%d: %s', num, log_name)
             cmd = 'NODE_NUMBER={NODE_ID} {WORKSPACE_DIR}/run-oai nrue' \
-                  .format(NODE_ID=self.ue_node_id[num], WORKSPACE_DIR=WORKSPACE_DIR)
+                  .format(NODE_ID=len(self.ue_node_id)+self.ue_node_id[num], WORKSPACE_DIR=WORKSPACE_DIR)
+            if OPTS.nsa:
+                cmd += ' --nsa'
             output_cmd = redirect_output(cmd, log_name)
-            if OPTS.run_mode == 'ue' and OPTS.tee:
-                output_cmd = 'gnome-terminal -- sh -c "{}"'.format(output_cmd)
             procs[num] = subprocess.Popen(output_cmd, stdin=subprocess.PIPE, shell=True)
             # TODO: Sleep time needed so eNB and UEs don't start at the exact same time
             # When nodes start at the same time, occasionally eNB will only recognize one UE
@@ -389,28 +338,19 @@ class Scenario:
         # ------------------------------------------------------------------------------------
         # Launch the softmodem processes
 
-        if OPTS.run_mode in ['enb', '']:
+        if self.enb_hostname:
             enb_proc = self.launch_enb()
 
-        if OPTS.run_mode in ['proxy', '']:
-            proxy_proc = self.launch_proxy()
+        if self.gnb_hostname:
+            gnb_proc = self.launch_gnb()
 
-        if OPTS.run_mode in ['ue', '']:
-            if ue_id != None:
-                # If ue_id is given, other ues will be ignored.
-                hostname = self.ue_hostname[ue_id]
-                node_id = self.ue_node_id[ue_id]
-                self.ue_hostname = {}
-                self.ue_node_id = {}
-                self.ue_hostname[ue_id] = hostname
-                self.ue_node_id[ue_id] = node_id
+        proxy_proc = self.launch_proxy()
+
+        if self.ue_hostname:
             ue_proc = self.launch_ue()
 
-        if OPTS.nr:
-            if OPTS.run_mode in ['gnb', '']:
-                gnb_proc = self.launch_gnb()
-            if OPTS.run_mode in ['nrue', '']:
-                nrue_proc = self.launch_nrue()
+        if self.nrue_hostname:
+            nrue_proc = self.launch_nrue()
 
         # ------------------------------------------------------------------------------------
 
@@ -466,14 +406,25 @@ class Scenario:
                     LOGGER.critical('NRUE%d process ended early: %r', nrue_number, status)
 
         LOGGER.info('kill main simulation processes...')
+        all_procs = ['proxy']
         if enb_proc:
-            enb_proc.send_signal(signal.SIGTERM)
-        if proxy_proc:
-            proxy_proc.send_signal(signal.SIGTERM)
+            all_procs.append('lte-softmodem')
+        if gnb_proc:
+            all_procs.append('nr-softmodem')
+        if ue_proc:
+            all_procs.append('lte-uesoftmodem')
+        if nrue_proc:
+            all_procs.append('nr-uesoftmodem')
+        subprocess.run(['sudo', 'killall'] + all_procs)
+        proxy_proc.wait()
+        if enb_proc:
+            enb_proc.wait()
+        if gnb_proc:
+            gnb_proc.wait()
         for proc in ue_proc.values():
-            proc.send_signal(signal.SIGTERM)
+            proc.wait()
         for proc in nrue_proc.values():
-            proc.send_signal(signal.SIGTERM)
+            proc.wait()
         LOGGER.info('kill main simulation processes...done')
 
         if proxy_proc:
@@ -585,106 +536,117 @@ def save_core_files():
 def main():
     scenario = Scenario(OPTS.scenario)
 
-    LOGGER.info('eNB node number %d, UE node number%s %s',
-                scenario.enb_node_id,
-                '' if len(scenario.ue_node_id) == 1 else 's',
-                ' '.join(map(str, scenario.ue_node_id.values())))
+    if scenario.enb_hostname:
+        LOGGER.info('eNB node number %d', scenario.enb_node_id)
+
+    if scenario.gnb_hostname:
+        LOGGER.info('gNB node number %d', scenario.gnb_node_id)
+
+    if scenario.ue_hostname:
+        LOGGER.info('UE node number%s %s',
+                    '' if len(scenario.ue_node_id) == 1 else 's',
+                    ' '.join(map(str, scenario.ue_node_id.values())))
+
+    if scenario.nrue_hostname:
+        LOGGER.info('nr-UE node number%s %s',
+                    '' if len(scenario.nrue_node_id) == 1 else 's',
+                    ' '.join(map(str, scenario.nrue_node_id.values())))
 
     set_core_pattern()
 
     passed = True
 
-    if OPTS.run_mode in ['enb', 'ue', 'proxy', '']:
-        if not OPTS.no_run:
-            arg = int(OPTS.ue) if int(OPTS.ue) > 0 else None
-            passed = scenario.run(arg)
+    if not OPTS.no_run:
+        arg = int(OPTS.ue) if int(OPTS.ue) > 0 else None
+        passed = scenario.run(arg)
 
-    if OPTS.run_mode in ['check', ''] or OPTS.no_run:
-        # Examine the logs to determine if the test passed
+    # Examine the logs to determine if the test passed
 
-        # --- eNB log file ---
+    # --- eNB log file ---
+    found = set()
+    for line in get_analysis_messages('{}/eNB.log.bz2'.format(OPTS.log_dir)):
+        # 94772.731183 [MAC] A Configuring MIB for instance 0, CCid 0 : (band
+        # 7,N_RB_DL 50,Nid_cell 0,p 1,DL freq 2685000000,phich_config.resource 0,
+        # phich_config.duration 0)
+        if '[MAC] A Configuring MIB ' in line:
+            found.add('configured')
+            continue
+
+        # 94777.679273 [MAC] A [eNB 0][RAPROC] CC_id 0 Frame 74, subframeP 3:
+        # Generating Msg4 with RRC Piggyback (RNTI a67)
+        if 'Generating Msg4 with RRC Piggyback' in line:
+            found.add('msg4')
+            continue
+
+        # 94777.695277 [RRC] A [FRAME 00000][eNB][MOD 00][RNTI a67] [RAPROC]
+        # Logical Channel UL-DCCH, processing LTE_RRCConnectionSetupComplete
+        # from UE (SRB1 Active)
+        if 'processing LTE_RRCConnectionSetupComplete from UE ' in line:
+            found.add('setup')
+            continue
+
+        # 94776.725081 [RRC] A got UE capabilities for UE 6860
+        match = re.search(r'\[RRC\] A got UE (capabilities for UE \w+)$', line)
+        if match:
+            found.add(match.group(1))
+            continue
+
+    LOGGER.debug('found: %r', found)
+
+    num_ues = len(scenario.ue_hostname)
+    LOGGER.debug('num UEs: %d', num_ues)
+
+    if len(found) == 3 + num_ues:
+        LOGGER.info('All eNB Tests Passed')
+    else:
+        passed = False
+        LOGGER.error('!!! eNB Test Failed !!! -- found %r', found)
+
+    # --- UE log files ---
+    num_ue_failed = 0
+    for ue_number, ue_hostname in scenario.ue_hostname.items():
         found = set()
-        for line in get_analysis_messages('{}/eNB.log.bz2'.format(OPTS.log_dir)):
-            # 94772.731183 [MAC] A Configuring MIB for instance 0, CCid 0 : (band
-            # 7,N_RB_DL 50,Nid_cell 0,p 1,DL freq 2685000000,phich_config.resource 0,
-            # phich_config.duration 0)
-            if '[MAC] A Configuring MIB ' in line:
-                found.add('configured')
+        for line in get_analysis_messages('{}/{}.log.bz2'.format(OPTS.log_dir, ue_hostname)):
+            # 94777.660529 [MAC] A RACH_IND sent to Proxy, Size: 35 Frame 72 Subframe 1
+            if '[MAC] A RACH_IND sent to Proxy' in line:
+                found.add('rach sent')
                 continue
 
-            # 94777.679273 [MAC] A [eNB 0][RAPROC] CC_id 0 Frame 74, subframeP 3:
-            # Generating Msg4 with RRC Piggyback (RNTI a67)
-            if 'Generating Msg4 with RRC Piggyback' in line:
-                found.add('msg4')
+            # 94777.669610 [MAC] A [UE 0][RAPROC] Frame 73 Received RAR
+            # (50|00.00.05.4c.0a.67) for preamble 16/16
+            if ' Received RAR ' in line:
+                found.add('received rar')
                 continue
 
-            # 94777.695277 [RRC] A [FRAME 00000][eNB][MOD 00][RNTI a67] [RAPROC]
-            # Logical Channel UL-DCCH, processing LTE_RRCConnectionSetupComplete
-            # from UE (SRB1 Active)
-            if 'processing LTE_RRCConnectionSetupComplete from UE ' in line:
-                found.add('setup')
+            # 94777.679744 [RRC] A [UE0][RAPROC] Frame 74 : Logical Channel DL-CCCH
+            # (SRB0), Received RRCConnectionSetup RNTI a67
+            if 'Received RRCConnectionSetup' in line:
+                found.add('received setup')
                 continue
 
-            # 94776.725081 [RRC] A got UE capabilities for UE 6860
-            match = re.search(r'\[RRC\] A got UE (capabilities for UE \w+)$', line)
-            if match:
-                found.add(match.group(1))
+            # 94777.706964 [RRC] A UECapabilityInformation Encoded 148 bits
+            # (19 bytes)
+            if '[RRC] A UECapabilityInformation Encoded ' in line:
+                found.add('capabilities')
                 continue
 
         LOGGER.debug('found: %r', found)
 
-        num_ues = len(scenario.ue_hostname)
-        LOGGER.debug('num UEs: %d', num_ues)
-
-        if len(found) == 3 + num_ues:
-            LOGGER.info('All eNB Tests Passed')
+        if len(found) == 4:
+            LOGGER.info('All UE%d Tests Passed', ue_number)
         else:
+            num_ue_failed += 1
             passed = False
-            LOGGER.error('!!! eNB Test Failed !!! -- found %r', found)
+            LOGGER.error('!!! UE%d Test Failed !!! -- found %r', ue_number, found)
 
-        # --- UE log files ---
-        num_ue_failed = 0
-        for ue_number in scenario.ue_hostname:
-            found = set()
-            for line in get_analysis_messages('{}/UE{}.log.bz2'.format(OPTS.log_dir, ue_number)):
-                # 94777.660529 [MAC] A RACH_IND sent to Proxy, Size: 35 Frame 72 Subframe 1
-                if '[MAC] A RACH_IND sent to Proxy' in line:
-                    found.add('rach sent')
-                    continue
+    # TODO: Analyze gNB and nr-UE logs
 
-                # 94777.669610 [MAC] A [UE 0][RAPROC] Frame 73 Received RAR
-                # (50|00.00.05.4c.0a.67) for preamble 16/16
-                if ' Received RAR ' in line:
-                    found.add('received rar')
-                    continue
+    if not passed:
+        LOGGER.critical('FAILED, %d of %d UEs failed',
+                        num_ue_failed, len(scenario.ue_hostname))
+        return 1
 
-                # 94777.679744 [RRC] A [UE0][RAPROC] Frame 74 : Logical Channel DL-CCCH
-                # (SRB0), Received RRCConnectionSetup RNTI a67
-                if 'Received RRCConnectionSetup' in line:
-                    found.add('received setup')
-                    continue
-
-                # 94777.706964 [RRC] A UECapabilityInformation Encoded 148 bits
-                # (19 bytes)
-                if '[RRC] A UECapabilityInformation Encoded ' in line:
-                    found.add('capabilities')
-                    continue
-
-            LOGGER.debug('found: %r', found)
-
-            if len(found) == 4:
-                LOGGER.info('All UE%d Tests Passed', ue_number)
-            else:
-                num_ue_failed += 1
-                passed = False
-                LOGGER.error('!!! UE%d Test Failed !!! -- found %r', ue_number, found)
-
-        if not passed:
-            LOGGER.critical('FAILED, %d of %d UEs failed',
-                            num_ue_failed, len(scenario.ue_hostname))
-            return 1
-
-        LOGGER.info('PASSED')
+    LOGGER.info('PASSED')
 
     return 0
 

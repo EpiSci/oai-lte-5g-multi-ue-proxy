@@ -69,7 +69,7 @@ uint8_t push8(uint8_t in, uint8_t **out, uint8_t *end)
 	}
 	else
 	{
-		NFAPI_TRACE(NFAPI_TRACE_ERROR, "%s no space in buffer\n", __FUNCTION__);
+		NFAPI_TRACE(NFAPI_TRACE_ERROR, "no space in buffer\n");
 		return 0;
 	}
 
@@ -89,7 +89,7 @@ uint8_t pushs8(int8_t in, uint8_t **out, uint8_t *end)
 	}
 	else 
 	{
-		NFAPI_TRACE(NFAPI_TRACE_ERROR, "%s no space in buffer\n", __FUNCTION__);
+		NFAPI_TRACE(NFAPI_TRACE_ERROR, "no space in buffer\n");
 		return 0;
 	}
 }
@@ -109,7 +109,7 @@ uint8_t push16(uint16_t in, uint8_t **out, uint8_t *end)
 	}
 	else
 	{
-		NFAPI_TRACE(NFAPI_TRACE_ERROR, "%s no space in buffer\n", __FUNCTION__);
+		NFAPI_TRACE(NFAPI_TRACE_ERROR, "no space in buffer\n");
 		return 0;
 	}
 }
@@ -129,7 +129,7 @@ uint8_t pushs16(int16_t in, uint8_t **out, uint8_t *end)
 	}
 	else
 	{
-		NFAPI_TRACE(NFAPI_TRACE_ERROR, "%s no space in buffer\n", __FUNCTION__);
+		NFAPI_TRACE(NFAPI_TRACE_ERROR, "no space in buffer\n");
 		return 0;
 	}
 }
@@ -150,7 +150,7 @@ uint8_t push32(uint32_t in, uint8_t **out, uint8_t *end)
 	}
 	else
 	{
-		NFAPI_TRACE(NFAPI_TRACE_ERROR, "%s no space in buffer\n", __FUNCTION__);
+		NFAPI_TRACE(NFAPI_TRACE_ERROR, "no space in buffer\n");
 		return 0;
 	}
 }
@@ -172,7 +172,7 @@ uint8_t pushs32(int32_t in, uint8_t **out, uint8_t *end)
 	}
 	else
 	{
-		NFAPI_TRACE(NFAPI_TRACE_ERROR, "%s no space in buffer\n", __FUNCTION__);
+		NFAPI_TRACE(NFAPI_TRACE_ERROR, "no space in buffer\n");
 		return 0;
 	}
 }
@@ -191,7 +191,7 @@ uint8_t pull8(uint8_t **in, uint8_t *out, uint8_t *end)
 	}
 	else
 	{
-		NFAPI_TRACE(NFAPI_TRACE_ERROR, "%s no space in buffer\n", __FUNCTION__);
+		NFAPI_TRACE(NFAPI_TRACE_ERROR, "no space in buffer\n");
 		return 0;
 	}
 }
@@ -210,7 +210,7 @@ uint8_t pulls8(uint8_t **in, int8_t *out, uint8_t *end)
 	}
 	else
 	{
-		NFAPI_TRACE(NFAPI_TRACE_ERROR, "%s no space in buffer\n", __FUNCTION__);
+		NFAPI_TRACE(NFAPI_TRACE_ERROR, "no space in buffer\n");
 		return 0;
 	}
 }
@@ -228,7 +228,7 @@ uint8_t pull16(uint8_t **in, uint16_t *out, uint8_t *end)
 	}
 	else
 	{
-		NFAPI_TRACE(NFAPI_TRACE_ERROR, "%s no space in buffer\n", __FUNCTION__);
+		NFAPI_TRACE(NFAPI_TRACE_ERROR, "no space in buffer\n");
 		return 0;
 	}
 }
@@ -247,7 +247,7 @@ uint8_t pulls16(uint8_t **in, int16_t *out, uint8_t *end)
 	}
 	else
 	{
-		NFAPI_TRACE(NFAPI_TRACE_ERROR, "%s no space in buffer\n", __FUNCTION__);
+		NFAPI_TRACE(NFAPI_TRACE_ERROR, "no space in buffer\n");
 		return 0;
 	}
 }
@@ -266,7 +266,7 @@ uint8_t pull32(uint8_t **in, uint32_t *out, uint8_t *end)
 	}
 	else
 	{
-		NFAPI_TRACE(NFAPI_TRACE_ERROR, "%s no space in buffer\n",  __FUNCTION__);
+		NFAPI_TRACE(NFAPI_TRACE_ERROR, "no space in buffer\n");
 		return 0;
 	}
 }
@@ -285,7 +285,7 @@ uint8_t pulls32(uint8_t **in, int32_t *out, uint8_t *end)
 	}
 	else
 	{
-		NFAPI_TRACE(NFAPI_TRACE_ERROR, "%s no space in buffer\n", __FUNCTION__);
+		NFAPI_TRACE(NFAPI_TRACE_ERROR, "no space in buffer\n");
 		return 0;
 	}
 }
@@ -303,7 +303,7 @@ uint32_t pullarray16(uint8_t **in, uint16_t out[], uint32_t max_len, uint32_t le
 
 	if(len > max_len)
 	{
-		NFAPI_TRACE(NFAPI_TRACE_ERROR, "%s exceed array size (%d > %d)\n", __FUNCTION__, len, max_len);
+		NFAPI_TRACE(NFAPI_TRACE_ERROR, "exceed array size (%d > %d)\n", len, max_len);
 		return 0;
 	}
 
@@ -320,7 +320,7 @@ uint32_t pullarray16(uint8_t **in, uint16_t out[], uint32_t max_len, uint32_t le
 	}
 	else
 	{
-		NFAPI_TRACE(NFAPI_TRACE_ERROR, "%s no space in buffer\n", __FUNCTION__);
+		NFAPI_TRACE(NFAPI_TRACE_ERROR, "no space in buffer\n");
 		return 0;
 	}
 }
@@ -332,7 +332,7 @@ uint32_t pullarrays16(uint8_t **in, int16_t out[], uint32_t max_len, uint32_t le
 
 	if(len > max_len)
 	{
-		NFAPI_TRACE(NFAPI_TRACE_ERROR, "%s exceed array size (%d > %d)\n", __FUNCTION__, len, max_len);
+		NFAPI_TRACE(NFAPI_TRACE_ERROR, "exceed array size (%d > %d)\n", len, max_len);
 		return 0;
 	}
 
@@ -349,7 +349,7 @@ uint32_t pullarrays16(uint8_t **in, int16_t out[], uint32_t max_len, uint32_t le
 	}
 	else
 	{
-		NFAPI_TRACE(NFAPI_TRACE_ERROR, "%s no space in buffer\n", __FUNCTION__);
+		NFAPI_TRACE(NFAPI_TRACE_ERROR, "no space in buffer\n");
 		return 0;
 	}
 }
@@ -360,7 +360,7 @@ uint32_t pusharray16(uint16_t in[], uint32_t max_len, uint32_t len, uint8_t **ou
 
 	if(len > max_len)
 	{
-		NFAPI_TRACE(NFAPI_TRACE_ERROR, "%s exceed array size (%d > %d)\n", __FUNCTION__, len, max_len);
+		NFAPI_TRACE(NFAPI_TRACE_ERROR, "exceed array size (%d > %d)\n", len, max_len);
 		return 0;
 	}
 
@@ -376,7 +376,7 @@ uint32_t pusharray16(uint16_t in[], uint32_t max_len, uint32_t len, uint8_t **ou
 	}
 	else
 	{
-		NFAPI_TRACE(NFAPI_TRACE_ERROR, "%s no space in buffer\n", __FUNCTION__);
+		NFAPI_TRACE(NFAPI_TRACE_ERROR, "no space in buffer\n");
 		return 0;
 	}
 }
@@ -387,7 +387,7 @@ uint32_t pusharrays16(int16_t in[], uint32_t max_len, uint32_t len, uint8_t **ou
 
 	if(len > max_len)
 	{
-		NFAPI_TRACE(NFAPI_TRACE_ERROR, "%s exceed array size (%d > %d)\n", __FUNCTION__, len, max_len);
+		NFAPI_TRACE(NFAPI_TRACE_ERROR, "exceed array size (%d > %d)\n", len, max_len);
 		return 0;
 	}
 
@@ -402,7 +402,7 @@ uint32_t pusharrays16(int16_t in[], uint32_t max_len, uint32_t len, uint8_t **ou
 	}
 	else
 	{
-		NFAPI_TRACE(NFAPI_TRACE_ERROR, "%s no space in buffer\n", __FUNCTION__);
+		NFAPI_TRACE(NFAPI_TRACE_ERROR, "no space in buffer\n");
 		return 0;
 	}
 }
@@ -413,7 +413,7 @@ uint32_t pullarray32(uint8_t **in, uint32_t out[], uint32_t max_len, uint32_t le
 
        if(len > max_len)
        {
-               NFAPI_TRACE(NFAPI_TRACE_ERROR, "%s exceed array size (%d > %d)\n", __FUNCTION__, len, max_len);
+               NFAPI_TRACE(NFAPI_TRACE_ERROR, "exceed array size (%d > %d)\n", len, max_len);
                return 0;
        }
 
@@ -430,7 +430,7 @@ uint32_t pullarray32(uint8_t **in, uint32_t out[], uint32_t max_len, uint32_t le
        }
        else
        {
-               NFAPI_TRACE(NFAPI_TRACE_ERROR, "%s no space in buffer\n", __FUNCTION__);
+               NFAPI_TRACE(NFAPI_TRACE_ERROR, "no space in buffer\n");
                return 0;
        }
 }
@@ -442,7 +442,7 @@ uint32_t pullarrays32(uint8_t **in, int32_t out[], uint32_t max_len, uint32_t le
 
        if(len > max_len)
        {
-               NFAPI_TRACE(NFAPI_TRACE_ERROR, "%s exceed array size (%d > %d)\n", __FUNCTION__, len, max_len);
+               NFAPI_TRACE(NFAPI_TRACE_ERROR, "exceed array size (%d > %d)\n", len, max_len);
                return 0;
        }
 
@@ -459,7 +459,7 @@ uint32_t pullarrays32(uint8_t **in, int32_t out[], uint32_t max_len, uint32_t le
        }
        else
        {
-               NFAPI_TRACE(NFAPI_TRACE_ERROR, "%s no space in buffer\n", __FUNCTION__);
+               NFAPI_TRACE(NFAPI_TRACE_ERROR, "no space in buffer\n");
                return 0;
        }
 }
@@ -470,7 +470,7 @@ uint32_t pusharray32(uint32_t in[], uint32_t max_len, uint32_t len, uint8_t **ou
 
        if(len > max_len)
        {
-               NFAPI_TRACE(NFAPI_TRACE_ERROR, "%s exceed array size (%d > %d)\n", __FUNCTION__, len, max_len);
+               NFAPI_TRACE(NFAPI_TRACE_ERROR, "exceed array size (%d > %d)\n", len, max_len);
                return 0;
        }
 
@@ -486,7 +486,7 @@ uint32_t pusharray32(uint32_t in[], uint32_t max_len, uint32_t len, uint8_t **ou
        }
        else
        {
-               NFAPI_TRACE(NFAPI_TRACE_ERROR, "%s no space in buffer\n", __FUNCTION__);
+               NFAPI_TRACE(NFAPI_TRACE_ERROR, "no space in buffer\n");
                return 0;
        }
 }
@@ -497,7 +497,7 @@ uint32_t pusharrays32(int32_t in[], uint32_t max_len, uint32_t len, uint8_t **ou
 
        if(len > max_len)
        {
-               NFAPI_TRACE(NFAPI_TRACE_ERROR, "%s exceed array size (%d > %d)\n", __FUNCTION__, len, max_len);
+               NFAPI_TRACE(NFAPI_TRACE_ERROR, "exceed array size (%d > %d)\n", len, max_len);
                return 0;
        }
 
@@ -512,7 +512,7 @@ uint32_t pusharrays32(int32_t in[], uint32_t max_len, uint32_t len, uint8_t **ou
        }
        else
        {
-               NFAPI_TRACE(NFAPI_TRACE_ERROR, "%s no space in buffer\n", __FUNCTION__);
+               NFAPI_TRACE(NFAPI_TRACE_ERROR, "no space in buffer\n");
                return 0;
        }
 }
@@ -523,7 +523,7 @@ uint32_t pullarray8(uint8_t **in, uint8_t out[], uint32_t max_len, uint32_t len,
 
 	if(len > max_len)
 	{
-		NFAPI_TRACE(NFAPI_TRACE_ERROR, "%s exceed array size (%d > %d)\n", __FUNCTION__, len, max_len);
+		NFAPI_TRACE(NFAPI_TRACE_ERROR, "exceed array size (%d > %d)\n", len, max_len);
 		return 0;
 	}
 
@@ -536,7 +536,7 @@ uint32_t pullarray8(uint8_t **in, uint8_t out[], uint32_t max_len, uint32_t len,
 	}
 	else
 	{
-		NFAPI_TRACE(NFAPI_TRACE_ERROR, "%s no space in buffer\n", __FUNCTION__);
+		NFAPI_TRACE(NFAPI_TRACE_ERROR, "no space in buffer\n");
 		return 0;
 	}
 }
@@ -548,7 +548,7 @@ uint32_t pusharray8(uint8_t in[], uint32_t max_len, uint32_t len, uint8_t **out,
 
 	if(len > max_len)
 	{
-		NFAPI_TRACE(NFAPI_TRACE_ERROR, "%s exceed array size (%d > %d)\n", __FUNCTION__, len, max_len);
+		NFAPI_TRACE(NFAPI_TRACE_ERROR, "exceed array size (%d > %d)\n", len, max_len);
 		return 0;
 	}
 
@@ -561,7 +561,7 @@ uint32_t pusharray8(uint8_t in[], uint32_t max_len, uint32_t len, uint8_t **out,
 	}
 	else
 	{
-		NFAPI_TRACE(NFAPI_TRACE_ERROR, "%s no space in buffer\n", __FUNCTION__);
+		NFAPI_TRACE(NFAPI_TRACE_ERROR, "no space in buffer\n");
 		return 0;
 	}
 }
@@ -570,7 +570,7 @@ uint8_t packarray(void* array, uint16_t array_element_size, uint16_t max_count, 
 {
 	if(count > max_count)
 	{
-		NFAPI_TRACE(NFAPI_TRACE_ERROR, "%s exceed array size (%d > %d)\n", __FUNCTION__, count, max_count);
+		NFAPI_TRACE(NFAPI_TRACE_ERROR, "exceed array size (%d > %d)\n", count, max_count);
 		return 0;
 	}
 
@@ -590,7 +590,7 @@ uint8_t unpackarray(uint8_t **ppReadPackedMsg, void* array, uint16_t array_eleme
 {
 	if(count > max_count)
 	{
-		NFAPI_TRACE(NFAPI_TRACE_ERROR, "%s exceed array size (%d > %d)\n", __FUNCTION__, count, max_count);
+		NFAPI_TRACE(NFAPI_TRACE_ERROR, "exceed array size (%d > %d)\n", count, max_count);
 		return 0;
 	}
 
@@ -713,7 +713,7 @@ int unpack_tlv_list(unpack_tlv_t unpack_fns[], uint16_t size, uint8_t **ppReadPa
 
 		for(idx = 0; idx < size; ++idx)
 		{
-			if(unpack_fns[idx].tag == generic_tl.tag)
+			if(unpack_fns[idx].tag == generic_tl.tag) // match the extracted tag value with all the tags in unpack_fn list
 			{
 				tagMatch = 1;
 				nfapi_tl_t* tl = (nfapi_tl_t*)(unpack_fns[idx].tlv);
@@ -808,7 +808,7 @@ int unpack_p7_tlv_list(unpack_p7_tlv_t unpack_fns[], uint16_t size, uint8_t **pp
 		// unpack the tl and process the values accordingly
 		if(unpack_tl(ppReadPackedMsg, &generic_tl, end) == 0)
 		{
-			NFAPI_TRACE(NFAPI_TRACE_ERROR, "%s unpack_tl == 0\n", __FUNCTION__);
+			NFAPI_TRACE(NFAPI_TRACE_ERROR, "unpack_tl == 0\n");
 			return 0;
 		}
 		uint8_t tagMatch = 0;
@@ -828,7 +828,7 @@ int unpack_p7_tlv_list(unpack_p7_tlv_t unpack_fns[], uint16_t size, uint8_t **pp
 
 				if(result == 0)
 				{
-					NFAPI_TRACE(NFAPI_TRACE_ERROR, "%s result == 0\n", __FUNCTION__);
+					NFAPI_TRACE(NFAPI_TRACE_ERROR, "result == 0\n");
 					return  0;
 				}
 
@@ -851,7 +851,7 @@ int unpack_p7_tlv_list(unpack_p7_tlv_t unpack_fns[], uint16_t size, uint8_t **pp
 				if(result == 0)
 				{
 					// got to end
-					NFAPI_TRACE(NFAPI_TRACE_ERROR, "%s unpack_p7_vendor_extension_tlv == 0\n", __FUNCTION__);
+					NFAPI_TRACE(NFAPI_TRACE_ERROR, "unpack_p7_vendor_extension_tlv == 0\n");
 					return 0;
 				}
 				else if(result < 0)
@@ -872,7 +872,7 @@ int unpack_p7_tlv_list(unpack_p7_tlv_t unpack_fns[], uint16_t size, uint8_t **pp
 					else
 					{
 						// got ot the dn
-						NFAPI_TRACE(NFAPI_TRACE_ERROR, "%s Line: %d (end- *ppReadPackedMsg) >= generic_tl.length\n", __FUNCTION__, __LINE__);
+						NFAPI_TRACE(NFAPI_TRACE_ERROR, "Line: %d (end- *ppReadPackedMsg) >= generic_tl.length\n", __LINE__);
 						return 0;
 					}
 				}
@@ -895,7 +895,7 @@ int unpack_p7_tlv_list(unpack_p7_tlv_t unpack_fns[], uint16_t size, uint8_t **pp
 				else
 				{
 					// got ot the dn
-					NFAPI_TRACE(NFAPI_TRACE_ERROR, "%s Line: %d (end- *ppReadPackedMsg) >= generic_tl.length\n", __FUNCTION__, __LINE__);
+					NFAPI_TRACE(NFAPI_TRACE_ERROR, "Line: %d (end- *ppReadPackedMsg) >= generic_tl.length\n", __LINE__);
 					return 0;
 				}
 
