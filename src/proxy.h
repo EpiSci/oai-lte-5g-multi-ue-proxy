@@ -1,23 +1,13 @@
 #pragma once
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <pthread.h>
-#include <sys/time.h>
-#include <sys/socket.h>
-#include <sys/types.h>
-#include <netinet/in.h>
-#include <netinet/sctp.h>
-#include <arpa/inet.h>
-#include <netdb.h>
-#include <unistd.h>
-#include <errno.h>
-#include <stdarg.h>
-#include <string>
-#include <cstring>
-#include <mutex>
-#include <assert.h>
-#include <iostream>
-#include <memory>
-#include <vector>
-#include <thread>
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+typedef enum softmodem_mode_t
+    {SOFTMODEM_LTE, SOFTMODEM_NR, SOFTMODEM_NSA}
+softmodem_mode_t;
+
+#ifdef __cplusplus
+}
+#endif

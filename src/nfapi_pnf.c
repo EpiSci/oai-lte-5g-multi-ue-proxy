@@ -26,6 +26,7 @@ extern "C" {
 #include "nfapi_pnf.h"
 #include "nfapi.h"
 #include "queue.h"
+#include "proxy.h"
 #include <inttypes.h>
 #include <assert.h>
 
@@ -3887,6 +3888,7 @@ void *oai_subframe_task(void *context)
     uint16_t sfn = 0;
     uint16_t sf = 0;
     bool are_queues_empty = true;
+    softmodem_mode_t softmodem_mode = (softmodem_mode_t) context;
     NFAPI_TRACE(NFAPI_TRACE_INFO, "Subframe Task thread");
     while (true)
     {
@@ -3917,23 +3919,26 @@ void *oai_subframe_task(void *context)
 
         oai_subframe_aggregate_messages(subframe_msgs);
 
-        pthread_mutex_lock(&lock);
+        if(softmodem_mode == SOFTMODEM_NSA)
+        {
+            pthread_mutex_lock(&lock);
 
-        sf_slot_tick |= LTE_PROXY_DONE;
-        if (sf_slot_tick == BOTH_LTE_NR_DONE)
-        {
-            pthread_cond_broadcast(&cond_sf_slot);
-        }
-        else
-        {
-            while ( sf_slot_tick != BOTH_LTE_NR_DONE)
+            sf_slot_tick |= LTE_PROXY_DONE;
+            if (sf_slot_tick == BOTH_LTE_NR_DONE)
             {
-                pthread_cond_wait(&cond_sf_slot, &lock);
+                pthread_cond_broadcast(&cond_sf_slot);
             }
-            sf_slot_tick = 0;
-        }
+            else
+            {
+                while ( sf_slot_tick != BOTH_LTE_NR_DONE)
+                {
+                    pthread_cond_wait(&cond_sf_slot, &lock);
+                }
+                sf_slot_tick = 0;
+            }
 
-        pthread_mutex_unlock(&lock);
+            pthread_mutex_unlock(&lock);
+        }
 
         uint64_t aggregation_done = clock_usec();
 
@@ -3950,6 +3955,7 @@ void *oai_slot_task(void *context)
     uint16_t sfn = 0;
     uint16_t slot = 0;
     bool are_queues_empty = true;
+    softmodem_mode_t softmodem_mode = (softmodem_mode_t) context;
     NFAPI_TRACE(NFAPI_TRACE_INFO, "Slot Task thread");
     uint16_t slot_tick = 0;
 
@@ -3981,7 +3987,7 @@ void *oai_slot_task(void *context)
 
         oai_slot_aggregate_messages(slot_msgs);
 
-        if (++slot_tick == NR_PROXY_DONE)
+        if ((++slot_tick == NR_PROXY_DONE) && (softmodem_mode == SOFTMODEM_NSA))
         {
             pthread_mutex_lock(&lock);
 
