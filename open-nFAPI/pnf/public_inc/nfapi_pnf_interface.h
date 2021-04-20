@@ -846,6 +846,41 @@ int nfapi_pnf_p7_nb_harq_ind(nfapi_pnf_p7_config_t* config, nfapi_nb_harq_indica
  */
 int nfapi_pnf_p7_nrach_ind(nfapi_pnf_p7_config_t* config, nfapi_nrach_indication_t* ind);
 
+/*! Send the NR_RX_DATA.indication
+ * \param config A pointer to a PNF P7 config
+ * \param ind A pointer to the nr rx data indication message structure
+ * \return 0 means success, -1 means failure
+ */
+int nfapi_pnf_p7_nr_rx_data_ind(nfapi_pnf_p7_config_t* config, nfapi_nr_rx_data_indication_t* ind);
+
+/*! Send the NR_CRC.indication
+ * \param config A pointer to a PNF P7 config
+ * \param ind A pointer to the nr crc indication message structure
+ * \return 0 means success, -1 means failure
+ */
+int nfapi_pnf_p7_nr_crc_ind(nfapi_pnf_p7_config_t* config, nfapi_nr_crc_indication_t* ind);
+
+/*! Send the NR_SRS.indication
+ * \param config A pointer to a PNF P7 config
+ * \param ind A pointer to the nr srs indication message structure
+ * \return 0 means success, -1 means failure
+ */
+int nfapi_pnf_p7_nr_srs_ind(nfapi_pnf_p7_config_t* config, nfapi_nr_srs_indication_t* ind);
+
+/*! Send the NR_UCI.indication
+ * \param config A pointer to a PNF P7 config
+ * \param ind A pointer to the nr uci indication message structure
+ * \return 0 means success, -1 means failure
+ */
+int nfapi_pnf_p7_nr_uci_ind(nfapi_pnf_p7_config_t* config, nfapi_nr_uci_indication_t* ind);
+
+/*! Send the NR_RACH.indication
+ * \param config A pointer to a PNF P7 config
+ * \param ind A pointer to the nr rach indication message structure
+ * \return 0 means success, -1 means failure
+ */
+int nfapi_pnf_p7_nr_rach_ind(nfapi_pnf_p7_config_t* config, nfapi_nr_rach_indication_t* ind);
+
 
 /*! Send a vendor exntesion message
  * \param config A pointer to a PNF P7 config
