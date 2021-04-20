@@ -269,8 +269,9 @@ class Scenario:
     def launch_proxy(self):
         log_name = '{}/nfapi.log'.format(OPTS.log_dir)
         LOGGER.info('Launch Proxy: %s', log_name)
-        cmd = '{WORKSPACE_DIR}/build/proxy {NUM_UES}' \
-              .format(WORKSPACE_DIR=WORKSPACE_DIR, NUM_UES=len(self.ue_hostname))
+        cmd = '{WORKSPACE_DIR}/build/proxy {NUM_UES} {SOFTMODEM_MODE}' \
+              .format(WORKSPACE_DIR=WORKSPACE_DIR, NUM_UES=len(self.ue_hostname), \
+                      SOFTMODEM_MODE='--nsa' if OPTS.nsa else '--nr' if OPTS.nr else '--lte')
         proc = subprocess.Popen(redirect_output(cmd, log_name), shell=True)
         time.sleep(2)
 

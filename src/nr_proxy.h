@@ -21,6 +21,7 @@
 #include <memory>
 #include <vector>
 #include <thread>
+#include "proxy.h"
 
 class Multi_UE_NR_Proxy
 {
@@ -36,7 +37,7 @@ public:
     void send_nr_ue_to_gnb_msg(void *buffer, size_t buflen);
     void send_received_msg_to_proxy_queue(void *buffer, size_t buflen);
     void send_uplink_oai_msg_to_proxy_queue(void *buffer, size_t buflen);
-    void start();
+    void start(softmodem_mode_t softmodem_mode);
 private:
     std::string oai_ue_ipaddr;
     std::string vnf_ipaddr;
