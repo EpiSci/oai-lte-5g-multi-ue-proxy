@@ -1,6 +1,4 @@
-#include <string>
 #include <sys/stat.h>
-#include <iostream>
 #include <sstream>
 #include "lte_proxy.h"
 #include "nfapi_pnf.h"
@@ -21,13 +19,13 @@ Multi_UE_Proxy::Multi_UE_Proxy(int num_of_ues,  std::string enb_ip, std::string 
     oai_subframe_init();
 }
 
-void Multi_UE_Proxy::start()
+void Multi_UE_Proxy::start(softmodem_mode_t softmodem_mode)
 {
     pthread_t thread;
 
     configure_nfapi_pnf(vnf_ipaddr.c_str(), vnf_p5port, pnf_ipaddr.c_str(), pnf_p7port, vnf_p7port);
 
-    if (pthread_create(&thread, NULL, &oai_subframe_task, NULL) != 0)
+    if (pthread_create(&thread, NULL, &oai_subframe_task, (void *)softmodem_mode) != 0)
     {
         NFAPI_TRACE(NFAPI_TRACE_ERROR, "pthread_create failed for calling oai_subframe_task");
     }

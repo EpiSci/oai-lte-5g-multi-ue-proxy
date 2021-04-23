@@ -12,11 +12,14 @@ extern "C"
 void usage();
 bool is_Numeric(char number[]);
 void init_log_file();
+bool valid_IpAddress(std::string &ipAddress);
 
 int main(int argc, char *argv[])
 {
     int ues = 0;
-    std::string oai_ue_ipaddr = "127.0.0.1";
+    softmodem_mode_t softmodem_mode = SOFTMODEM_LTE;
+    bool valid_ipaddr_args = true;
+    std::string ue_ipaddr = "127.0.0.1";
     std::string enb_ipaddr = "127.0.0.1";
     std::string gnb_ipaddr = "127.0.0.2";
     std::string proxy_ipaddr = "127.0.0.1";
@@ -24,36 +27,82 @@ int main(int argc, char *argv[])
     {
         ues = 1;
     }
-    else if((argc >= 2) && (is_Numeric(argv[1])))
+    else if (argc >= 2 && is_Numeric(argv[1]))
     {
         ues = atoi(argv[1]);
     }
-    if (argc == 5) // lte or nr case
+    if (argc >= 3)
     {
-        enb_ipaddr = argv[2];
-        gnb_ipaddr = argv[2];
-        proxy_ipaddr = argv[3];
-        oai_ue_ipaddr = argv[4];
+        std::vector<std::string> ipaddrs;
+        for (int i = 2; i < argc ; ++i)
+        {
+            std::string arg = argv[i];
+            if (arg == "--lte")
+            {
+                softmodem_mode = SOFTMODEM_LTE;
+            }
+            else if (arg == "--nr")
+            {
+                softmodem_mode = SOFTMODEM_NR;
+            }
+            else if (arg == "--nsa")
+            {
+                softmodem_mode = SOFTMODEM_NSA;
+            }
+            else if (valid_IpAddress(arg))
+            {
+                ipaddrs.push_back(arg);
+            }
+            else
+            {
+                valid_ipaddr_args = false;
+                break;
+            }
+        }
+        if (ipaddrs.size() == 3) // lte or nr case
+        {
+            enb_ipaddr = ipaddrs[0];
+            gnb_ipaddr = ipaddrs[0];
+            proxy_ipaddr = ipaddrs[1];
+            ue_ipaddr = ipaddrs[2];
+        }
+        else if (ipaddrs.size() == 4) // nsa case
+        {
+            enb_ipaddr = ipaddrs[0];
+            gnb_ipaddr = ipaddrs[1];
+            proxy_ipaddr = ipaddrs[2];
+            ue_ipaddr = ipaddrs[3];
+        }
+        else if (ipaddrs.size() > 0)
+        {
+            valid_ipaddr_args = false;
+        }
     }
-    else if (argc == 6) // nsa case
-    {
-        enb_ipaddr = argv[2];
-        gnb_ipaddr = argv[3];
-        proxy_ipaddr = argv[4];
-        oai_ue_ipaddr = argv[5];
-    }
-    if ( ues > 0 )
+    if (ues > 0 && valid_ipaddr_args)
     {
         init_log_file();
 
-        Multi_UE_Proxy lte_proxy(ues, enb_ipaddr, proxy_ipaddr, oai_ue_ipaddr);
-        Multi_UE_NR_Proxy nr_proxy(ues, gnb_ipaddr, proxy_ipaddr, oai_ue_ipaddr);
+        if (softmodem_mode == SOFTMODEM_LTE)
+        {
+            Multi_UE_Proxy lte_proxy(ues, enb_ipaddr, proxy_ipaddr, ue_ipaddr);
+            lte_proxy.start(softmodem_mode);
+        }
+        else if (softmodem_mode == SOFTMODEM_NR)
+        {
+            Multi_UE_NR_Proxy nr_proxy(ues, gnb_ipaddr, proxy_ipaddr, ue_ipaddr);
+            nr_proxy.start(softmodem_mode);
+        }
+        else if (softmodem_mode == SOFTMODEM_NSA)
+        {
+            Multi_UE_Proxy lte_proxy(ues, enb_ipaddr, proxy_ipaddr, ue_ipaddr);
+            Multi_UE_NR_Proxy nr_proxy(ues, gnb_ipaddr, proxy_ipaddr, ue_ipaddr);
 
-        std::thread lte_th( &Multi_UE_Proxy::start, &lte_proxy);
-        std::thread nr_th( &Multi_UE_NR_Proxy::start, &nr_proxy);
+            std::thread lte_th( &Multi_UE_Proxy::start, &lte_proxy, softmodem_mode);
+            std::thread nr_th( &Multi_UE_NR_Proxy::start, &nr_proxy, softmodem_mode);
 
-        lte_th.join();
-        nr_th.join();
+            lte_th.join();
+            nr_th.join();
+        }
     }
     else
     {
@@ -64,14 +113,18 @@ int main(int argc, char *argv[])
 
 void usage()
 {
-    std::cout<<"usage: ./proxy number_of_UEs eNB_IP_addr proxy_IP_addr UE_IP_addr"<<std::endl;
-    std::cout<<"  Mandatory:"<<std::endl;
-    std::cout<<"       number_of_UEs needs to be a positive interger, with default number_of_UEs = 1."<<std::endl;
-    std::cout<<"  Optional: (if not used, loopback will be used)"<<std::endl;
-    std::cout<<"       eNB_IP_addr (gNB_IP_addr in NR standalone mode) shall be a valid IP address"<<std::endl;
-    std::cout<<"       gNB_IP_addr shall be a valid IP address in NR non-standalone mode. Otherwise, it should be omitted"<<std::endl;
-    std::cout<<"       proxy_IP_addr shall be a valid IP address"<<std::endl;
-    std::cout<<"       UE_IP_addr shall be a valid IP address"<<std::endl;
+    std::cout << "usage: ./proxy number_of_UEs eNB_IP_addr proxy_IP_addr UE_IP_addr softmodem_mode\n";
+    std::cout << "  Mandatory:\n";
+    std::cout << "       number_of_UEs needs to be a positive interger, with default number_of_UEs = 1.";
+    std::cout << "  Optional IP address: (if not used, loopback will be used)";
+    std::cout << "       eNB_IP_addr (gNB_IP_addr in NR standalone mode) shall be a valid IP address\n";
+    std::cout << "       gNB_IP_addr shall be a valid IP address in NR non-standalone mode. Otherwise, it should be omitted\n";
+    std::cout << "       proxy_IP_addr shall be a valid IP address\n";
+    std::cout << "       UE_IP_addr shall be a valid IP address\n";
+    std::cout << "  Optional softmodem_mode: (if not used, --lte will be used)\n";
+    std::cout << "       --lte if it runs in lte as a defalt value.\n";
+    std::cout << "       --nr if it runs in nr standalone mode.\n";
+    std::cout << "       --nsa if it runs in nr non-standalone mode.\n";
 }
 
 bool is_Numeric(char number[]) 
@@ -86,7 +139,7 @@ bool is_Numeric(char number[])
     return true;
 }  
 
-inline bool exists (const std::string& filename)
+inline bool exists(const std::string& filename)
 {
     struct stat buffer;
     return (stat (filename.c_str(), &buffer) == 0);
@@ -103,4 +156,11 @@ void init_log_file()
             perror(log_name);
         }
     }
+}
+
+bool valid_IpAddress(std::string &ipAddress)
+{
+    struct sockaddr_in sa;
+    int result = inet_pton(AF_INET, ipAddress.c_str(), &(sa.sin_addr));
+    return result == 1;
 }
