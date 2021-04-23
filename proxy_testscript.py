@@ -257,6 +257,8 @@ class Scenario:
         LOGGER.info('Launch eNB: %s', log_name)
         cmd = 'NODE_NUMBER=1 {WORKSPACE_DIR}/run-oai enb' \
               .format(WORKSPACE_DIR=WORKSPACE_DIR)
+        if OPTS.nsa:
+              cmd += ' --nsa'
         proc = subprocess.Popen(redirect_output(cmd, log_name), shell=True)
 
         # TODO: Sleep time needed so eNB and UEs don't start at the exact same time
