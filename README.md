@@ -35,8 +35,7 @@ make
 ## Run the proxy ##
 
 ```shell
-./proxy_testscript.py -s Core_PROXY_2_UEs.imn
+./proxy_testscript.py
 ```
 
-The `-s` option specifies the scenario file.
-The default scenario file is Core_PROXY_1_UEs.imn which launches one UE.
+See `./proxy_testscript.py --help` for more information.
