@@ -1,19 +1,21 @@
 #!/usr/bin/env python3
 #
-# Automated tests for running PROXY simulations.
+# Automated tests for running proxy simulations.
 # See `--help` for more information.
 #
 import os
 import sys
 import argparse
 import logging
-import subprocess
 import time
 import re
 import glob
 import bz2
 import signal
 import platform
+import subprocess
+from subprocess import Popen
+from typing import Optional, Dict, List, Generator
 
 WORKSPACE_DIR = os.path.abspath(os.path.dirname(sys.argv[0]))
 
@@ -22,52 +24,48 @@ WORKSPACE_DIR = os.path.abspath(os.path.dirname(sys.argv[0]))
 
 parser = argparse.ArgumentParser(description="""
 
-Automated tests for running PROXY simulations
+Automated tests for running proxy simulations
 
 """)
-parser.add_argument('--scenario', '-s', metavar='IMN',
-                    default='{}/Core_PROXY_1_UEs.imn'.format(WORKSPACE_DIR),
+
+parser.add_argument('--num-ues', '-u', metavar='N', type=int, default=1,
                     help="""
-The CORE scenario .imn file (default: %(default)s)
+The number of UEs to launch (default: %(default)s)
 """)
+
 parser.add_argument('--duration', '-d', metavar='SECONDS', type=int, default=15,
                     help="""
 How long to run the test before stopping to examine the logs
 """)
-parser.add_argument('--ue', '-u', type=int, default=0,
-                    help="""
-UE id starting from 1""")
-parser.add_argument('--sleep', '-e', type=int, default=0,
-                    help="""
-sleep time for UE at the end of execution in seconds
-""")
-parser.add_argument('--log-dir', '-l', default=os.environ['HOME'],
+
+parser.add_argument('--log-dir', '-l', default='.',
                     help="""
 Where to store log files
 """)
+
 parser.add_argument('--no-run', '-n', action='store_true', help="""
 Don't run the scenario, only examine the logs in the --log-dir
 directory from a previous run of the scenario
 """)
-parser.add_argument('--nsa', action='store_true', help="""
-Enable NSA (LTE and 5G) mode
+
+parser.add_argument('--mode', default='lte', choices='lte nr nsa'.split(),
+                    help="""
+The kind of simulation scenario to run
+(default: %(default)s)
 """)
-parser.add_argument('--nr', '--5g', '-5', action='store_true', help="""
-Enable NR/5G mode
-""")
+
 parser.add_argument('--nfapi-trace-level', '-N',
                     choices='none error warn note info debug'.split(),
                     help="""
 Set the NFAPI trace level
 """)
+
 parser.add_argument('--debug', action='store_true', help="""
 Enable debug logging (for this script only)
 """)
+
 OPTS = parser.parse_args()
 del parser
-
-if OPTS.nr and OPTS.nsa:
-    raise Exception('Cannot do --nr and --nsa together')
 
 logging.basicConfig(level=logging.DEBUG if OPTS.debug else logging.INFO,
                     format='>>> %(name)s: %(levelname)s: %(message)s')
@@ -78,11 +76,16 @@ if OPTS.nfapi_trace_level:
 
 # ----------------------------------------------------------------------------
 
-def redirect_output(cmd, filename):
+def redirect_output(cmd: str, filename: str) -> str:
     cmd += ' >{} 2>&1'.format(filename)
     return cmd
 
-def compress(from_name, to_name=None, remove_original=False):
+def compress(from_name: str, to_name: Optional[str]=None, remove_original: bool=False) -> None:
+    """
+    Compress the file `from_name` and store it as `to_name`.
+    `to_name` defaults to `from_name` with `.bz2` appended.
+    If `remove_original` is True, removes `from_name` when the compress finishes.
+    """
     if to_name is None:
         to_name = from_name
     if not to_name.endswith('.bz2'):
@@ -104,10 +107,10 @@ class CompressJobs:
     Allow multiple invocations of `compress` to run in parallel
     """
 
-    def __init__(self):
-        self.kids = []
+    def __init__(self) -> None:
+        self.kids: List[int] = []
 
-    def compress(self, from_name, to_name=None, remove_original=False):
+    def compress(self, from_name: str, to_name: Optional[str]=None, remove_original: bool=False) -> None:
         if not os.path.exists(from_name):
             # It's not necessarily an error if the log file does not exist.
             # For example, if nfapi_trace never gets invoked (e.g., because
@@ -124,7 +127,7 @@ class CompressJobs:
             LOGGER.debug('in pid %d compress %s...done', os.getpid(), from_name)
             sys.exit()
 
-    def wait(self):
+    def wait(self) -> None:
         LOGGER.debug('wait %s...', self.kids)
         failed = []
         for kid in self.kids:
@@ -136,130 +139,72 @@ class CompressJobs:
             raise Exception('compression failed: %s', failed)
         LOGGER.debug('wait...done')
 
+class NodeIdGenerator:
+    id: int = 0
+
+    def __call__(self):
+        self.id += 1
+        return self.id
+
 class Scenario:
     """
-    Represents a PROXY scenario
+    Represents a proxy scenario
     """
 
-    def __init__(self, filename):
-        self.filename = filename
-        self.parse_config()
+    def __init__(self) -> None:
+        self.enb_hostname: Optional[str] = None
+        self.enb_node_id: Optional[int] = None
+        self.ue_hostname: Dict[int, str] = {}
+        self.ue_node_id: Dict[int, int] = {}
+        self.gnb_hostname: Optional[str] = None
+        self.gnb_node_id: Optional[int] = None
+        self.nrue_hostname: Dict[int, str] = {}
+        self.nrue_node_id: Dict[int, int] = {}
 
-    def parse_config(self):
-        """
-        Scan the scenario file to determine node numbers, etc.
-        """
-        self.enb_hostname = None
-        self.enb_node_id = None
-        self.ue_hostname = {}
-        self.ue_node_id = {}
-        self.gnb_hostname = None
-        self.gnb_node_id = None
-        self.nrue_hostname = {}
-        self.nrue_node_id = {}
+        # Setup our data structures according to the command-line options
 
-        node_re = re.compile(r'^\s*node\s+(\S+)')
-        hostname_re = re.compile(r'^\s*hostname\s+(\S+)')
+        node_ids = NodeIdGenerator()
 
-        with open(self.filename, 'rt') as filehandler:
-            node_id = None
-            for line in filehandler:
-                match = node_re.match(line)
-                if match:
-                    node_id = match.group(1)
-                    if not node_id.startswith('n'):
-                        raise Exception('Bad node ID: {}'.format(node_id))
-                    node_id = int(node_id[1:])
-                    LOGGER.debug('node_id %r', node_id)
-                    continue
+        if OPTS.mode == 'nsa':
+            # Non-standalone mode: eNB, gNB, UEs and NRUEs
+            self.enb_hostname = 'eNB'
+            self.enb_node_id = node_ids()
+            for i in range(OPTS.num_ues):
+                ue_num = i + 1
+                node_id = node_ids()
+                self.ue_hostname[ue_num] = f'UE{ue_num}'
+                self.ue_node_id[ue_num] = node_id
+                self.nrue_hostname[ue_num] = f'NRUE{ue_num}'
+                self.nrue_node_id[ue_num] = node_id
+            self.gnb_hostname = 'gNB'
+            self.gnb_node_id = node_ids()
 
-                match = hostname_re.match(line)
-                if match:
-                    hostname = match.group(1)
-                    LOGGER.debug('hostname %r', hostname)
+        if OPTS.mode == 'nr':
+            # NR mode: gNB and NRUEs, no eNB, no UEs
+            self.gnb_hostname = 'gNB'
+            self.gnb_node_id = node_ids()
+            for i in range(OPTS.num_ues):
+                ue_num = i + 1
+                self.nrue_hostname[ue_num] = f'NRUE{ue_num}'
+                self.nrue_node_id[ue_num] = node_ids()
 
-                    if not node_id:
-                        LOGGER.warning('No node ID for hostname %r', hostname)
-                        continue
+        if OPTS.mode == 'lte':
+            # LTE mode: eNB and UEs, no gNB, no NRUEs
+            self.enb_hostname = 'eNB'
+            self.enb_node_id = node_ids()
+            for i in range(OPTS.num_ues):
+                ue_num = i + 1
+                self.ue_hostname[ue_num] = f'UE{ue_num}'
+                self.ue_node_id[ue_num] = node_ids()
 
-                    if hostname.lower() in ['proxy', 'lte']:
-                        LOGGER.debug('Network node is %s', node_id)
-                        continue
-
-                    if hostname.lower() == 'enb':
-                        LOGGER.debug('enb node is %s', node_id)
-                        self.enb_hostname = hostname
-                        self.enb_node_id = node_id
-                        continue
-
-                    if hostname.lower().startswith('ue'):
-                        ue_number = int(hostname[2:])
-                        LOGGER.debug('UE %d is node_id %s', ue_number, node_id)
-                        self.ue_hostname[ue_number] = hostname
-                        self.ue_node_id[ue_number] = node_id
-                        continue
-
-                    if hostname.lower() == 'gnb':
-                        LOGGER.debug('gnb node is %s', node_id)
-                        self.gnb_hostname = hostname
-                        self.gnb_node_id = node_id
-                        continue
-
-                    if hostname.lower().startswith('nrue'):
-                        nrue_number = int(hostname[4:])
-                        LOGGER.debug('NRUE %d is node_id %s', nrue_number, node_id)
-                        self.nrue_hostname[nrue_number] = hostname
-                        self.nrue_node_id[nrue_number] = node_id
-                        continue
-
-                    if hostname.lower().startswith('nsaue'):
-                        nsaue_number = int(hostname[5:])
-                        LOGGER.debug('NSA-UE %d is node_id %s', nsaue_number, node_id)
-                        self.ue_hostname[nsaue_number] = hostname + '-lte'
-                        self.ue_node_id[nsaue_number] = node_id
-                        self.nrue_hostname[nsaue_number] = hostname + '-nr'
-                        self.nrue_node_id[nsaue_number] = node_id
-                        continue
-
-                    LOGGER.warning('Skipping unknown hostname %r of node_id %r', hostname, node_id)
-                    continue
-
-                LOGGER.debug('Unmatched line %r', line)
-
-        if OPTS.nsa:
-            if not self.enb_hostname:
-                raise Exception('No eNB node in scenario ' + self.filename)
-            if not self.gnb_hostname:
-                raise Exception('No gNB node in scenario ' + self.filename)
-            if not self.nrue_hostname or not self.ue_hostname:
-                raise Exception('No NSA node in scenario ' + self.filename)
-        elif OPTS.nr:
-            if not self.gnb_hostname:
-                raise Exception('No gNB node in scenario ' + self.filename)
-            if not self.nrue_hostname:
-                raise Exception('No nr-UE node in scenario ' + self.filename)
-            if self.enb_hostname:
-                raise Exception('Unexpected eNB node in scenario ' + self.filename)
-            if self.ue_hostname:
-                raise Exception('Unexpected UE node in scenario ' + self.filename)
-        else:
-            if not self.enb_hostname:
-                raise Exception('No eNB node in scenario ' + self.filename)
-            if not self.ue_hostname:
-                raise Exception('No UE node in scenario ' + self.filename)
-            if self.gnb_hostname:
-                raise Exception('Unexpected gNB node in scenario ' + self.filename)
-            if self.nrue_hostname:
-                raise Exception('Unexpected nr-UE node in scenario ' + self.filename)
-
-    def launch_enb(self):
+    def launch_enb(self) -> Popen:
         log_name = '{}/eNB.log'.format(OPTS.log_dir)
         LOGGER.info('Launch eNB: %s', log_name)
         cmd = 'NODE_NUMBER=1 {WORKSPACE_DIR}/run-oai enb' \
               .format(WORKSPACE_DIR=WORKSPACE_DIR)
-        if OPTS.nsa:
-              cmd += ' --nsa'
-        proc = subprocess.Popen(redirect_output(cmd, log_name), shell=True)
+        if OPTS.mode == 'nsa':
+            cmd += ' --nsa'
+        proc = Popen(redirect_output(cmd, log_name), shell=True)
 
         # TODO: Sleep time needed so eNB and UEs don't start at the exact same time
         # When nodes start at the same time, occasionally eNB will only recognize one UE
@@ -268,40 +213,40 @@ class Scenario:
 
         return proc
 
-    def launch_proxy(self):
+    def launch_proxy(self) -> Popen:
         log_name = '{}/nfapi.log'.format(OPTS.log_dir)
         LOGGER.info('Launch Proxy: %s', log_name)
         cmd = '{WORKSPACE_DIR}/build/proxy {NUM_UES} {SOFTMODEM_MODE}' \
               .format(WORKSPACE_DIR=WORKSPACE_DIR, NUM_UES=len(self.ue_hostname), \
-                      SOFTMODEM_MODE='--nsa' if OPTS.nsa else '--nr' if OPTS.nr else '--lte')
-        proc = subprocess.Popen(redirect_output(cmd, log_name), shell=True)
+                      SOFTMODEM_MODE=f'--{OPTS.mode}')
+        proc = Popen(redirect_output(cmd, log_name), shell=True)
         time.sleep(2)
 
         return proc
 
-    def launch_ue(self):
+    def launch_ue(self) -> Dict[int, Popen]:
         procs = {}
         for num, hostname in self.ue_hostname.items():
             log_name = '{}/{}.log'.format(OPTS.log_dir, hostname)
             LOGGER.info('Launch UE%d: %s', num, log_name)
             cmd = 'NODE_NUMBER={NODE_ID} {WORKSPACE_DIR}/run-oai ue' \
                   .format(NODE_ID=self.ue_node_id[num], WORKSPACE_DIR=WORKSPACE_DIR)
-            if OPTS.nsa:
+            if OPTS.mode == 'nsa':
                 cmd += ' --nsa'
             output_cmd = redirect_output(cmd, log_name)
-            procs[num] = subprocess.Popen(output_cmd, stdin=subprocess.PIPE, shell=True)
+            procs[num] = Popen(output_cmd, stdin=subprocess.PIPE, shell=True)
             # TODO: Sleep time needed so eNB and UEs don't start at the exact same time
             # When nodes start at the same time, occasionally eNB will only recognize one UE
             time.sleep(1)
 
         return procs
 
-    def launch_gnb(self):
+    def launch_gnb(self) -> Popen:
         log_name = '{}/gNB.log'.format(OPTS.log_dir)
         LOGGER.info('Launch gNB: %s', log_name)
         cmd = 'NODE_NUMBER=0 {WORKSPACE_DIR}/run-oai gnb' \
               .format(WORKSPACE_DIR=WORKSPACE_DIR)
-        proc = subprocess.Popen(redirect_output(cmd, log_name), shell=True)
+        proc = Popen(redirect_output(cmd, log_name), shell=True)
 
         # TODO: Sleep time needed so eNB and UEs don't start at the exact same time
         # When nodes start at the same time, occasionally eNB will only recognize one UE
@@ -310,33 +255,34 @@ class Scenario:
 
         return proc
 
-    def launch_nrue(self):
+    def launch_nrue(self) -> Dict[int, Popen]:
         procs = {}
         for num, hostname in self.nrue_hostname.items():
             log_name = '{}/{}.log'.format(OPTS.log_dir, hostname)
             LOGGER.info('Launch nrUE%d: %s', num, log_name)
             cmd = 'NODE_NUMBER={NODE_ID} {WORKSPACE_DIR}/run-oai nrue' \
                   .format(NODE_ID=len(self.ue_node_id)+self.ue_node_id[num], WORKSPACE_DIR=WORKSPACE_DIR)
-            if OPTS.nsa:
+            if OPTS.mode == 'nsa':
                 cmd += ' --nsa'
             output_cmd = redirect_output(cmd, log_name)
-            procs[num] = subprocess.Popen(output_cmd, stdin=subprocess.PIPE, shell=True)
+            procs[num] = Popen(output_cmd, stdin=subprocess.PIPE, shell=True)
             # TODO: Sleep time needed so eNB and UEs don't start at the exact same time
             # When nodes start at the same time, occasionally eNB will only recognize one UE
             time.sleep(1)
 
         return procs
 
-    def run(self, ue_id):
+    def run(self) -> bool:
         """
-        Run the scenario simulation
+        Run the simulation.
+        Return True if the test passes
         """
 
-        enb_proc = None
-        proxy_proc = None
-        ue_proc = {}
-        gnb_proc = None
-        nrue_proc = {}
+        enb_proc: Optional[Popen] = None
+        proxy_proc: Optional[Popen] = None
+        ue_proc: Dict[int, Popen] = {}
+        gnb_proc: Optional[Popen] = None
+        nrue_proc: Dict[int, Popen] = {}
 
         # ------------------------------------------------------------------------------------
         # Launch the softmodem processes
@@ -356,8 +302,12 @@ class Scenario:
             nrue_proc = self.launch_nrue()
 
         # ------------------------------------------------------------------------------------
+        # Let the simulation run for a while
 
         time.sleep(OPTS.duration)
+
+        # ------------------------------------------------------------------------------------
+        # Analyze the log files to see if the test run passed
 
         passed = True
 
@@ -461,7 +411,7 @@ class Scenario:
 
 # ----------------------------------------------------------------------------
 
-def get_analysis_messages(filename):
+def get_analysis_messages(filename: str) -> Generator:
     """
     Find all the LOG_A log messages in the given log file `filename`
     and yield them one by one.  The file is a .bz2 compressed log.
@@ -491,7 +441,7 @@ def get_analysis_messages(filename):
                 else:
                     LOGGER.warning('%s', line)
 
-def set_core_pattern():
+def set_core_pattern() -> None:
     # Set the core_pattern so we can save the core files from any crashes.
     #
     # On Ubuntu, the pattern is normally `|/usr/share/apport/apport %p %s %c %d %P %E`
@@ -515,7 +465,7 @@ def set_core_pattern():
     subprocess.run(['sudo', 'sh', '-c',
                     'echo /tmp/coredump-%P > {}'.format(pattern_file)])
 
-def save_core_files():
+def save_core_files() -> bool:
     core_files = glob.glob('/tmp/coredump-*')
     if not core_files:
         LOGGER.info('No core files')
@@ -536,8 +486,8 @@ def save_core_files():
 
     return True
 
-def main():
-    scenario = Scenario(OPTS.scenario)
+def main() -> int:
+    scenario = Scenario()
 
     if scenario.enb_hostname:
         LOGGER.info('eNB node number %d', scenario.enb_node_id)
@@ -560,8 +510,7 @@ def main():
     passed = True
 
     if not OPTS.no_run:
-        arg = int(OPTS.ue) if int(OPTS.ue) > 0 else None
-        passed = scenario.run(arg)
+        passed = scenario.run()
 
     # Examine the logs to determine if the test passed
 

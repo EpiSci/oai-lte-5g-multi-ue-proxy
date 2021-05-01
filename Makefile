@@ -1,4 +1,3 @@
-
 CC = gcc
 CFLAGS = -g -O2 -Wall -Werror
 CXX = g++ -std=c++11
@@ -48,6 +47,8 @@ INC_FLAGS := $(addprefix -I,$(INC_DIRS))
 
 LDFLAGS = -lasan -pthread  -lpthread -lz -lsctp 
 
+MKDIR_P ?= mkdir -p
+
 $(TARGET_EXEC): $(OBJS)
 	$(CXX) $(OBJS) -o $@ $(LDFLAGS)
 
@@ -67,4 +68,7 @@ clean:
 
 -include $(DEPS)
 
-MKDIR_P ?= mkdir -p
+# Run static analysis checks on Python scripts
+.PHONY: mypy
+mypy:
+	python3 -m mypy proxy_testscript.py
