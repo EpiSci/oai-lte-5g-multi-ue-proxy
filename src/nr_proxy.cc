@@ -58,8 +58,8 @@ void Multi_UE_NR_Proxy::configure(std::string gnb_ip, std::string proxy_ip, std:
 
     for (int ue_idx = 0; ue_idx < num_ues; ue_idx++)
     {
-        int oai_rx_ue_port = 3211 + (num_ues + ue_idx) * port_delta;
-        int oai_tx_ue_port = 3212 + (num_ues + ue_idx) * port_delta;
+        int oai_rx_ue_port = 3611 + (num_ues + ue_idx) * port_delta;
+        int oai_tx_ue_port = 3612 + (num_ues + ue_idx) * port_delta;
         init_oai_socket(oai_ue_ipaddr.c_str(), oai_tx_ue_port, oai_rx_ue_port, ue_idx);
     }
 }
@@ -187,7 +187,7 @@ void Multi_UE_NR_Proxy::oai_gnb_downlink_nfapi_task(void *msg_org)
 
     for(int ue_idx = 0; ue_idx < num_ues; ue_idx++)
     {
-        address_tx_.sin_port = htons(3212 + (num_ues + ue_idx) * port_delta);
+        address_tx_.sin_port = htons(3612 + (num_ues + ue_idx) * port_delta);
         switch (msg.header.message_id)
         {
 
