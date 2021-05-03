@@ -98,6 +98,7 @@ case "$node_type" in
             --nokrnmod 1
             --noS1
             --nfapi 5
+            --node-number "$NODE_NUMBER"
         )
         ;;
 

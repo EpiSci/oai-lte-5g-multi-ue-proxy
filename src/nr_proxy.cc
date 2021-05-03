@@ -91,6 +91,7 @@ int Multi_UE_NR_Proxy::init_oai_socket(const char *addr, int tx_port, int rx_por
             ue_rx_socket_ = -1;
             return -1;
         }
+        NFAPI_TRACE(NFAPI_TRACE_DEBUG, "rx addr: %s, rx port: %d", addr, rx_port);
     }
     {   //Setup Tx Socket
         memset(&address_tx_, 0, sizeof(address_tx_));
@@ -117,6 +118,7 @@ int Multi_UE_NR_Proxy::init_oai_socket(const char *addr, int tx_port, int rx_por
           close(ue_tx_socket_);
           return -1;
         }
+        NFAPI_TRACE(NFAPI_TRACE_DEBUG, "tx addr: %s, tx port: %d", addr, tx_port);
     }
     return 0;
 }
@@ -185,7 +187,7 @@ void Multi_UE_NR_Proxy::oai_gnb_downlink_nfapi_task(void *msg_org)
 
     for(int ue_idx = 0; ue_idx < num_ues; ue_idx++)
     {
-        address_tx_.sin_port = htons(3212 + ue_idx * port_delta);
+        address_tx_.sin_port = htons(3212 + (num_ues + ue_idx) * port_delta);
         switch (msg.header.message_id)
         {
 
