@@ -26,5 +26,7 @@ build/
 
 *.log
 *~
+coredump-*
+*.log.bz2
 
 
