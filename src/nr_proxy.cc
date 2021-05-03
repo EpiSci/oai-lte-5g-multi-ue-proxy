@@ -260,7 +260,7 @@ void Multi_UE_NR_Proxy::pack_and_send_downlink_sfn_slot_msg(uint16_t sfn_slot)
 
     for(int ue_idx = 0; ue_idx < num_ues; ue_idx++)
     {
-        address_tx_.sin_port = htons(3212 + (num_ues + ue_idx) * port_delta);
+        address_tx_.sin_port = htons(3612 + (num_ues + ue_idx) * port_delta);
         assert(ue_tx_socket[ue_idx] > 2);
         if (sendto(ue_tx_socket[ue_idx], &sfn_slot, sizeof(sfn_slot), 0, (const struct sockaddr *) &address_tx_, sizeof(address_tx_)) < 0)
         {
