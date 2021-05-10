@@ -127,13 +127,14 @@ uint16_t nfapi_get_sfnslot(const void *msg, size_t length)
     }
 
     in = (uint8_t *)msg + sizeof(nfapi_p7_message_header_t);
-    uint16_t sfn_slot;
-    if (!pull16(&in, &sfn_slot, end))
+    uint16_t sfn, slot;
+    if (!pull16(&in, &sfn, end) ||
+        !pull16(&in, &slot, end))
     {
-        NFAPI_TRACE(NFAPI_TRACE_ERROR, "could not retrieve sfn_slot");
+        NFAPI_TRACE(NFAPI_TRACE_ERROR, "could not retrieve sfn and slot");
         return ~0;
     }
-    return sfn_slot;
+    return NFAPI_SFNSLOT2HEX(sfn, slot);
 }
 
 pnf_config_phy_t *find_pnf_phy_config(pnf_config_t *config,

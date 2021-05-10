@@ -196,6 +196,12 @@ int oai_nfapi_cqi_indication(nfapi_cqi_indication_t *ind);
 int oai_nfapi_rx_ind(nfapi_rx_indication_t *ind);
 int oai_nfapi_sr_indication(nfapi_sr_indication_t *ind);
 
+int oai_nfapi_nr_rach_indication(nfapi_nr_rach_indication_t *ind);
+int oai_nfapi_nr_rx_data_indication(nfapi_nr_rx_data_indication_t *ind);
+int oai_nfapi_nr_crc_indication(nfapi_nr_crc_indication_t *ind);
+int oai_nfapi_nr_srs_indication(nfapi_nr_srs_indication_t *ind);
+int oai_nfapi_nr_uci_indication(nfapi_nr_uci_indication_t *ind);
+
 void oai_subframe_ind(uint16_t sfn, uint16_t sf);
 void oai_slot_ind(uint16_t sfn, uint16_t slot);
 
@@ -245,13 +251,11 @@ void transfer_downstream_sfn_sf_to_proxy(uint16_t sfn_sf);
 void transfer_downstream_sfn_slot_to_proxy(uint16_t sfn_slot);
 
 uint16_t sfn_sf_add(uint16_t a, uint16_t add_val);
-uint16_t sfn_slot_add(uint16_t a, uint16_t add_val);
+void sfn_slot_add(uint16_t *sfn, uint16_t *slot, uint16_t add_val);
 
 int get_sf_delta(uint16_t a, uint16_t b);
 int get_slot_delta(uint16_t a, uint16_t b);
 uint16_t sfn_sf_subtract(uint16_t a, uint16_t sub_val);
-uint16_t sfn_sf_add(uint16_t a, uint16_t add_val);
-uint16_t sfn_slot_add(uint16_t a, uint16_t add_val);
 
 
 bool dequeue_ue_msgs(subframe_msgs_t *subframe_msgs, uint16_t sfn_sf_tx);
