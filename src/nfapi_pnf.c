@@ -2512,6 +2512,46 @@ static bool get_sfnsf(message_buffer_t *msg, uint16_t *sfnsf)
     return true;
 }
 
+static bool get_sfnslot(message_buffer_t *msg, uint16_t *sfnslot)
+{
+    uint8_t *in = msg->data;
+    uint8_t *end = msg->data + msg->length;
+    assert(end <= msg->data + sizeof(msg->data));
+
+    uint16_t phy_id;
+    uint16_t message_id;
+    if (!pull16(&in, &phy_id, end) ||
+        !pull16(&in, &message_id, end))
+    {
+        NFAPI_TRACE(NFAPI_TRACE_ERROR, "could not retrieve message_id");
+        return false;
+    }
+
+    switch (message_id)
+    {
+    case NFAPI_NR_PHY_MSG_TYPE_RACH_INDICATION:
+    case NFAPI_NR_PHY_MSG_TYPE_CRC_INDICATION:
+    case NFAPI_NR_PHY_MSG_TYPE_RX_DATA_INDICATION:
+    case NFAPI_NR_PHY_MSG_TYPE_UCI_INDICATION:
+    case NFAPI_NR_PHY_MSG_TYPE_SRS_INDICATION:
+        break;
+    default:
+        NFAPI_TRACE(NFAPI_TRACE_ERROR, "Message_id is unknown %u", message_id);
+        return false;
+    }
+
+    in = msg->data + sizeof(nfapi_p7_message_header_t);
+    uint16_t sfn, slot;
+    if (!pull16(&in, &sfn, end) ||
+        !pull16(&in, &slot, end))
+    {
+        NFAPI_TRACE(NFAPI_TRACE_ERROR, "could not retrieve sfn and slot");
+        return false;
+    }
+    *sfnslot = NFAPI_SFNSLOT2HEX(sfn, slot);
+    return true;
+}
+
 static void warn_if_different(const char *label,
                               const nfapi_p7_message_header_t *agg_header,
                               const nfapi_p7_message_header_t *ind_header,
@@ -2531,6 +2571,28 @@ static void warn_if_different(const char *label,
     }
 }
 
+static void warn_if_different_slots(const char *label,
+                              const nfapi_p7_message_header_t *agg_header,
+                              const nfapi_p7_message_header_t *ind_header,
+                              uint16_t agg_sfn,
+                              uint16_t ind_sfn,
+                              uint16_t agg_slot,
+                              uint16_t ind_slot)
+{
+    if (agg_header->phy_id != ind_header->phy_id ||
+        agg_header->message_id != ind_header->message_id ||
+        agg_header->m_segment_sequence != ind_header->m_segment_sequence ||
+        agg_sfn != ind_sfn ||
+        agg_slot != ind_slot)
+    {
+        NFAPI_TRACE(NFAPI_TRACE_ERROR, "Mismatch phy_id %u,%u message_id %u,%u m_seg_sequence %u,%u sfn %u,%u slot %u,%u (%s)",
+                    agg_header->phy_id, ind_header->phy_id,
+                    agg_header->message_id, ind_header->message_id,
+                    agg_header->m_segment_sequence, ind_header->m_segment_sequence,
+                    agg_sfn, ind_sfn,
+                    agg_slot, ind_slot, label);
+    }
+}
 
 /*
   nfapi_rach_indication_t
@@ -2627,18 +2689,16 @@ static void oai_slot_aggregate_rach_ind(slot_msgs_t *msgs)
     for (int i = 0; i < msgs->num_msgs; ++i)
     {
         message_buffer_t *msg = msgs->msgs[i];
-        nfapi_rach_indication_t ind;
+        nfapi_nr_rach_indication_t ind;
         assert(msg->length <= sizeof(msg->data));
 
-        if (nfapi_p7_message_unpack(msg->data, msg->length, &ind, sizeof(ind), NULL) < 0)
+        if (nfapi_nr_p7_message_unpack(msg->data, msg->length, &ind, sizeof(ind), NULL) < 0)
         {
             NFAPI_TRACE(NFAPI_TRACE_ERROR,  "rach unpack failed");
             continue;
         }
-        //uint32_t sfn_slot_tx = sfnslot_add_slot(ind.sfn, ind.slot, 5);
-        ind.sfn_sf = sfn_sf_add(ind.sfn_sf, 5);
-        //To Do Items: ind type is different between caller and callee. Need update.
-        oai_nfapi_rach_ind(&ind);
+        sfn_slot_add(&ind.sfn, &ind.slot, 5);
+        oai_nfapi_nr_rach_indication(&ind);
     }
 }
 
@@ -2721,60 +2781,86 @@ static void oai_subframe_aggregate_crc_ind(subframe_msgs_t *msgs)
     oai_nfapi_crc_indication(&agg);
     free(agg.crc_indication_body.crc_pdu_list); // Should actually be nfapi_vnf_p7_release_msg
 }
+
 /*
+typedef struct
+{
+  uint32_t handle;
+  uint16_t rnti;
+  uint8_t  harq_id;
+  uint8_t  tb_crc_status;
+  uint16_t num_cb;//If CBG is not used this parameter can be set to zero. Otherwise the number of CBs in the TB. Value: 0->65535
+  //! fixme
+  uint8_t* cb_crc_status;//cb_crc_status[ceil(NumCb/8)];
+  uint8_t  ul_cqi;
+  uint16_t timing_advance;
+  uint16_t rssi;
+
+} nfapi_nr_crc_t;
+
+typedef struct
+{
+  nfapi_p7_message_header_t header;
+  uint16_t sfn;
+  uint16_t slot;
+  uint16_t number_crcs;
+  nfapi_nr_crc_t* crc_list;
+
+} nfapi_nr_crc_indication_t;
+*/
+
 static void oai_slot_aggregate_crc_ind(slot_msgs_t *msgs)
 {
     assert(msgs->num_msgs > 0);
-    nfapi_crc_indication_t agg;
+    nfapi_nr_crc_indication_t agg;
     memset(&agg, 0, sizeof(agg));
-    agg.crc_indication_body.crc_pdu_list = calloc(NFAPI_CRC_IND_MAX_PDU, sizeof(nfapi_crc_indication_pdu_t));
-    assert(agg.crc_indication_body.crc_pdu_list);
+    agg.crc_list = calloc(NFAPI_NR_CRC_IND_MAX_PDU, sizeof(nfapi_nr_crc_t));
+    assert(agg.crc_list);
 
     size_t pduIndex = 0;
     for (size_t n = 0; n < msgs->num_msgs; ++n)
     {
-        nfapi_crc_indication_t ind;
+        nfapi_nr_crc_indication_t ind;
         message_buffer_t *msg = msgs->msgs[n];
         assert(msg->length <= sizeof(msg->data));
-        if (nfapi_p7_message_unpack(msg->data, msg->length, &ind, sizeof(ind), NULL) < 0)
+        if (nfapi_nr_p7_message_unpack(msg->data, msg->length, &ind, sizeof(ind), NULL) < 0)
         {
-            NFAPI_TRACE(NFAPI_TRACE_ERROR, "crc indication unpack failed, msg[%zu]", n);
-            free(agg.crc_indication_body.crc_pdu_list);
+            NFAPI_TRACE(NFAPI_TRACE_ERROR, "nr_crc indication unpack failed, msg[%zu]", n);
+            free(agg.crc_list);
             return;
         }
 
-        // Header, sfn_sf, and tl assumed to be same across msgs
+        // Header, sfn, and slot assumed to be same across msgs
         if (n != 0)
         {
-            warn_if_different(__func__, &agg.header, &ind.header, agg.sfn_sf, ind.sfn_sf);
+            warn_if_different_slots(__func__, &agg.header, &ind.header, agg.sfn, ind.sfn, agg.slot, ind.slot);
         }
         agg.header = ind.header;
-        agg.sfn_sf = ind.sfn_sf;
-        assert(!ind.vendor_extension); // TODO ignoring vendor_extension for now
-        agg.crc_indication_body.tl = ind.crc_indication_body.tl;
-        agg.crc_indication_body.number_of_crcs += ind.crc_indication_body.number_of_crcs;
+        agg.sfn = ind.sfn;
+        agg.slot = ind.slot;
+        agg.number_crcs += ind.number_crcs;
 
-        for (size_t i = 0; i < ind.crc_indication_body.number_of_crcs; ++i)
+        for (size_t i = 0; i < ind.number_crcs; ++i)
         {
-            if (pduIndex == NFAPI_CRC_IND_MAX_PDU)
+            if (pduIndex == NFAPI_NR_CRC_IND_MAX_PDU)
             {
                 NFAPI_TRACE(NFAPI_TRACE_ERROR, "Too many PDUs to aggregate");
                 break;
             }
-            agg.crc_indication_body.crc_pdu_list[pduIndex] = ind.crc_indication_body.crc_pdu_list[i];
+            agg.crc_list[pduIndex] = ind.crc_list[i];
             pduIndex++;
         }
-        free(ind.crc_indication_body.crc_pdu_list); // Should actually be nfapi_vnf_p7_release_msg
-        if (pduIndex == NFAPI_CRC_IND_MAX_PDU)
+        free(ind.crc_list);
+        if (pduIndex == NFAPI_NR_CRC_IND_MAX_PDU)
         {
             break;
         }
     }
 
-    oai_nfapi_crc_indication(&agg);
-    free(agg.crc_indication_body.crc_pdu_list); // Should actually be nfapi_vnf_p7_release_msg
+    oai_nfapi_nr_crc_indication(&agg);
+    free(agg.crc_list);
 }
-*/
+
 /*
   nfapi_rx_indication_t
     nfapi_p7_message_header_t header
@@ -2891,7 +2977,7 @@ static void oai_subframe_aggregate_rx_ind(subframe_msgs_t *msgs)
 
         int rnti = ind.rx_indication_body.rx_pdu_list[0].rx_ue_information.rnti;
         bool found = false;
-        for (int i = 1; i < agg.rx_indication_body.number_of_pdus; ++i)
+        for (int i = 0; i < agg.rx_indication_body.number_of_pdus; ++i)
         {
             int rnti_i = agg.rx_indication_body.rx_pdu_list[i].rx_ue_information.rnti;
             if (rnti == rnti_i)
@@ -2940,57 +3026,81 @@ static void oai_subframe_aggregate_rx_ind(subframe_msgs_t *msgs)
     free(agg.rx_indication_body.rx_pdu_list); // Should actually be nfapi_vnf_p7_release_msg
 }
 
-//To Do Items : Need to update again.
 /*
-static void oai_slot_aggregate_rx_ind(slot_msgs_t *msgs)
+typedef struct 
+{
+  uint32_t handle;
+  uint16_t rnti;
+  uint8_t  harq_id;
+  uint16_t pdu_length;
+  uint8_t  ul_cqi;
+  uint16_t timing_advance;//Timing advance 𝑇𝐴 measured for the UE [TS 38.213, Section 4.2] NTA_new = NTA_old + (TA − 31) ⋅ 16 ⋅ 64⁄2μ Value: 0 → 63 0xffff should be set if this field is invalid
+  uint16_t rssi;
+  //variable ! fixme
+  uint8_t *pdu; //MAC PDU
+
+} nfapi_nr_rx_data_pdu_t;
+
+typedef struct
+{
+  nfapi_p7_message_header_t header;
+  uint16_t sfn;
+  uint16_t slot;
+  uint16_t number_of_pdus;
+  nfapi_nr_rx_data_pdu_t *pdu_list; //changed from pointer to struct - gokul
+
+} nfapi_nr_rx_data_indication_t;
+*/
+
+static void oai_slot_aggregate_rx_data_ind(slot_msgs_t *msgs)
 {
 
     assert(msgs->num_msgs > 0);
     nfapi_nr_rx_data_indication_t agg;
     memset(&agg, 0, sizeof(agg));    //To Do Items : Need to check whether MAX_PDU is okay ?
-    agg.pdu_list = calloc(NFAPI_RX_IND_MAX_PDU, sizeof(nfapi_nr_rx_data_pdu_t));
+    agg.pdu_list = calloc(NFAPI_NR_RX_DATA_IND_MAX_PDU, sizeof(nfapi_nr_rx_data_pdu_t));
     assert(agg.pdu_list);
 
     size_t pduIndex = 0;
 
     if (msgs->num_msgs > 1)
     {
-        uint16_t sfn_sf_val;
+        uint16_t sfn_slot_val;
         message_buffer_t *first_msg = msgs->msgs[0];
-        if (!get_sfnsf(first_msg, &sfn_sf_val))
+        if (!get_sfnslot(first_msg, &sfn_slot_val))
         {
             NFAPI_TRACE(NFAPI_TRACE_ERROR, "Something went very wrong");
             abort();
         }
-        NFAPI_TRACE(NFAPI_TRACE_INFO, "We are aggregating %zu rx_ind's for SFN.SF %u.%u "
+        NFAPI_TRACE(NFAPI_TRACE_INFO, "We are aggregating %zu rx_data_ind's for SFN.SLOT %u.%u "
                    "trying to aggregate",
-                   msgs->num_msgs, sfn_sf_val >> 4,
-                   sfn_sf_val & 15);
+                   msgs->num_msgs, sfn_slot_val >> 6,
+                   sfn_slot_val & 0x3F);
     }
 
     for (size_t n = 0; n < msgs->num_msgs; ++n)
     {
-        nfapi_rx_indication_t ind;
+        nfapi_nr_rx_data_indication_t ind;
         message_buffer_t *msg = msgs->msgs[n];
         assert(msg->length <= sizeof(msg->data));
-        if (nfapi_p7_message_unpack(msg->data, msg->length, &ind, sizeof(ind), NULL) < 0)
+        if (nfapi_nr_p7_message_unpack(msg->data, msg->length, &ind, sizeof(ind), NULL) < 0)
         {
             NFAPI_TRACE(NFAPI_TRACE_ERROR, "rx indication unpack failed, msg[%zu]", n);
             free(agg.pdu_list);
             return;
         }
 
-        if (ind.rx_indication_body.number_of_pdus == 0)
+        if (ind.number_of_pdus == 0)
         {
             NFAPI_TRACE(NFAPI_TRACE_ERROR, "empty rx message");
             abort();
         }
 
-        int rnti = ind.pdu_list[0].rx_ue_information.rnti;
+        int rnti = ind.pdu_list[0].rnti;
         bool found = false;
-        for (int i = 1; i < agg.number_of_pdus; ++i)
+        for (int i = 0; i < agg.number_of_pdus; ++i)
         {
-            int rnti_i = agg.pdu_list[i].rx_ue_information.rnti;
+            int rnti_i = agg.pdu_list[i].rnti;
             if (rnti == rnti_i)
             {
                 found = true;
@@ -3002,41 +3112,36 @@ static void oai_slot_aggregate_rx_ind(slot_msgs_t *msgs)
             NFAPI_TRACE(NFAPI_TRACE_ERROR, "two rx for single UE rnti: %x", rnti);
         }
 
-        // Header, sfn_sf, and tl assumed to be same across msgs
+        // Header, sfn, and slot assumed to be same across msgs
         if (n != 0)
         {
-            warn_if_different(__func__, &agg.header, &ind.header, agg.sfn_sf, ind.sfn_sf);
+            warn_if_different_slots(__func__, &agg.header, &ind.header, agg.sfn, ind.sfn, agg.slot, ind.slot);
         }
         agg.header = ind.header;
-        agg.sfn_sf = ind.sfn_sf;
-        assert(!ind.vendor_extension); // TODO ignoring vendor_extension for now
-        agg.rx_indication_body.tl = ind.rx_indication_body.tl;
-        NFAPI_TRACE(NFAPI_TRACE_INFO, "agg.tl.tag: %x agg.tl.length: %d ind.tl.tag: %x ind.tl.length: %u",
-                agg.rx_indication_body.tl.tag,agg.rx_indication_body.tl.length,
-                ind.rx_indication_body.tl.tag, ind.rx_indication_body.tl.length);
-        agg.rx_indication_body.number_of_pdus += ind.rx_indication_body.number_of_pdus;
+        agg.sfn = ind.sfn;
+        agg.slot = ind.slot;
+        agg.number_of_pdus += ind.number_of_pdus;
 
-        for (size_t i = 0; i < ind.rx_indication_body.number_of_pdus; ++i)
+        for (size_t i = 0; i < ind.number_of_pdus; ++i)
         {
-            if (pduIndex == NFAPI_RX_IND_MAX_PDU)
+            if (pduIndex == NFAPI_NR_RX_DATA_IND_MAX_PDU)
             {
                 NFAPI_TRACE(NFAPI_TRACE_ERROR, "Too many PDUs to aggregate");
                 break;
             }
-            agg.rx_indication_body.rx_pdu_list[pduIndex] = ind.rx_indication_body.rx_pdu_list[i];
+            agg.pdu_list[pduIndex] = ind.pdu_list[i];
             pduIndex++;
         }
-        free(ind.rx_indication_body.rx_pdu_list); // Should actually be nfapi_vnf_p7_release_msg
-        if (pduIndex == NFAPI_RX_IND_MAX_PDU)
+        free(ind.pdu_list);
+        if (pduIndex == NFAPI_NR_RX_DATA_IND_MAX_PDU)
         {
             break;
         }
     }
 
-    oai_nfapi_rx_ind(&agg);
-    free(agg.rx_indication_body.rx_pdu_list); // Should actually be nfapi_vnf_p7_release_msg
+    oai_nfapi_nr_rx_data_indication(&agg);
+    free(agg.pdu_list);
 }
-*/
 
 /*
   nfapi_cqi_indication_t
@@ -3162,6 +3267,186 @@ static void oai_subframe_aggregate_cqi_ind(subframe_msgs_t *msgs)
     oai_nfapi_cqi_indication(&agg);
     free(agg.cqi_indication_body.cqi_pdu_list); // Should actually be nfapi_vnf_p7_release_msg
     free(agg.cqi_indication_body.cqi_raw_pdu_list);
+}
+
+/*
+typedef struct
+{
+  uint16_t pdu_type;  // 0 for PDU on PUSCH, 1 for PUCCH format 0 or 1, 2 for PUCCH format 2 to 4
+  uint16_t pdu_size;
+  union
+  {
+    nfapi_nr_uci_pusch_pdu_t pusch_pdu;
+        uint8_t  pduBitmap;
+        uint32_t handle;
+        uint16_t rnti;
+        uint8_t  ul_cqi;
+        uint16_t timing_advance;
+        uint16_t rssi;
+        nfapi_nr_harq_pdu_2_3_4_t harq;//table 3-70
+            uint8_t  harq_crc;
+            uint16_t harq_bit_len;
+            //! fixme
+            uint8_t*  harq_payload;//harq_payload[ceil(harq_bit_len)];
+        nfapi_nr_csi_part1_pdu_t csi_part1;//71
+            uint8_t  csi_part1_crc;
+            uint16_t csi_part1_bit_len;
+            //! fixme
+            uint8_t*  csi_part1_payload;//uint8_t[ceil(csiPart1BitLen/8)]
+        nfapi_nr_csi_part2_pdu_t csi_part2;//72
+            uint8_t  csi_part2_crc;
+            uint16_t csi_part2_bit_len;
+            //! fixme
+            uint8_t*  csi_part2_payload;//uint8_t[ceil(csiPart2BitLen/8)]
+    nfapi_nr_uci_pucch_pdu_format_0_1_t pucch_pdu_format_0_1;
+        uint8_t  pduBitmap;
+        uint32_t handle;
+        uint16_t rnti;
+        uint8_t  pucch_format;//PUCCH format Value: 0 -> 1 0: PUCCH Format0 1: PUCCH Format1
+        uint8_t  ul_cqi;
+        uint16_t timing_advance;
+        uint16_t rssi;
+        nfapi_nr_sr_pdu_0_1_t *sr;//67
+            uint8_t sr_indication;
+            uint8_t sr_confidence_level;
+        nfapi_nr_harq_pdu_0_1_t *harq;//68
+            uint8_t num_harq;
+            uint8_t harq_confidence_level;
+            nfapi_nr_harq_t* harq_list;
+                uint8_t  harq_value;//Indicates result on HARQ data. Value: 0 = pass 1 = fail 2 = not present
+    nfapi_nr_uci_pucch_pdu_format_2_3_4_t pucch_pdu_format_2_3_4;
+        uint8_t  pduBitmap;
+        uint32_t handle;
+        uint16_t rnti;
+        uint8_t  pucch_format;//PUCCH format Value: 0 -> 2 0: PUCCH Format2 1: PUCCH Format3 2: PUCCH Format4
+        uint8_t  ul_cqi;
+        uint16_t timing_advance;
+        uint16_t rssi;
+        nfapi_nr_sr_pdu_2_3_4_t sr;//69
+            uint16_t sr_bit_len;
+            //! fixme
+            uint8_t* sr_payload;//sr_payload[ceil(sr_bit_len/8)];
+        nfapi_nr_harq_pdu_2_3_4_t harq;//70
+            uint8_t  harq_crc;
+            uint16_t harq_bit_len;
+            //! fixme
+            uint8_t*  harq_payload;//harq_payload[ceil(harq_bit_len)];
+        nfapi_nr_csi_part1_pdu_t csi_part1;//71
+            uint8_t  csi_part1_crc;
+            uint16_t csi_part1_bit_len;
+            //! fixme
+            uint8_t*  csi_part1_payload;//uint8_t[ceil(csiPart1BitLen/8)]
+        nfapi_nr_csi_part2_pdu_t csi_part2;//72
+            uint8_t  csi_part2_crc;
+            uint16_t csi_part2_bit_len;
+            //! fixme
+            uint8_t*  csi_part2_payload;//uint8_t[ceil(csiPart2BitLen/8)]
+  };
+} nfapi_nr_uci_t;
+
+typedef struct
+{
+  nfapi_p7_message_header_t header;
+  uint16_t sfn;
+  uint16_t slot;
+  uint16_t num_ucis;
+  nfapi_nr_uci_t *uci_list;
+
+} nfapi_nr_uci_indication_t;
+*/
+
+static int get_nr_uci_rnti(nfapi_nr_uci_t *pdu, uint16_t pdu_type)
+{
+    if (pdu_type == NFAPI_NR_UCI_PUSCH_PDU_TYPE)
+        return pdu->pusch_pdu.rnti;
+    else if (pdu_type == NFAPI_NR_UCI_FORMAT_0_1_PDU_TYPE)
+        return pdu->pucch_pdu_format_0_1.rnti;
+    else if (pdu_type == NFAPI_NR_UCI_FORMAT_2_3_4_PDU_TYPE)
+        return pdu->pucch_pdu_format_2_3_4.rnti;
+    return -1;
+}
+
+static void oai_slot_aggregate_uci_ind(slot_msgs_t *msgs)
+{
+    assert(msgs->num_msgs > 0);
+    nfapi_nr_uci_indication_t agg;
+    memset(&agg, 0, sizeof(agg));
+    agg.uci_list = calloc(NFAPI_NR_UCI_IND_MAX_PDU, sizeof(nfapi_nr_uci_t));
+    assert(agg.uci_list);
+    size_t pduIndex = 0;
+
+    for (size_t n = 0; n < msgs->num_msgs; ++n)
+    {
+        nfapi_nr_uci_indication_t ind;
+        message_buffer_t *msg = msgs->msgs[n];
+        assert(msg->length <= sizeof(msg->data));
+        if (nfapi_nr_p7_message_unpack(msg->data, msg->length, &ind, sizeof(ind), NULL) < 0)
+        {
+            NFAPI_TRACE(NFAPI_TRACE_ERROR, "uci indication unpack failed, msg[%zu]", n);
+            free(agg.uci_list);
+            return;
+        }
+
+        if (ind.num_ucis == 0)
+        {
+            NFAPI_TRACE(NFAPI_TRACE_ERROR, "empty uci message");
+            abort();
+        }
+
+        uint16_t pdu_type = ind.uci_list[0].pdu_type;
+        int rnti = get_nr_uci_rnti(&ind.uci_list[0], pdu_type);
+        if (rnti == -1)
+        {
+            NFAPI_TRACE(NFAPI_TRACE_ERROR, "Invalid rnti value in uci indication");
+            abort();
+        }
+
+        bool found = false;
+        for (int i = 0; i < agg.num_ucis; ++i)
+        {
+            int rnti_i = get_nr_uci_rnti(&agg.uci_list[i], pdu_type);
+
+            if (rnti == rnti_i)
+            {
+                found = true;
+                break;
+            }
+        }
+        if (found)
+        {
+            NFAPI_TRACE(NFAPI_TRACE_ERROR, "two uci for single UE rnti: %x", rnti);
+        }
+
+        // Header, sfn, and slot assumed to be same across msgs
+        if (n != 0)
+        {
+            warn_if_different_slots(__func__, &agg.header, &ind.header, agg.sfn, ind.sfn, agg.slot, ind.slot);
+        }
+        agg.header = ind.header;
+        agg.sfn = ind.sfn;
+        agg.slot = ind.slot;
+        agg.num_ucis += ind.num_ucis;
+
+        for (size_t i = 0; i < ind.num_ucis; ++i)
+        {
+            if (pduIndex == NFAPI_NR_UCI_IND_MAX_PDU)
+            {
+                NFAPI_TRACE(NFAPI_TRACE_ERROR, "Too many PDUs to aggregate");
+                break;
+            }
+
+            agg.uci_list[pduIndex] = ind.uci_list[i];
+            pduIndex++;
+        }
+        free(ind.uci_list); // Should actually be nfapi_vnf_p7_release_msg
+        if (pduIndex == NFAPI_NR_UCI_IND_MAX_PDU)
+        {
+            break;
+        }
+    }
+
+    oai_nfapi_nr_uci_indication(&agg);
+    free(agg.uci_list); // Should actually be nfapi_vnf_p7_release_msg
 }
 
 /*
@@ -3388,6 +3673,82 @@ static void oai_subframe_aggregate_sr_ind(subframe_msgs_t *msgs)
     free(agg.sr_indication_body.sr_pdu_list); // Should actually be nfapi_vnf_p7_release_msg
 }
 
+/*
+typedef struct
+{
+  uint32_t handle;
+  uint16_t rnti;
+  uint16_t timing_advance;
+  uint8_t  num_symbols;
+  uint8_t  wide_band_snr;
+  uint8_t  num_reported_symbols;
+  nfapi_nr_srs_indication_reported_symbol_t* reported_symbol_list;
+
+}nfapi_nr_srs_indication_pdu_t;
+
+typedef struct
+{
+  nfapi_p7_message_header_t header;
+  uint16_t sfn;
+  uint16_t slot;
+  uint8_t number_of_pdus;
+  nfapi_nr_srs_indication_pdu_t* pdu_list;
+
+} nfapi_nr_srs_indication_t;
+*/
+
+static void oai_slot_aggregate_srs_ind(slot_msgs_t *msgs)
+{
+    assert(msgs->num_msgs > 0);
+    nfapi_nr_srs_indication_t agg;
+    memset(&agg, 0, sizeof(agg));
+    agg.pdu_list = calloc(NFAPI_NR_SRS_IND_MAX_PDU, sizeof(nfapi_nr_srs_indication_t));
+    assert(agg.pdu_list);
+
+    size_t pduIndex = 0;
+    for (size_t n = 0; n < msgs->num_msgs; ++n)
+    {
+        nfapi_nr_srs_indication_t ind;
+        message_buffer_t *msg = msgs->msgs[n];
+        assert(msg->length <= sizeof(msg->data));
+        if (nfapi_nr_p7_message_unpack(msg->data, msg->length, &ind, sizeof(ind), NULL) < 0)
+        {
+            NFAPI_TRACE(NFAPI_TRACE_ERROR, "srs indication unpack failed, msg[%zu]", n);
+            free(agg.pdu_list);
+            return;
+        }
+
+        // Header, sfn, and slot assumed to be same across msgs
+        if (n != 0)
+        {
+            warn_if_different_slots(__func__, &agg.header, &ind.header, agg.sfn, ind.sfn, agg.slot, ind.slot);
+        }
+        agg.header = ind.header;
+        agg.sfn = ind.sfn;
+        agg.slot = ind.slot;
+        agg.number_of_pdus += ind.number_of_pdus;
+
+        for (size_t i = 0; i < ind.number_of_pdus; ++i)
+        {
+            if (pduIndex == NFAPI_NR_SRS_IND_MAX_PDU)
+            {
+                NFAPI_TRACE(NFAPI_TRACE_ERROR, "Too many PDUs to aggregate");
+                break;
+            }
+            agg.pdu_list[pduIndex] = ind.pdu_list[i];
+            pduIndex++;
+        }
+        free(ind.pdu_list); // Should actually be nfapi_vnf_p7_release_msg
+        if (pduIndex == NFAPI_NR_SRS_IND_MAX_PDU)
+        {
+            break;
+        }
+    }
+
+    oai_nfapi_nr_srs_indication(&agg);
+    free(agg.pdu_list); // Should actually be nfapi_vnf_p7_release_msg
+}
+
 static void oai_subframe_aggregate_message_id(uint16_t msg_id, subframe_msgs_t *msgs)
 {
     assert(msgs->num_msgs > 0);
@@ -3489,16 +3850,32 @@ int get_sf_delta(uint16_t a, uint16_t b)
     return (sfn_a * 10 + sf_a) - (sfn_b * 10 + sf_b);
 }
 
+int get_slot_delta(uint16_t a, uint16_t b)
+{
+    int sfn_a = a >> 6;
+    int slot_a = a & 0x3F;
+    int sfn_b = b >> 6;
+    int slot_b = b & 0x3F;
+
+    return (sfn_a * 20 + slot_a) - (sfn_b * 20 + slot_b);
+}
+
 uint16_t sfn_sf_add(uint16_t a, uint16_t add_val)
 {
     uint16_t sfn_a = a >> 4;
     uint16_t sf_a = a & 15;
     uint16_t temp = sfn_a * 10 + sf_a + add_val;
     uint16_t sf = temp % 10;
-    uint16_t sfn = temp / 10;
+    uint16_t sfn = (temp / 10) % 1024;
     uint16_t sfn_sf = (sfn << 4) | sf;
 
     return sfn_sf;
+}
+
+void sfn_slot_add(uint16_t *sfn, uint16_t *slot, uint16_t add_val)
+{
+    *sfn = (*sfn + (*slot + add_val) / 20) % 1024;
+    *slot = (*slot + add_val) % 20;
 }
 
 static void oai_slot_aggregate_message_id(uint16_t msg_id, slot_msgs_t *msgs)
@@ -3516,24 +3893,18 @@ static void oai_slot_aggregate_message_id(uint16_t msg_id, slot_msgs_t *msgs)
     case NFAPI_NR_PHY_MSG_TYPE_RACH_INDICATION:
         oai_slot_aggregate_rach_ind(msgs);//It is using subframe. Need to check further.
         break;
-    /*
     case NFAPI_NR_PHY_MSG_TYPE_CRC_INDICATION:
-        //oai_slot_aggregate_crc_ind(msgs);
-        oai_subframe_aggregate_crc_ind(msgs);
+        oai_slot_aggregate_crc_ind(msgs);
         break;
     case NFAPI_NR_PHY_MSG_TYPE_RX_DATA_INDICATION:
-        //oai_slot_aggregate_rx_ind(msgs);
-        oai_subframe_aggregate_rx_ind(msgs);
+        oai_slot_aggregate_rx_data_ind(msgs);
         break;
     case NFAPI_NR_PHY_MSG_TYPE_UCI_INDICATION:
-        oai_subframe_aggregate_cqi_ind(msgs);
-        //oai_slot_aggregate_cqi_ind(msgs);
+        oai_slot_aggregate_uci_ind(msgs);
         break;
     case NFAPI_NR_PHY_MSG_TYPE_SRS_INDICATION:
-        oai_subframe_aggregate_sr_ind(msgs);
-        //oai_slot_aggregate_sr_ind(msgs);
+        oai_slot_aggregate_srs_ind(msgs);
         break;
-    */
     default:
         return;
     }
@@ -3596,28 +3967,6 @@ static void oai_slot_aggregate_messages(slot_msgs_t *slot_msgs)
             free(msg);
         }
     }
-}
-
-int get_slot_delta(uint16_t a, uint16_t b)
-{
-    int sfn_a = a >> 6;
-    int slot_a = a & 0x3F;
-    int sfn_b = b >> 6;
-    int slot_b = b & 0x3F;
-
-    return (sfn_a * 20 + slot_a) - (sfn_b * 20 + slot_b);
-}
-
-uint16_t sfn_slot_add(uint16_t a, uint16_t add_val)
-{
-    uint16_t sfn_a = a >> 6;
-    uint16_t slot_a = a & 0x3F;
-    uint16_t temp = sfn_a * 20 + slot_a + add_val;
-    uint16_t slot = temp % 20;
-    uint16_t sfn = temp / 20;
-    uint16_t sfn_slot = (sfn << 6) | slot;
-
-    return sfn_slot;
 }
 
 // TODO: Expand this function to include checking what the different sfn_sf
@@ -3742,7 +4091,7 @@ bool dequeue_ue_slot_msgs(slot_msgs_t *slot_msgs, uint16_t sfn_slot_tx)
     // Dequeue for all UE responses, and discard any with the wrong sfn/sf value.
     // There might be multiple messages from a given UE with the same sfn/sf value.
     bool are_queues_empty = true;
-    uint16_t master_sfn_sf = 0xFFFF;
+    uint16_t master_sfn_slot = 0xFFFF;
     for (int i = 0; i < num_ues; i++)
     {
         for (;;)
@@ -3760,17 +4109,17 @@ bool dequeue_ue_slot_msgs(slot_msgs_t *slot_msgs, uint16_t sfn_slot_tx)
                 continue;
             }
             uint16_t msg_sfn_slot;
-            if (!get_sfnsf(msg, &msg_sfn_slot))
+            if (!get_sfnslot(msg, &msg_sfn_slot))
             {
                 msg->magic = 0;
                 free(msg);
                 continue;
             }
-            if (master_sfn_sf == 0xFFFF)
+            if (master_sfn_slot == 0xFFFF)
             {
-                master_sfn_sf = msg_sfn_slot;
+                master_sfn_slot  = msg_sfn_slot;
             }
-            if (master_sfn_sf != msg_sfn_slot)
+            if (master_sfn_slot != msg_sfn_slot)
             {
                 if (!requeue(&msgs_from_nr_ue[i], msg))
                 {
@@ -3807,7 +4156,7 @@ bool dequeue_ue_slot_msgs(slot_msgs_t *slot_msgs, uint16_t sfn_slot_tx)
 
 void add_sleep_time(uint64_t start, uint64_t poll, uint64_t send, uint64_t agg)
 {
-    NFAPI_TRACE(NFAPI_TRACE_INFO, "polling took %" PRIu64 "usec, subframe ind took %" PRIu64 "usec, aggreg took %" PRIu64 "usec",
+    NFAPI_TRACE(NFAPI_TRACE_DEBUG, "polling took %" PRIu64 "usec, subframe ind took %" PRIu64 "usec, aggreg took %" PRIu64 "usec",
                 poll - start,
                 send - poll,
                 agg - send);
@@ -3828,10 +4177,10 @@ void add_sleep_time(uint64_t start, uint64_t poll, uint64_t send, uint64_t agg)
 
 void add_nr_sleep_time(uint64_t start, uint64_t poll, uint64_t send, uint64_t agg)
 {
-    /*NFAPI_TRACE(NFAPI_TRACE_INFO, "polling took %" PRIu64 "usec, subframe ind took %" PRIu64 "usec, aggreg took %" PRIu64 "usec",
+    NFAPI_TRACE(NFAPI_TRACE_DEBUG, "polling took %" PRIu64 "usec, subframe ind took %" PRIu64 "usec, aggreg took %" PRIu64 "usec",
                 poll - start,
                 send - poll,
-                agg - send);*/
+                agg - send);
 
     /* See how long this iteration of this loop took, and sleep for the
         balance of the 1ms subframe */
@@ -4252,31 +4601,31 @@ int oai_nfapi_sr_indication(nfapi_sr_indication_t *ind)
 int oai_nfapi_nr_rx_data_indication(nfapi_nr_rx_data_indication_t *ind) {
   ind->header.phy_id = 1; // DJP HACK TODO FIXME - need to pass this around!!!!
   ind->header.message_id = NFAPI_NR_PHY_MSG_TYPE_RX_DATA_INDICATION;
-  return nfapi_pnf_p7_nr_rx_data_ind(p7_config_g, ind);
+  return nfapi_pnf_p7_nr_rx_data_ind(p7_nr_config_g, ind);
 }
 
 int oai_nfapi_nr_crc_indication(nfapi_nr_crc_indication_t *ind) {
   ind->header.phy_id = 1; // DJP HACK TODO FIXME - need to pass this around!!!!
   ind->header.message_id = NFAPI_NR_PHY_MSG_TYPE_CRC_INDICATION;
-  return nfapi_pnf_p7_nr_crc_ind(p7_config_g, ind);
+  return nfapi_pnf_p7_nr_crc_ind(p7_nr_config_g, ind);
 }
 
 int oai_nfapi_nr_srs_indication(nfapi_nr_srs_indication_t *ind) {
   ind->header.phy_id = 1; // DJP HACK TODO FIXME - need to pass this around!!!!
   ind->header.message_id = NFAPI_NR_PHY_MSG_TYPE_SRS_INDICATION;
-  return nfapi_pnf_p7_nr_srs_ind(p7_config_g, ind);
+  return nfapi_pnf_p7_nr_srs_ind(p7_nr_config_g, ind);
 }
 
 int oai_nfapi_nr_uci_indication(nfapi_nr_uci_indication_t *ind) {
   ind->header.phy_id = 1; // DJP HACK TODO FIXME - need to pass this around!!!!
   ind->header.message_id = NFAPI_NR_PHY_MSG_TYPE_UCI_INDICATION;
-  return nfapi_pnf_p7_nr_uci_ind(p7_config_g, ind);
+  return nfapi_pnf_p7_nr_uci_ind(p7_nr_config_g, ind);
 }
 
 int oai_nfapi_nr_rach_indication(nfapi_nr_rach_indication_t *ind) {
   ind->header.phy_id = 1; // DJP HACK TODO FIXME - need to pass this around!!!!
   ind->header.message_id = NFAPI_NR_PHY_MSG_TYPE_RACH_INDICATION;
-  return nfapi_pnf_p7_nr_rach_ind(p7_config_g, ind);
+  return nfapi_pnf_p7_nr_rach_ind(p7_nr_config_g, ind);
 }
 
 //DUMMY Functions to help integrate into proxy
