@@ -71,6 +71,8 @@ logging.basicConfig(level=logging.DEBUG if OPTS.debug else logging.INFO,
                     format='>>> %(name)s: %(levelname)s: %(message)s')
 LOGGER = logging.getLogger(os.path.basename(sys.argv[0]))
 
+RUN_OAI = os.path.join(WORKSPACE_DIR, 'run-oai')
+
 if OPTS.nfapi_trace_level:
     os.environ['NFAPI_TRACE_LEVEL'] = OPTS.nfapi_trace_level
 
@@ -200,16 +202,17 @@ class Scenario:
     def launch_enb(self) -> Popen:
         log_name = '{}/eNB.log'.format(OPTS.log_dir)
         LOGGER.info('Launch eNB: %s', log_name)
-        cmd = 'NODE_NUMBER=1 {WORKSPACE_DIR}/run-oai enb' \
-              .format(WORKSPACE_DIR=WORKSPACE_DIR)
+        cmd = 'NODE_NUMBER=1 {RUN_OAI} enb' \
+              .format(RUN_OAI=RUN_OAI)
         if OPTS.mode == 'nsa':
             cmd += ' --nsa'
         proc = Popen(redirect_output(cmd, log_name), shell=True)
 
-        # TODO: Sleep time needed so eNB and UEs don't start at the exact same time
-        # When nodes start at the same time, occasionally eNB will only recognize one UE
-        # I think this bug has been fixed -- the random number generator initializer issue
-        time.sleep(2)
+        # TODO: Sleep time needed so eNB and UEs don't start at the exact same
+        # time When nodes start at the same time, occasionally eNB will only
+        # recognize one UE I think this bug has been fixed -- the random
+        # number generator initializer issue
+        time.sleep(1)
 
         return proc
 
@@ -229,14 +232,16 @@ class Scenario:
         for num, hostname in self.ue_hostname.items():
             log_name = '{}/{}.log'.format(OPTS.log_dir, hostname)
             LOGGER.info('Launch UE%d: %s', num, log_name)
-            cmd = 'NODE_NUMBER={NODE_ID} {WORKSPACE_DIR}/run-oai ue' \
-                  .format(NODE_ID=self.ue_node_id[num], WORKSPACE_DIR=WORKSPACE_DIR)
+            cmd = 'NODE_NUMBER={NODE_ID} {RUN_OAI} ue' \
+                  .format(NODE_ID=self.ue_node_id[num],
+                          RUN_OAI=RUN_OAI)
             if OPTS.mode == 'nsa':
                 cmd += ' --nsa'
-            output_cmd = redirect_output(cmd, log_name)
-            procs[num] = Popen(output_cmd, stdin=subprocess.PIPE, shell=True)
-            # TODO: Sleep time needed so eNB and UEs don't start at the exact same time
-            # When nodes start at the same time, occasionally eNB will only recognize one UE
+            procs[num] = Popen(redirect_output(cmd, log_name), shell=True)
+
+            # TODO: Sleep time needed so eNB and UEs don't start at the exact
+            # same time When nodes start at the same time, occasionally eNB
+            # will only recognize one UE
             time.sleep(1)
 
         return procs
@@ -244,14 +249,15 @@ class Scenario:
     def launch_gnb(self) -> Popen:
         log_name = '{}/gNB.log'.format(OPTS.log_dir)
         LOGGER.info('Launch gNB: %s', log_name)
-        cmd = 'NODE_NUMBER=0 {WORKSPACE_DIR}/run-oai gnb' \
-              .format(WORKSPACE_DIR=WORKSPACE_DIR)
+        cmd = 'NODE_NUMBER=0 {RUN_OAI} gnb' \
+              .format(RUN_OAI=RUN_OAI)
         proc = Popen(redirect_output(cmd, log_name), shell=True)
 
-        # TODO: Sleep time needed so eNB and UEs don't start at the exact same time
-        # When nodes start at the same time, occasionally eNB will only recognize one UE
-        # I think this bug has been fixed -- the random number generator initializer issue
-        time.sleep(2)
+        # TODO: Sleep time needed so eNB and UEs don't start at the exact same
+        # time When nodes start at the same time, occasionally eNB will only
+        # recognize one UE I think this bug has been fixed -- the random
+        # number generator initializer issue
+        time.sleep(1)
 
         return proc
 
@@ -260,14 +266,16 @@ class Scenario:
         for num, hostname in self.nrue_hostname.items():
             log_name = '{}/{}.log'.format(OPTS.log_dir, hostname)
             LOGGER.info('Launch nrUE%d: %s', num, log_name)
-            cmd = 'NODE_NUMBER={NODE_ID} {WORKSPACE_DIR}/run-oai nrue' \
-                  .format(NODE_ID=len(self.ue_node_id)+self.ue_node_id[num], WORKSPACE_DIR=WORKSPACE_DIR)
+            cmd = 'NODE_NUMBER={NODE_ID} {RUN_OAI} nrue' \
+                  .format(NODE_ID=len(self.ue_node_id) + self.ue_node_id[num],
+                          RUN_OAI=RUN_OAI)
             if OPTS.mode == 'nsa':
                 cmd += ' --nsa'
-            output_cmd = redirect_output(cmd, log_name)
-            procs[num] = Popen(output_cmd, stdin=subprocess.PIPE, shell=True)
-            # TODO: Sleep time needed so eNB and UEs don't start at the exact same time
-            # When nodes start at the same time, occasionally eNB will only recognize one UE
+            procs[num] = Popen(redirect_output(cmd, log_name), shell=True)
+
+            # TODO: Sleep time needed so eNB and NRUEs don't start at the
+            # exact same time When nodes start at the same time, occasionally
+            # eNB will only recognize one NRUE
             time.sleep(1)
 
         return procs
@@ -517,27 +525,27 @@ def main() -> int:
     # --- eNB log file ---
     found = set()
     for line in get_analysis_messages('{}/eNB.log.bz2'.format(OPTS.log_dir)):
-        # 94772.731183 [MAC] A Configuring MIB for instance 0, CCid 0 : (band
+        # 94772.731183 00000057 [MAC] A Configuring MIB for instance 0, CCid 0 : (band
         # 7,N_RB_DL 50,Nid_cell 0,p 1,DL freq 2685000000,phich_config.resource 0,
         # phich_config.duration 0)
         if '[MAC] A Configuring MIB ' in line:
             found.add('configured')
             continue
 
-        # 94777.679273 [MAC] A [eNB 0][RAPROC] CC_id 0 Frame 74, subframeP 3:
+        # 94777.679273 00000057 [MAC] A [eNB 0][RAPROC] CC_id 0 Frame 74, subframeP 3:
         # Generating Msg4 with RRC Piggyback (RNTI a67)
         if 'Generating Msg4 with RRC Piggyback' in line:
             found.add('msg4')
             continue
 
-        # 94777.695277 [RRC] A [FRAME 00000][eNB][MOD 00][RNTI a67] [RAPROC]
+        # 94777.695277 00000057 [RRC] A [FRAME 00000][eNB][MOD 00][RNTI a67] [RAPROC]
         # Logical Channel UL-DCCH, processing LTE_RRCConnectionSetupComplete
         # from UE (SRB1 Active)
         if 'processing LTE_RRCConnectionSetupComplete from UE ' in line:
             found.add('setup')
             continue
 
-        # 94776.725081 [RRC] A got UE capabilities for UE 6860
+        # 94776.725081 00000057 [RRC] A got UE capabilities for UE 6860
         match = re.search(r'\[RRC\] A got UE (capabilities for UE \w+)$', line)
         if match:
             found.add(match.group(1))
