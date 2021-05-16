@@ -11,8 +11,6 @@ import time
 import re
 import glob
 import bz2
-import signal
-import platform
 import subprocess
 from subprocess import Popen
 from typing import Optional, Dict, List, Generator
