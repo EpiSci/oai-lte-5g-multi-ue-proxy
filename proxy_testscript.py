@@ -492,6 +492,251 @@ def save_core_files() -> bool:
 
     return True
 
+def analyze_enb_logs(scenario: Scenario) -> bool:
+    if not scenario.enb_hostname:
+        LOGGER.info('No eNB in this scenario')
+        return True
+
+    found = set()
+    for line in get_analysis_messages('{}/eNB.log.bz2'.format(OPTS.log_dir)):
+        # 94772.731183 00000057 [MAC] A Configuring MIB for instance 0, CCid 0 : (band
+        # 7,N_RB_DL 50,Nid_cell 0,p 1,DL freq 2685000000,phich_config.resource 0,
+        # phich_config.duration 0)
+        if '[MAC] A Configuring MIB ' in line:
+            found.add('configured')
+            continue
+
+        # 94777.679273 00000057 [MAC] A [eNB 0][RAPROC] CC_id 0 Frame 74, subframeP 3:
+        # Generating Msg4 with RRC Piggyback (RNTI a67)
+        if 'Generating Msg4 with RRC Piggyback' in line:
+            found.add('msg4')
+            continue
+
+        # 94777.695277 00000057 [RRC] A [FRAME 00000][eNB][MOD 00][RNTI a67] [RAPROC]
+        # Logical Channel UL-DCCH, processing LTE_RRCConnectionSetupComplete
+        # from UE (SRB1 Active)
+        if 'processing LTE_RRCConnectionSetupComplete from UE ' in line:
+            found.add('setup')
+            continue
+
+        # 94776.725081 00000057 [RRC] A got UE capabilities for UE 6860
+        match = re.search(r'\[RRC\] A (got UE capabilities for UE \w+)$', line)
+        if match:
+            found.add(match.group(1))
+            continue
+
+        # 2075586.647598 00006b4a [RRC] A Generating
+        # RRCCConnectionReconfigurationRequest (NRUE Measurement Report
+        # Request).
+        if '[RRC] A Generating RRCCConnectionReconfigurationRequest (NRUE Measurement Report Request)' in line:
+            found.add('gen nrue meas report req')
+            continue
+
+        # 2075586.671139 00006b4a [RRC] A [FRAME 00000][eNB][MOD 00][RNTI
+        # e9fb] Logical Channel DL-DCCH, Generate NR UECapabilityEnquiry
+        # (bytes 11)
+        if ' Logical Channel DL-DCCH, Generate NR UECapabilityEnquiry' in line:
+            found.add('dl-dcch gen nrue cap enq')
+            continue
+
+        # 2075586.677066 00006b4a [RRC] A got nrUE capabilities for UE e9fb
+        match = re.search(r'\[RRC\] (got nrUE capabilities for UE \w+)$', line)
+        if match:
+            found.add(match.group(1))
+            continue
+
+        # 2075586.756959 00006b4a [RRC] A [eNB 0] frame 0 subframe 0: UE rnti
+        # e9fb switching to NSA mode
+        match = re.search(r': (UE rnti \w+ switching to NSA mode)', line)
+        if match:
+            found.add(match.group(1))
+            continue
+
+        # 2075586.911204 00006b4a [RRC] A Sent rrcReconfigurationComplete to gNB
+        if '[RRC] A Sent rrcReconfigurationComplete to gNB' in line:
+            found.add('rrc reconf complete to gnb')
+            continue
+
+    LOGGER.debug('found: %r', found)
+
+    num_ues = len(scenario.ue_hostname)
+    LOGGER.debug('num UEs: %d', num_ues)
+
+    if OPTS.mode == 'lte' and len(found) == 3 + num_ues:
+        LOGGER.info('eNB passed: %r', found)
+        return True
+
+    if OPTS.mode == 'nsa' and len(found) == 6 + 2 * num_ues:
+        LOGGER.info('eNB passed: %r', found)
+        return True
+
+    if OPTS.mode == 'nr' and len(found) == 3 + num_ues:
+        LOGGER.info('eNB passed: %r', found)
+        return True
+
+    LOGGER.error('eNB failed -- found %d %r', len(found), found)
+    return False
+
+def analyze_ue_logs(scenario: Scenario) -> bool:
+    if not scenario.ue_hostname:
+        LOGGER.info('No UEs in this scenario')
+        return True
+
+    num_failed = 0
+    for ue_number, ue_hostname in scenario.ue_hostname.items():
+        found = set()
+        for line in get_analysis_messages('{}/{}.log.bz2'.format(OPTS.log_dir, ue_hostname)):
+            # 94777.660529 [MAC] A RACH_IND sent to Proxy, Size: 35 Frame 72 Subframe 1
+            if '[MAC] A RACH_IND sent to Proxy' in line:
+                found.add('rach sent')
+                continue
+
+            # 94777.669610 [MAC] A [UE 0][RAPROC] Frame 73 Received RAR
+            # (50|00.00.05.4c.0a.67) for preamble 16/16
+            if ' Received RAR ' in line:
+                found.add('received rar')
+                continue
+
+            # 94777.679744 [RRC] A [UE0][RAPROC] Frame 74 : Logical Channel DL-CCCH
+            # (SRB0), Received RRCConnectionSetup RNTI a67
+            if 'Received RRCConnectionSetup' in line:
+                found.add('received setup')
+                continue
+
+            # 94777.706964 [RRC] A UECapabilityInformation Encoded 148 bits
+            # (19 bytes)
+            if '[RRC] A UECapabilityInformation Encoded ' in line:
+                found.add('capabilities')
+                continue
+
+            # 2075586.627878 00006d6e [RRC] A Initial ueCapabilityEnquiry sent
+            # to NR UE with size 5
+            if '[RRC] A Initial ueCapabilityEnquiry sent to NR UE with size ' in line:
+                found.add('cap enq to nrue')
+                continue
+
+            # 2075586.675497 00006d6e [RRC] A NR_UECapabilityInformation
+            # Encoded 108 bits (14 bytes)
+            if '[RRC] A NR_UECapabilityInformation Encoded ' in line:
+                found.add('cap info encoded')
+                continue
+
+            # 2075586.662377 00006d6e [RRC] A Encoded measurement object 101
+            # bits (13 bytes) and sent to NR UE
+            if '[RRC] A Encoded measurement object ' in line and \
+               ' and sent to NR UE' in line:
+                found.add('meas to nrue')
+                continue
+
+            # 2075586.673264 00006d6e [RRC] A Second ueCapabilityEnquiry
+            # (request for NR capabilities) sent to NR UE with size 5
+            if '[RRC] A Second ueCapabilityEnquiry (request for NR capabilities) sent to NR UE' in line:
+                found.add('2nd cap enq to nrue')
+                continue
+
+            # 2075586.884697 00006d6e [RRC] A Sent RRC_CONFIG_COMPLETE_REQ to
+            # the NR UE
+            if '[RRC] A Sent RRC_CONFIG_COMPLETE_REQ to the NR UE' in line:
+                found.add('config complete to nrue')
+                continue
+
+        if OPTS.mode == 'lte' and len(found) == 4:
+            LOGGER.info('UE%d passed: %r', ue_number, found)
+        elif OPTS.mode == 'nsa' and len(found) == 9:
+            LOGGER.info('UE%d passed: %r', ue_number, found)
+        elif OPTS.mode == 'nr' and len(found) == 4:
+            LOGGER.info('UE%d passed: %r', ue_number, found)
+        else:
+            num_failed += 1
+            LOGGER.error('UE%d failed -- found %d %r', ue_number, len(found), found)
+
+    if num_failed != 0:
+        LOGGER.critical('%d of %d UEs failed', num_failed, len(scenario.ue_hostname))
+        return False
+
+    LOGGER.info('All UEs passed')
+    return True
+
+def analyze_gnb_logs(scenario: Scenario) -> bool:
+    if not scenario.gnb_hostname:
+        LOGGER.info('No gNB in this scenario')
+        return True
+
+    found = set()
+    for line in get_analysis_messages('{}/gNB.log.bz2'.format(OPTS.log_dir)):
+        # 2075586.780257 00006cd4 [NR_RRC] A Successfully parsed CG_ConfigInfo
+        # of size 19 bits. (19 bytes)
+        if '[NR_RRC] A Successfully parsed CG_ConfigInfo ' in line:
+            found.add('configured')
+            continue
+
+        # 2075586.912997 00006cd4 [NR_RRC] A Handling of reconfiguration
+        # complete message at RRC gNB is pending
+        if '[NR_RRC] A Handling of reconfiguration complete message at RRC gNB is pending' in line:
+            found.add('reconfiguring')
+            continue
+
+    LOGGER.debug('found: %r', found)
+
+    num_ues = len(scenario.ue_hostname)
+    LOGGER.debug('num UEs: %d', num_ues)
+
+    # TODO: Melissa, is this right? When num_ues!=1, how many of those messages should we see?
+    if len(found) != 1 + num_ues:
+        LOGGER.error('gNB failed -- found %r', found)
+        return False
+
+    LOGGER.info('gNB passed')
+    return True
+
+def analyze_nrue_logs(scenario: Scenario) -> bool:
+    if not scenario.nrue_hostname:
+        LOGGER.info('No NRUEs in this scenario')
+        return True
+
+    num_failed = 0
+    for nrue_number, nrue_hostname in scenario.nrue_hostname.items():
+        found = set()
+        for line in get_analysis_messages('{}/{}.log.bz2'.format(OPTS.log_dir, nrue_hostname)):
+            # 2075586.628184 00006d66 [NR_RRC] A Sent initial NRUE Capability
+            # response to LTE UE
+            if '[NR_RRC] A Sent initial NRUE Capability response to LTE UE' in line:
+                found.add('sent cap')
+                continue
+
+            # 2075586.674747 00006d66 [NR_RRC] A [NR_RRC] NRUE Capability
+            # encoded, 10 bytes (86 bits)
+            if '[NR_RRC] NRUE Capability encoded,' in line:
+                found.add('cap encoded')
+                continue
+
+            # 2075586.895662 00006d66 [NR_RRC] A rrcReconfigurationComplete
+            # Encoded 5 bits (1 bytes)
+            if '[NR_RRC] A rrcReconfigurationComplete Encoded' in line:
+                found.add('reconf encoded')
+                continue
+
+            # 2075586.949504 00006d72 [NR_RRC] A Populated
+            # NR_UE_RRC_MEASUREMENT information and sent to LTE UE
+            if '[NR_RRC] A Populated NR_UE_RRC_MEASUREMENT information and sent to LTE UE' in line:
+                found.add('rrc meas sent')
+                continue
+
+        LOGGER.debug('found: %r', found)
+
+        if len(found) == 4:
+            LOGGER.info('NRUE%d passed', nrue_number)
+        else:
+            num_failed += 1
+            LOGGER.error('NRUE%d failed -- found %r', nrue_number, found)
+
+    if num_failed != 0:
+        LOGGER.critical('%d of %d NRUEs failed', num_failed, len(scenario.nrue_hostname))
+        return False
+
+    LOGGER.info('All NRUEs passed')
+    return True
+
 def main() -> int:
     scenario = Scenario()
 
@@ -520,88 +765,20 @@ def main() -> int:
 
     # Examine the logs to determine if the test passed
 
-    # --- eNB log file ---
-    found = set()
-    for line in get_analysis_messages('{}/eNB.log.bz2'.format(OPTS.log_dir)):
-        # 94772.731183 00000057 [MAC] A Configuring MIB for instance 0, CCid 0 : (band
-        # 7,N_RB_DL 50,Nid_cell 0,p 1,DL freq 2685000000,phich_config.resource 0,
-        # phich_config.duration 0)
-        if '[MAC] A Configuring MIB ' in line:
-            found.add('configured')
-            continue
-
-        # 94777.679273 00000057 [MAC] A [eNB 0][RAPROC] CC_id 0 Frame 74, subframeP 3:
-        # Generating Msg4 with RRC Piggyback (RNTI a67)
-        if 'Generating Msg4 with RRC Piggyback' in line:
-            found.add('msg4')
-            continue
-
-        # 94777.695277 00000057 [RRC] A [FRAME 00000][eNB][MOD 00][RNTI a67] [RAPROC]
-        # Logical Channel UL-DCCH, processing LTE_RRCConnectionSetupComplete
-        # from UE (SRB1 Active)
-        if 'processing LTE_RRCConnectionSetupComplete from UE ' in line:
-            found.add('setup')
-            continue
-
-        # 94776.725081 00000057 [RRC] A got UE capabilities for UE 6860
-        match = re.search(r'\[RRC\] A got UE (capabilities for UE \w+)$', line)
-        if match:
-            found.add(match.group(1))
-            continue
-
-    LOGGER.debug('found: %r', found)
-
-    num_ues = len(scenario.ue_hostname)
-    LOGGER.debug('num UEs: %d', num_ues)
-
-    if len(found) == 3 + num_ues:
-        LOGGER.info('All eNB Tests Passed')
-    else:
+    if not analyze_enb_logs(scenario):
         passed = False
-        LOGGER.error('!!! eNB Test Failed !!! -- found %r', found)
 
-    # --- UE log files ---
-    num_ue_failed = 0
-    for ue_number, ue_hostname in scenario.ue_hostname.items():
-        found = set()
-        for line in get_analysis_messages('{}/{}.log.bz2'.format(OPTS.log_dir, ue_hostname)):
-            # 94777.660529 [MAC] A RACH_IND sent to Proxy, Size: 35 Frame 72 Subframe 1
-            if '[MAC] A RACH_IND sent to Proxy' in line:
-                found.add('rach sent')
-                continue
+    if not analyze_ue_logs(scenario):
+        passed = False
 
-            # 94777.669610 [MAC] A [UE 0][RAPROC] Frame 73 Received RAR
-            # (50|00.00.05.4c.0a.67) for preamble 16/16
-            if ' Received RAR ' in line:
-                found.add('received rar')
-                continue
+    if not analyze_gnb_logs(scenario):
+        passed = False
 
-            # 94777.679744 [RRC] A [UE0][RAPROC] Frame 74 : Logical Channel DL-CCCH
-            # (SRB0), Received RRCConnectionSetup RNTI a67
-            if 'Received RRCConnectionSetup' in line:
-                found.add('received setup')
-                continue
-
-            # 94777.706964 [RRC] A UECapabilityInformation Encoded 148 bits
-            # (19 bytes)
-            if '[RRC] A UECapabilityInformation Encoded ' in line:
-                found.add('capabilities')
-                continue
-
-        LOGGER.debug('found: %r', found)
-
-        if len(found) == 4:
-            LOGGER.info('All UE%d Tests Passed', ue_number)
-        else:
-            num_ue_failed += 1
-            passed = False
-            LOGGER.error('!!! UE%d Test Failed !!! -- found %r', ue_number, found)
-
-    # TODO: Analyze gNB and nr-UE logs
+    if not analyze_nrue_logs(scenario):
+        passed = False
 
     if not passed:
-        LOGGER.critical('FAILED, %d of %d UEs failed',
-                        num_ue_failed, len(scenario.ue_hostname))
+        LOGGER.critical('FAILED')
         return 1
 
     LOGGER.info('PASSED')
