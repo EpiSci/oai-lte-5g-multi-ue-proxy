@@ -570,10 +570,6 @@ def analyze_enb_logs(scenario: Scenario) -> bool:
         LOGGER.info('eNB passed: %r', found)
         return True
 
-    if OPTS.mode == 'nr' and len(found) == 3 + num_ues:
-        LOGGER.info('eNB passed: %r', found)
-        return True
-
     LOGGER.error('eNB failed -- found %d %r', len(found), found)
     return False
 
@@ -615,10 +611,18 @@ def analyze_ue_logs(scenario: Scenario) -> bool:
                 found.add('cap enq to nrue')
                 continue
 
-            # 2075586.675497 00006d6e [RRC] A NR_UECapabilityInformation
+            # 2075586.675497 00006d6e [RRC] A
+            # rrc_ue_process_nrueCapabilityEnquiry: NR_UECapabilityInformation
             # Encoded 108 bits (14 bytes)
-            if '[RRC] A NR_UECapabilityInformation Encoded ' in line:
-                found.add('cap info encoded')
+            if '[RRC] A rrc_nrue_process_nrueCapabilityEnquiry: NR_UECapabilityInformation Encoded ' in line:
+                found.add('nrue cap info encoded')
+                continue
+
+            # 2075586.675497 00006d6e [RRC] A
+            # rrc_ue_process_ueCapabilityEnquiry: NR_UECapabilityInformation
+            # Encoded 108 bits (14 bytes)
+            if '[RRC] A rrc_ue_process_ueCapabilityEnquiry: NR_UECapabilityInformation Encoded ' in line:
+                found.add('ue cap info encoded')
                 continue
 
             # 2075586.662377 00006d6e [RRC] A Encoded measurement object 101
@@ -643,8 +647,6 @@ def analyze_ue_logs(scenario: Scenario) -> bool:
         if OPTS.mode == 'lte' and len(found) == 4:
             LOGGER.info('UE%d passed: %r', ue_number, found)
         elif OPTS.mode == 'nsa' and len(found) == 9:
-            LOGGER.info('UE%d passed: %r', ue_number, found)
-        elif OPTS.mode == 'nr' and len(found) == 4:
             LOGGER.info('UE%d passed: %r', ue_number, found)
         else:
             num_failed += 1
@@ -676,14 +678,20 @@ def analyze_gnb_logs(scenario: Scenario) -> bool:
             found.add('reconfiguring')
             continue
 
+        # 2075586.763190 00006cd4 [RRC] A Successfully decoded UE NR
+        # capabilities for RNTI 1234 (NR and MRDC)
+        match = re.search(r'\[RRC\] A Successfully decoded UE NR (capabilities for RNTI \w+) ', line)
+        if match:
+            found.add(match.group(1))
+            continue
+
     LOGGER.debug('found: %r', found)
 
     num_ues = len(scenario.ue_hostname)
     LOGGER.debug('num UEs: %d', num_ues)
 
-    # TODO: Melissa, is this right? When num_ues!=1, how many of those messages should we see?
-    if len(found) != 1 + num_ues:
-        LOGGER.error('gNB failed -- found %r', found)
+    if len(found) != 2 + num_ues:
+        LOGGER.error('gNB failed -- found %d %r', len(found), found)
         return False
 
     LOGGER.info('gNB passed')
@@ -728,7 +736,7 @@ def analyze_nrue_logs(scenario: Scenario) -> bool:
             LOGGER.info('NRUE%d passed', nrue_number)
         else:
             num_failed += 1
-            LOGGER.error('NRUE%d failed -- found %r', nrue_number, found)
+            LOGGER.error('NRUE%d failed -- found %d %r', nrue_number, len(found), found)
 
     if num_failed != 0:
         LOGGER.critical('%d of %d NRUEs failed', num_failed, len(scenario.nrue_hostname))
