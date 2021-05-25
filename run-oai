@@ -41,7 +41,7 @@ case "$node_type" in
             # Keep the eNB on processor 1 (the second processor) by default
             taskset --cpu-list 1
             ./ran_build/build/lte-softmodem
-            -O ../ci-scripts/conf_files/rcc.band7.tm1.nfapi.conf
+            -O ../ci-scripts/conf_files/proxy_rcc.band7.tm1.nfapi.conf
             --noS1
         )
         ;;
@@ -52,7 +52,7 @@ case "$node_type" in
             # Keep the gNB on processor 1 (the second processor) by default
             taskset --cpu-list 1
             ./ran_build/build/nr-softmodem
-            -O ../targets/PROJECTS/GENERIC-LTE-EPC/CONF/rcc.band78.tm1.106PRB.nfapi.conf
+            -O ../targets/PROJECTS/GENERIC-LTE-EPC/CONF/proxy_rcc.band78.tm1.106PRB.nfapi.conf
             --nfapi 2 --noS1
         )
         ;;
