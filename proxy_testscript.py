@@ -563,11 +563,11 @@ def analyze_enb_logs(scenario: Scenario) -> bool:
     LOGGER.debug('num UEs: %d', num_ues)
 
     if OPTS.mode == 'lte' and len(found) == 3 + num_ues:
-        LOGGER.info('eNB passed: %r', found)
+        LOGGER.info('eNB passed')
         return True
 
     if OPTS.mode == 'nsa' and len(found) == 6 + 2 * num_ues:
-        LOGGER.info('eNB passed: %r', found)
+        LOGGER.info('eNB passed')
         return True
 
     LOGGER.error('eNB failed -- found %d %r', len(found), found)
@@ -599,9 +599,9 @@ def analyze_ue_logs(scenario: Scenario) -> bool:
                 found.add('received setup')
                 continue
 
-            # 94777.706964 [RRC] A UECapabilityInformation Encoded 148 bits
-            # (19 bytes)
-            if '[RRC] A UECapabilityInformation Encoded ' in line:
+            # 2350014.072310 0001d422 [RRC] A rrc_ue_process_ueCapabilityEnquiry:
+            # UECapabilityInformation Encoded 316 bits (40 bytes)
+            if '[RRC] A rrc_ue_process_ueCapabilityEnquiry: UECapabilityInformation Encoded ' in line:
                 found.add('capabilities')
                 continue
 
@@ -612,16 +612,16 @@ def analyze_ue_logs(scenario: Scenario) -> bool:
                 continue
 
             # 2075586.675497 00006d6e [RRC] A
-            # rrc_ue_process_nrueCapabilityEnquiry: NR_UECapabilityInformation
+            # rrc_ue_process_nrueCapabilityEnquiry: NR_UECapInfo LTE_RAT_Type_nr Encoded
             # Encoded 108 bits (14 bytes)
-            if '[RRC] A rrc_nrue_process_nrueCapabilityEnquiry: NR_UECapabilityInformation Encoded ' in line:
+            if '[RRC] A rrc_ue_process_nrueCapabilityEnquiry: NR_UECapInfo LTE_RAT_Type_nr Encoded ' in line:
                 found.add('nrue cap info encoded')
                 continue
 
             # 2075586.675497 00006d6e [RRC] A
-            # rrc_ue_process_ueCapabilityEnquiry: NR_UECapabilityInformation
+            # rrc_ue_process_nrueCapabilityEnquiry: NR_UECapInfo LTE_RAT_Type_eutra_nr Encoded
             # Encoded 108 bits (14 bytes)
-            if '[RRC] A rrc_ue_process_ueCapabilityEnquiry: NR_UECapabilityInformation Encoded ' in line:
+            if '[RRC] A rrc_ue_process_nrueCapabilityEnquiry: NR_UECapInfo LTE_RAT_Type_eutra_nr Encoded ' in line:
                 found.add('ue cap info encoded')
                 continue
 
@@ -645,9 +645,9 @@ def analyze_ue_logs(scenario: Scenario) -> bool:
                 continue
 
         if OPTS.mode == 'lte' and len(found) == 4:
-            LOGGER.info('UE%d passed: %r', ue_number, found)
-        elif OPTS.mode == 'nsa' and len(found) == 9:
-            LOGGER.info('UE%d passed: %r', ue_number, found)
+            LOGGER.info('UE%d passed', ue_number)
+        elif OPTS.mode == 'nsa' and len(found) == 10:
+            LOGGER.info('UE%d passed', ue_number)
         else:
             num_failed += 1
             LOGGER.error('UE%d failed -- found %d %r', ue_number, len(found), found)
@@ -672,17 +672,18 @@ def analyze_gnb_logs(scenario: Scenario) -> bool:
             found.add('configured')
             continue
 
-        # 2075586.912997 00006cd4 [NR_RRC] A Handling of reconfiguration
-        # complete message at RRC gNB is pending
-        if '[NR_RRC] A Handling of reconfiguration complete message at RRC gNB is pending' in line:
-            found.add('reconfiguring')
+        # 2075586.912997 00006cd4 [NR_RRC] A [UE d39c]
+        # Handling of reconfiguration complete message at RRC gNB is pending
+        match = re.search(r'\[NR_RRC\] A \[UE (\w+)\] Handling of reconfiguration '
+                           'complete message at RRC gNB is pending', line)
+        if match:
+            found.add('rrc complete ' + match.group(1))
             continue
 
-        # 2075586.763190 00006cd4 [RRC] A Successfully decoded UE NR
-        # capabilities for RNTI 1234 (NR and MRDC)
-        match = re.search(r'\[RRC\] A Successfully decoded UE NR (capabilities for RNTI \w+) ', line)
-        if match:
-            found.add(match.group(1))
+        # 2075586.763190 00006cd4 [NR_RRC] A Successfully decoded UE NR
+        # capabilities (NR and MRDC)
+        if '[NR_RRC] A Successfully decoded UE NR capabilities (NR and MRDC)' in line:
+            found.add('nr capabilites')
             continue
 
     LOGGER.debug('found: %r', found)
