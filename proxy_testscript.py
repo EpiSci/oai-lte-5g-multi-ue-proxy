@@ -410,9 +410,6 @@ class Scenario:
                 jobs.compress('{}/{}.log'.format(OPTS.log_dir, nrue_hostname), remove_original=True)
         jobs.wait()
 
-        if save_core_files():
-            passed = False
-
         return passed
 
 # ----------------------------------------------------------------------------
@@ -765,12 +762,15 @@ def main() -> int:
                     '' if len(scenario.nrue_node_id) == 1 else 's',
                     ' '.join(map(str, scenario.nrue_node_id.values())))
 
-    set_core_pattern()
-
     passed = True
 
     if not OPTS.no_run:
+        set_core_pattern()
+
         passed = scenario.run()
+
+        if save_core_files():
+            passed = False
 
     # Examine the logs to determine if the test passed
 
