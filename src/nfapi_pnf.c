@@ -2694,10 +2694,9 @@ static void oai_slot_aggregate_rach_ind(slot_msgs_t *msgs)
 
         if (nfapi_nr_p7_message_unpack(msg->data, msg->length, &ind, sizeof(ind), NULL) < 0)
         {
-            NFAPI_TRACE(NFAPI_TRACE_ERROR,  "rach unpack failed");
+            NFAPI_TRACE(NFAPI_TRACE_ERROR,  "nr rach unpack failed");
             continue;
         }
-        sfn_slot_add(&ind.sfn, &ind.slot, 5);
         oai_nfapi_nr_rach_indication(&ind);
     }
 }

@@ -1554,7 +1554,14 @@ void vnf_handle_nr_rach_indication(void *pRecvMsg, int recvMsgLen, vnf_p7_t* vnf
 		{
 			NFAPI_TRACE(NFAPI_TRACE_ERROR, "%s: Failed to unpack message\n", __FUNCTION__);
 		}
-		
+		else
+		{
+		        NFAPI_TRACE(NFAPI_TRACE_INFO, "%s: Handling NR RACH indication.\n", __FUNCTION__);
+			if(vnf_p7->_public.nr_rach_indication)
+			{
+				(vnf_p7->_public.nr_rach_indication)(&vnf_p7->_public, &ind);
+			}
+		}
 	}
 }
 

@@ -53,7 +53,7 @@ case "$node_type" in
             taskset --cpu-list 1
             ./ran_build/build/nr-softmodem
             -O ../targets/PROJECTS/GENERIC-LTE-EPC/CONF/proxy_rcc.band78.tm1.106PRB.nfapi.conf
-            --nfapi 2 --noS1
+            --nfapi 2
         )
         ;;
 
