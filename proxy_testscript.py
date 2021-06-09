@@ -301,11 +301,11 @@ class Scenario:
 
         proxy_proc = self.launch_proxy()
 
-        if self.nrue_hostname:
-            nrue_proc = self.launch_nrue()
-
         if self.ue_hostname:
             ue_proc = self.launch_ue()
+
+        if self.nrue_hostname:
+            nrue_proc = self.launch_nrue()
 
         # ------------------------------------------------------------------------------------
         # Let the simulation run for a while
@@ -669,11 +669,12 @@ def analyze_gnb_logs(scenario: Scenario) -> bool:
             found.add('configured')
             continue
 
-        # 2075586.912997 00006cd4 [NR_RRC] A
+        # 2075586.912997 00006cd4 [NR_RRC] A [UE d39c]
         # Handling of reconfiguration complete message at RRC gNB is pending
-        if 'Handling of reconfiguration complete message at RRC gNB is pending' in line:
-            timestamp = line.split()[0]
-            found.add('rrc complete ' + timestamp)
+        match = re.search(r'\[NR_RRC\] A \[UE (\w+)\] Handling of reconfiguration '
+                           'complete message at RRC gNB is pending', line)
+        if match:
+            found.add('rrc complete ' + match.group(1))
             continue
 
         # 2075586.763190 00006cd4 [NR_RRC] A Successfully decoded UE NR
