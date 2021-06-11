@@ -86,7 +86,7 @@ int Multi_UE_Proxy::init_oai_socket(const char *addr, int tx_port, int rx_port, 
         }
         if (bind(ue_rx_socket_, (struct sockaddr *)&address_rx_, sizeof(address_rx_)) < 0)
         {
-            NFAPI_TRACE(NFAPI_TRACE_ERROR, "bind failed in init_oai_socket");
+            NFAPI_TRACE(NFAPI_TRACE_ERROR, "bind failed in init_oai_socket: %s\n", strerror(errno));
             close(ue_rx_socket_);
             ue_rx_socket_ = -1;
             return -1;
@@ -113,7 +113,7 @@ int Multi_UE_Proxy::init_oai_socket(const char *addr, int tx_port, int rx_port, 
 
         if (connect(ue_tx_socket_, (struct sockaddr *)&address_tx_, sizeof(address_tx_)) < 0)
         {
-          NFAPI_TRACE(NFAPI_TRACE_ERROR, "tx connection failed in init_oai_socket");
+          NFAPI_TRACE(NFAPI_TRACE_ERROR, "tx connection failed in init_oai_socket: %s\n", strerror(errno));
           close(ue_tx_socket_);
           return -1;
         }
