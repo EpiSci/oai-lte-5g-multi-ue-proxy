@@ -58,8 +58,8 @@ void Multi_UE_NR_Proxy::configure(std::string gnb_ip, std::string proxy_ip, std:
 
     for (int ue_idx = 0; ue_idx < num_ues; ue_idx++)
     {
-        int oai_rx_ue_port = 3611 + (num_ues + ue_idx) * port_delta;
-        int oai_tx_ue_port = 3612 + (num_ues + ue_idx) * port_delta;
+        int oai_rx_ue_port = 3611 + ue_idx * port_delta;
+        int oai_tx_ue_port = 3612 + ue_idx * port_delta;
         init_oai_socket(oai_ue_ipaddr.c_str(), oai_tx_ue_port, oai_rx_ue_port, ue_idx);
     }
 }
@@ -187,7 +187,7 @@ void Multi_UE_NR_Proxy::oai_gnb_downlink_nfapi_task(void *msg_org)
 
     for(int ue_idx = 0; ue_idx < num_ues; ue_idx++)
     {
-        address_tx_.sin_port = htons(3612 + (num_ues + ue_idx) * port_delta);
+        address_tx_.sin_port = htons(3612 + ue_idx * port_delta);
         switch (msg.header.message_id)
         {
 
@@ -260,7 +260,7 @@ void Multi_UE_NR_Proxy::pack_and_send_downlink_sfn_slot_msg(uint16_t sfn_slot)
 
     for(int ue_idx = 0; ue_idx < num_ues; ue_idx++)
     {
-        address_tx_.sin_port = htons(3612 + (num_ues + ue_idx) * port_delta);
+        address_tx_.sin_port = htons(3612 + ue_idx * port_delta);
         assert(ue_tx_socket[ue_idx] > 2);
         if (sendto(ue_tx_socket[ue_idx], &sfn_slot, sizeof(sfn_slot), 0, (const struct sockaddr *) &address_tx_, sizeof(address_tx_)) < 0)
         {

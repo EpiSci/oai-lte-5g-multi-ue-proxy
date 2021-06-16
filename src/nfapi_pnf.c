@@ -4246,7 +4246,7 @@ void *oai_subframe_task(void *context)
         uint64_t iteration_start = clock_usec();
 
         transfer_downstream_sfn_sf_to_proxy(sfn_sf_tx); // send to oai UE
-        NFAPI_TRACE(NFAPI_TRACE_INFO, "Frame %u Subframe %u sent to OAI ue", sfn_sf_tx >> 4,
+        NFAPI_TRACE(NFAPI_TRACE_DEBUG, "Frame %u Subframe %u sent to OAI ue", sfn_sf_tx >> 4,
                     sfn_sf_tx & 0XF);
 
         if (are_queues_empty)
@@ -4314,7 +4314,7 @@ void *oai_slot_task(void *context)
         uint64_t iteration_start = clock_usec();
 
         transfer_downstream_sfn_slot_to_proxy(sfn_slot_tx); // send to oai UE
-        NFAPI_TRACE(NFAPI_TRACE_INFO, "Frame %u Slot %u sent to OAI ue", NFAPI_SFNSLOT2SFN(sfn_slot_tx),
+        NFAPI_TRACE(NFAPI_TRACE_DEBUG, "Frame %u Slot %u sent to OAI ue", NFAPI_SFNSLOT2SFN(sfn_slot_tx),
                    NFAPI_SFNSLOT2SLOT(sfn_slot_tx));
 
         if (are_queues_empty)

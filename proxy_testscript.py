@@ -31,7 +31,7 @@ parser.add_argument('--num-ues', '-u', metavar='N', type=int, default=1,
 The number of UEs to launch (default: %(default)s)
 """)
 
-parser.add_argument('--duration', '-d', metavar='SECONDS', type=int, default=15,
+parser.add_argument('--duration', '-d', metavar='SECONDS', type=int, default=30,
                     help="""
 How long to run the test before stopping to examine the logs
 """)
@@ -265,7 +265,7 @@ class Scenario:
             log_name = '{}/{}.log'.format(OPTS.log_dir, hostname)
             LOGGER.info('Launch nrUE%d: %s', num, log_name)
             cmd = 'NODE_NUMBER={NODE_ID} {RUN_OAI} nrue' \
-                  .format(NODE_ID=len(self.ue_node_id) + self.ue_node_id[num],
+                  .format(NODE_ID=self.ue_node_id[num],
                           RUN_OAI=RUN_OAI)
             if OPTS.mode == 'nsa':
                 cmd += ' --nsa'
@@ -689,7 +689,7 @@ def analyze_gnb_logs(scenario: Scenario) -> bool:
     LOGGER.debug('num UEs: %d', num_ues)
 
     if len(found) != 2 + num_ues:
-        LOGGER.error('gNB failed -- found %d %r', len(found), found)
+        LOGGER.error('gNB failed -- found %d/%d %r', len(found), 2 + num_ues, found)
         return False
 
     LOGGER.info('gNB passed')
@@ -703,6 +703,12 @@ def analyze_nrue_logs(scenario: Scenario) -> bool:
     num_failed = 0
     for nrue_number, nrue_hostname in scenario.nrue_hostname.items():
         found = set()
+        expected = {
+            'sent cap',
+            'cap encoded',
+            'reconf encoded',
+            'rrc meas sent',
+        }
         for line in get_analysis_messages('{}/{}.log.bz2'.format(OPTS.log_dir, nrue_hostname)):
             # 2075586.628184 00006d66 [NR_RRC] A Sent initial NRUE Capability
             # response to LTE UE
@@ -734,7 +740,8 @@ def analyze_nrue_logs(scenario: Scenario) -> bool:
             LOGGER.info('NRUE%d passed', nrue_number)
         else:
             num_failed += 1
-            LOGGER.error('NRUE%d failed -- found %d %r', nrue_number, len(found), found)
+            LOGGER.error('NRUE%d failed -- found %d/%d %r', nrue_number, len(found), len(expected), found)
+            LOGGER.error('NRUE%d failed -- missed %d %r', nrue_number, len(expected - found), expected - found)
 
     if num_failed != 0:
         LOGGER.critical('%d of %d NRUEs failed', num_failed, len(scenario.nrue_hostname))
