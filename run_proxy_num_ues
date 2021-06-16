@@ -63,13 +63,6 @@ if ! (( num_ues > 0 )); then
     exit 1
 fi
 
-scenario=$this_dir/Core_PROXY_${num_ues}_UEs.imn
-if ! [ -e "$scenario" ]; then
-    echo >&2 "$this_script: No scenario for $num_ues UEs: $scenario"
-    echo >&2 "$this_script: To create it: $this_dir/generate-imn.py $num_ues >$scenario"
-    exit 1
-fi
-
 log_base=$log_dir/logs-$(date +%Y-%m-%d-%H%M%S)
 mkdir -p "$log_base" || exit
 echo "Logs: $log_base"
@@ -85,7 +78,7 @@ for i in $(seq $num_runs); do
 
     run_cmd=(
         "$proxy_testscript"
-        --scenario="$scenario"
+        -u $num_ues
         --log-dir="$log_dir"
         "$@"
     )
