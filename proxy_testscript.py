@@ -683,6 +683,9 @@ def analyze_gnb_logs(scenario: Scenario) -> bool:
             found.add('nr capabilites')
             continue
 
+        # 364915.873598 000062e2 [NR_MAC] A (ue 0, rnti 0xb094) CFRA procedure succeeded!
+        # TODO: Michael add this for multi-ues
+
     LOGGER.debug('found: %r', found)
 
     num_ues = len(scenario.ue_hostname)
