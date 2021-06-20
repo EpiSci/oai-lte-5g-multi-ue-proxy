@@ -366,16 +366,24 @@ class Scenario:
                     LOGGER.critical('NRUE%d process ended early: %r', nrue_number, status)
 
         LOGGER.info('kill main simulation processes...')
-        all_procs = ['proxy']
+        cmd = ['sudo', 'killall']
+        # TODO: softmodem processes tend to crash while trying to shutdown.
+        # They don't actually need to do anything on shutdown, so for now we
+        # use -KILL because the softmodem processes can't catch that signal
+        # and so they don't get a chance to try to shutdown
+        cmd.append('-KILL')
         if enb_proc:
-            all_procs.append('lte-softmodem')
+            cmd.append('lte-softmodem')
         if gnb_proc:
-            all_procs.append('nr-softmodem')
+            cmd.append('nr-softmodem')
         if ue_proc:
-            all_procs.append('lte-uesoftmodem')
+            cmd.append('lte-uesoftmodem')
         if nrue_proc:
-            all_procs.append('nr-uesoftmodem')
-        subprocess.run(['sudo', 'killall'] + all_procs)
+            cmd.append('nr-uesoftmodem')
+        subprocess.run(cmd)
+        proxy_proc.kill()
+
+        # Wait for the processes to end
         proxy_proc.wait()
         if enb_proc:
             enb_proc.wait()
