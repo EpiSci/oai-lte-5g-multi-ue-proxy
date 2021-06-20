@@ -69,13 +69,8 @@ int Multi_UE_Proxy::init_oai_socket(const char *addr, int tx_port, int rx_port, 
     {   //Setup Rx Socket
         memset(&address_rx_, 0, sizeof(address_rx_));
         address_rx_.sin_family = AF_INET;
+        address_rx_.sin_addr.s_addr = INADDR_ANY;
         address_rx_.sin_port = htons(rx_port);
-
-        if (inet_aton(addr, &address_rx_.sin_addr) == 0)
-        {
-            NFAPI_TRACE(NFAPI_TRACE_ERROR, "addr no good %s", addr);
-            return -1;
-        }
 
         ue_rx_socket_ = socket(address_rx_.sin_family, SOCK_DGRAM, 0);
         ue_rx_socket[ue_idx] = ue_rx_socket_;
