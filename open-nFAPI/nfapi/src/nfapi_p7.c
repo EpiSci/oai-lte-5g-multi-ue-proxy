@@ -307,7 +307,7 @@ static uint8_t pack_dl_tti_pdcch_pdu_rel15_value(void* tlv, uint8_t **ppWritePac
 
 static uint8_t pack_dl_tti_pdsch_pdu_rel15_value(void* tlv, uint8_t **ppWritePackedMsg, uint8_t *end)
 {
-	printf("packing pdsch pdu. \n");
+	NFAPI_TRACE(NFAPI_TRACE_DEBUG, "packing pdsch pdu. \n");
 	nfapi_nr_dl_tti_pdsch_pdu_rel15_t* value = (nfapi_nr_dl_tti_pdsch_pdu_rel15_t*)tlv;
 
 	// TODO: resolve the packaging of array (currently sending a single element)
@@ -361,7 +361,7 @@ static uint8_t pack_dl_tti_pdsch_pdu_rel15_value(void* tlv, uint8_t **ppWritePac
 
 static uint8_t pack_dl_tti_ssb_pdu_rel15_value(void* tlv, uint8_t **ppWritePackedMsg, uint8_t *end)
 {
-	printf("Packing ssb. \n");
+	NFAPI_TRACE(NFAPI_TRACE_DEBUG, "Packing ssb. \n");
 	nfapi_nr_dl_tti_ssb_pdu_rel15_t* value = (nfapi_nr_dl_tti_ssb_pdu_rel15_t*)tlv;
 
 	return(
@@ -2573,7 +2573,7 @@ static uint8_t pack_rx_ulsch_indication_body_value(void *tlv, uint8_t **ppWriteP
 {
 	nfapi_rx_indication_body_t* value = (nfapi_rx_indication_body_t*)tlv;
 
-        //printf("RX ULSCH BODY\n");
+        //NFAPI_TRACE(NFAPI_TRACE_DEBUG, "RX ULSCH BODY\n");
 
 	if( push16(value->number_of_pdus, ppWritePackedMsg, end) == 0)
 		return 0;
@@ -2582,26 +2582,26 @@ static uint8_t pack_rx_ulsch_indication_body_value(void *tlv, uint8_t **ppWriteP
 	uint16_t i = 0;
 	uint16_t offset = 2; // taking into account the number_of_pdus
 	uint16_t total_number_of_pdus = value->number_of_pdus;
-        //printf("ULSCH:pdus:%d\n", total_number_of_pdus);
+        //NFAPI_TRACE(NFAPI_TRACE_DEBUG, "ULSCH:pdus:%d\n", total_number_of_pdus);
 
 	for(i = 0; i < total_number_of_pdus; ++i)
 	{
 		nfapi_rx_indication_pdu_t* pdu = &(value->rx_pdu_list[i]);
 		if(pdu->rx_ue_information.tl.tag == NFAPI_RX_UE_INFORMATION_TAG)
 		{
-                  //printf("NFAPI_RX_UE_INFORMATION_TAG\n");
+                  //NFAPI_TRACE(NFAPI_TRACE_DEBUG, "NFAPI_RX_UE_INFORMATION_TAG\n");
 			offset += 4 + 6;
 		}
 				
 		if(pdu->rx_indication_rel8.tl.tag == NFAPI_RX_INDICATION_REL8_TAG)
 		{
-                  //printf("NFAPI_RX_INDICATION_REL8_TAG\n");
+                  //NFAPI_TRACE(NFAPI_TRACE_DEBUG, "NFAPI_RX_INDICATION_REL8_TAG\n");
 			offset += 4 + 7;
 		}
 
 		if(pdu->rx_indication_rel9.tl.tag == NFAPI_RX_INDICATION_REL9_TAG)
 		{
-                  //printf("NFAPI_RX_INDICATION_REL9_TAG\n");
+                  //NFAPI_TRACE(NFAPI_TRACE_DEBUG, "NFAPI_RX_INDICATION_REL9_TAG\n");
 			offset += 4 + 2;
 		}
 	}
@@ -3612,7 +3612,7 @@ static uint8_t pack_nr_uci_indication_body(void* tlv, uint8_t **ppWritePackedMsg
 	
 	switch (value->pdu_type) {
       case NFAPI_NR_UCI_PUSCH_PDU_TYPE:
-        printf("Unhandled NFAPI_NR_UCI_PUSCH_PDU_TYPE \n");
+        NFAPI_TRACE(NFAPI_TRACE_WARN, "Unhandled NFAPI_NR_UCI_PUSCH_PDU_TYPE \n");
         break;
 
       case NFAPI_NR_UCI_FORMAT_0_1_PDU_TYPE: {
@@ -3663,13 +3663,6 @@ int nfapi_nr_p7_message_pack(void *pMessageBuf, void *pPackedBuf, uint32_t packe
 		NFAPI_TRACE(NFAPI_TRACE_ERROR, "P7 Pack supplied pointers are null\n");
 		return -1;
 	}
-	/*
-	printf("\n P7 MESSAGE SENT: \n");
-	for(int i=0; i< packedBufLen; i++){
-		printf("%d", *(uint8_t *)(pMessageBuf + i));
-	}
-	printf("\n");
-	*/
 	// process the header
 	if(!(push16(pMessageHeader->phy_id, &pWritePackedMessage, end) &&
 		 push16(pMessageHeader->message_id, &pWritePackedMessage, end) &&
@@ -3692,7 +3685,7 @@ int nfapi_nr_p7_message_pack(void *pMessageBuf, void *pPackedBuf, uint32_t packe
 	{
 		case NFAPI_NR_PHY_MSG_TYPE_DL_TTI_REQUEST:
 			result = pack_dl_tti_request(pMessageHeader, &pWritePackedMessage, end, config);
-			printf("result of pack dl_tti_req is %d. \n",result);
+			NFAPI_TRACE(NFAPI_TRACE_DEBUG, "result of pack dl_tti_req is %d. \n",result);
 			break;
 
 		case NFAPI_NR_PHY_MSG_TYPE_UL_TTI_REQUEST:
@@ -3818,13 +3811,6 @@ int nfapi_p7_message_pack(void *pMessageBuf, void *pPackedBuf, uint32_t packedBu
 		NFAPI_TRACE(NFAPI_TRACE_ERROR, "P7 Pack supplied pointers are null\n");
 		return -1;
 	}
-	/*
-	printf("\n P7 MESSAGE SENT: \n");
-	for(int i=0; i< packedBufLen; i++){
-		printf("%d", *(uint8_t *)(pMessageBuf + i));
-	}
-	printf("\n");
-	*/
 	// process the header
 	if(!(push16(pMessageHeader->phy_id, &pWritePackedMessage, end) &&
 		 push16(pMessageHeader->message_id, &pWritePackedMessage, end) &&
@@ -4119,7 +4105,7 @@ static uint8_t unpack_dl_tti_pdsch_pdu_rel15_value(void* tlv, uint8_t **ppReadPa
 
 static uint8_t unpack_dl_tti_ssb_pdu_rel15_value(void* tlv, uint8_t **ppReadPackedMsg, uint8_t *end)
 {	
-	printf("ssb received and unpacked. \n");
+	NFAPI_TRACE(NFAPI_TRACE_DEBUG, "ssb received and unpacked. \n");
 	nfapi_nr_dl_tti_ssb_pdu_rel15_t* value = (nfapi_nr_dl_tti_ssb_pdu_rel15_t*)tlv;
 
 	return(
@@ -6371,7 +6357,6 @@ static uint8_t unpack_nr_rx_data_indication_body(nfapi_nr_rx_data_pdu_t* value,
 static uint8_t unpack_nr_rx_data_indication(uint8_t **ppReadPackedMsg, uint8_t *end, void *msg, nfapi_p7_codec_config_t* config)
 {
 	nfapi_nr_rx_data_indication_t *pNfapiMsg = (nfapi_nr_rx_data_indication_t*)msg;
-
 	if (!(pull16(ppReadPackedMsg, &pNfapiMsg->sfn , end) &&
 		pull16(ppReadPackedMsg, &pNfapiMsg->slot , end) &&
 		pull16(ppReadPackedMsg, &pNfapiMsg->number_of_pdus, end)
@@ -6533,14 +6518,6 @@ static uint8_t unpack_nr_rach_indication(uint8_t **ppReadPackedMsg, uint8_t *end
 static uint8_t unpack_nr_uci_pucch_0_1(void* tlv, uint8_t **ppReadPackedMsg, uint8_t *end) {
 	nfapi_nr_uci_pucch_pdu_format_0_1_t* value = (nfapi_nr_uci_pucch_pdu_format_0_1_t*)tlv;
 
-	uint8_t *ptr = *ppReadPackedMsg;
-	printf("\n Read P7 message uci_0_1 indication unpack: ");
-	while(ptr < end){
-		printf(" %d ", *ptr);
-		ptr++;
-	}
-	printf("\n");
-
 	if(!(pull8(ppReadPackedMsg, &value->pduBitmap, end) &&
 	 	 pull32(ppReadPackedMsg, &value->handle, end) &&
 		 pull16(ppReadPackedMsg, &value->rnti, end) &&
@@ -6635,7 +6612,7 @@ static uint8_t unpack_nr_uci_indication_body(void* tlv, uint8_t **ppReadPackedMs
 	
 	switch (value->pdu_type) {
       case NFAPI_NR_UCI_PUSCH_PDU_TYPE:
-        printf("Unhandled NFAPI_NR_UCI_PUSCH_PDU_TYPE \n");
+        NFAPI_TRACE(NFAPI_TRACE_WARN, "Unhandled NFAPI_NR_UCI_PUSCH_PDU_TYPE \n");
         break;
 
       case NFAPI_NR_UCI_FORMAT_0_1_PDU_TYPE: {

@@ -1897,15 +1897,6 @@ static uint8_t unpack_nr_param_response(uint8_t **ppReadPackedMsg, uint8_t *end,
 		{ NFAPI_NR_NFAPI_TIMING_INFO_MODE_TAG, &pNfapiMsg->nfapi_config.timing_info_mode, &unpack_uint8_tlv_value},
 		{ NFAPI_NR_NFAPI_TIMING_INFO_PERIOD_TAG, &pNfapiMsg->nfapi_config.timing_info_period, &unpack_uint8_tlv_value},
 	};
-	// print ppReadPackedMsg
-	uint8_t *ptr = *ppReadPackedMsg;
-	printf("\n Read message unpack_param_response: ");
-	while(ptr < end){
-		printf(" %d ", *ptr);
-		ptr++;
-	}
-	printf("\n");
-
 
 	return ( pull8(ppReadPackedMsg, &pNfapiMsg->error_code, end) &&
 			 pull8(ppReadPackedMsg, &pNfapiMsg->num_tlv, end) &&
@@ -2483,14 +2474,6 @@ int nfapi_nr_p5_message_unpack(void *pMessageBuf, uint32_t messageBufLen, void *
 		return -1;
 	}
 
-	uint8_t *ptr = pReadPackedMessage;
-	printf("\n Read message unpack: ");
-	while(ptr < end){
-		printf(" %d ", *ptr);
-		ptr++;
-	}
-	printf("\n");
-	
 	// clean the supplied buffer for - tag value blanking
 	(void)memset(pUnpackedBuf, 0, unpackedBufLen);
 
@@ -2629,14 +2612,6 @@ int nfapi_p5_message_unpack(void *pMessageBuf, uint32_t messageBufLen, void *pUn
 		return -1;
 	}
 
-	uint8_t *ptr = pReadPackedMessage;
-	printf("\n Read message unpack: ");
-	while(ptr < end){
-		printf(" %d ", *ptr);
-		ptr++;
-	}
-	printf("\n");
-	
 	// clean the supplied buffer for - tag value blanking
 	(void)memset(pUnpackedBuf, 0, unpackedBufLen);
 
