@@ -13,7 +13,7 @@ import glob
 import bz2
 import subprocess
 from subprocess import Popen
-from typing import Optional, Dict, List, Generator
+from typing import Optional, Dict, List, Generator, Union
 
 WORKSPACE_DIR = os.path.abspath(os.path.dirname(sys.argv[0]))
 
@@ -307,7 +307,6 @@ class Scenario:
         if self.ue_hostname:
             ue_proc = self.launch_ue()
 
-
         # ------------------------------------------------------------------------------------
         # Let the simulation run for a while
 
@@ -445,6 +444,11 @@ def get_analysis_messages(filename: str) -> Generator:
                 else:
                     LOGGER.warning('%s', line)
 
+def chown(files: Union[str, List[str]]) -> None:
+    if isinstance(files, str):
+        files = [files]
+    subprocess.run(['sudo', 'chown', '--changes', str(os.getuid())] + files)
+
 def set_core_pattern() -> None:
     # Set the core_pattern so we can save the core files from any crashes.
     #
@@ -479,7 +483,7 @@ def save_core_files() -> bool:
 
     # Core files tend to be owned by root and not readable by others.
     # Change the ownership so we can both read them and then remove them.
-    subprocess.run(['sudo', 'chown', str(os.getuid())] + core_files)
+    chown(core_files)
 
     jobs = CompressJobs()
     for core_file in core_files:
@@ -684,15 +688,19 @@ def analyze_gnb_logs(scenario: Scenario) -> bool:
             continue
 
         # 364915.873598 000062e2 [NR_MAC] A (ue 0, rnti 0xb094) CFRA procedure succeeded!
-        # TODO: Michael add this for multi-ues
+        match = re.search(r'\[NR_MAC\] A \(ue \d+, (rnti \w+)\) CFRA procedure succeeded!$', line)
+        if match:
+            found.add(f'cfra {match.group(1)}')
+            continue
 
     LOGGER.debug('found: %r', found)
 
     num_ues = len(scenario.ue_hostname)
     LOGGER.debug('num UEs: %d', num_ues)
 
-    if len(found) != 2 + num_ues:
-        LOGGER.error('gNB failed -- found %d/%d %r', len(found), 2 + num_ues, found)
+    num_expect = 2 + 2 * num_ues
+    if len(found) != num_expect:
+        LOGGER.error('gNB failed -- found %d/%d %r', len(found), num_expect, found)
         return False
 
     LOGGER.info('gNB passed')
@@ -801,7 +809,6 @@ def main() -> int:
         return 1
 
     LOGGER.info('PASSED')
-
     return 0
 
 sys.exit(main())
