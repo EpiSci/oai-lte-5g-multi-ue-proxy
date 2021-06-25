@@ -922,9 +922,6 @@ int pnf_p7_slot_ind(pnf_p7_t* pnf_p7, uint16_t phy_id, uint16_t sfn, uint16_t sl
 
 	// save the curren time, sfn and slot
 	pnf_p7->slot_start_time_hr = pnf_get_current_time_hr();
-	pnf_p7->sfn = sfn;
-	
-	pnf_p7->slot = slot;
 
 
 
@@ -1674,17 +1671,17 @@ void pnf_handle_dl_tti_request(void* pRecvMsg, int recvMsgLen, pnf_p7_t* pnf_p7)
 
                         NFAPI_TRACE(NFAPI_TRACE_INFO,"%s() %ld.%09ld POPULATE DL_TTI_REQ sfn_slot:%d buffer_index:%d\n", __FUNCTION__, t.tv_sec, t.tv_nsec, sfn_slot_dec, buffer_index);
 
-			// if there is already an dl_config_req make sure we free it.
+			// if there is already an dl_tti_req make sure we free it.
 			if(pnf_p7->slot_buffer[buffer_index].dl_tti_req != 0)
 			{
 				NFAPI_TRACE(NFAPI_TRACE_NOTE, "%s() is_nr_p7_request_in_window()=TRUE buffer_index occupied - free it first sfn_slot:%d buffer_index:%d\n", __FUNCTION__, NFAPI_SFNSLOT2DEC(req->SFN,req->Slot), buffer_index);
-				//NFAPI_TRACE(NFAPI_TRACE_NOTE, "[%d] Freeing dl_config_req at index %d (%d/%d)", 
+				//NFAPI_TRACE(NFAPI_TRACE_NOTE, "[%d] Freeing dl_tti_req at index %d (%d/%d)", 
 				//			pMyPhyInfo->sfnSf, bufferIdx,
-				//			SFNSF2SFN(dreq->sfn_sf), SFNSF2SF(dreq->sfn_sf));
+				//			dreq->SFN, dreq->Slot));
 				deallocate_nfapi_dl_tti_request(pnf_p7->slot_buffer[buffer_index].dl_tti_req, pnf_p7);
 			}
 
-			// saving dl_config_request in subframe buffer
+			// saving dl_tti_request in slot buffer
 			transfer_downstream_nfapi_msg_to_nr_proxy((void *)req);
 			pnf_p7->slot_buffer[buffer_index].sfn = req->SFN;
 			pnf_p7->slot_buffer[buffer_index].slot = req->Slot;
@@ -1694,7 +1691,7 @@ void pnf_handle_dl_tti_request(void* pRecvMsg, int recvMsgLen, pnf_p7_t* pnf_p7)
 		}
 		else
 		{
-			//NFAPI_TRACE(NFAPI_TRACE_NOTE, "NOT storing dl_config_req SFN/SF %d\n", req->sfn_sf);
+			//NFAPI_TRACE(NFAPI_TRACE_NOTE, "NOT storing dl_tti_req SFN/SLOT %d\n", req->sfn_slot);
 			deallocate_nfapi_dl_tti_request(req, pnf_p7);
 
 			if(pnf_p7->_public.timing_info_mode_aperiodic)
@@ -3196,6 +3193,38 @@ int pnf_p7_message_pump(pnf_p7_t* pnf_p7)
 	return 0;
 }
 
+struct timespec pnf_timespec_add(struct timespec lhs, struct timespec rhs)
+{
+	struct timespec result;
+
+	result.tv_sec = lhs.tv_sec + rhs.tv_sec;
+	result.tv_nsec = lhs.tv_nsec + rhs.tv_nsec;
+
+	if(result.tv_nsec > 1e9)
+	{
+		result.tv_sec++;
+		result.tv_nsec-= 1e9;
+	}
+
+	return result;
+}
+
+struct timespec pnf_timespec_sub(struct timespec lhs, struct timespec rhs)
+{
+	struct timespec result;
+	if ((lhs.tv_nsec-rhs.tv_nsec)<0) 
+	{
+		result.tv_sec = lhs.tv_sec-rhs.tv_sec-1;
+		result.tv_nsec = 1000000000+lhs.tv_nsec-rhs.tv_nsec;
+	} 
+	else 
+	{
+		result.tv_sec = lhs.tv_sec-rhs.tv_sec;
+		result.tv_nsec = lhs.tv_nsec-rhs.tv_nsec;
+	}
+	return result;
+}
+
 int pnf_nr_p7_message_pump(pnf_p7_t* pnf_p7)
 {
 
@@ -3271,6 +3300,23 @@ int pnf_nr_p7_message_pump(pnf_p7_t* pnf_p7)
 	}
 	NFAPI_TRACE(NFAPI_TRACE_INFO, "PNF P7 bind succeeded...\n");
 
+	//Initializaing timing structures needed for slot ticking 
+
+	struct timespec slot_start;
+	clock_gettime(CLOCK_MONOTONIC, &slot_start);
+
+	struct timespec pselect_start;
+
+	struct timespec timeout;
+	timeout.tv_sec = 0;
+	timeout.tv_nsec = 500000;
+
+	struct timespec slot_duration; 
+	slot_duration.tv_sec = 0;
+	slot_duration.tv_nsec = 0.5e6;
+
+	//Infinite loop 
+
 	while(pnf_p7->terminate == 0)
 	{
 		fd_set rfds;
@@ -3280,11 +3326,27 @@ int pnf_nr_p7_message_pump(pnf_p7_t* pnf_p7)
 		FD_ZERO(&rfds);
 		FD_SET(pnf_p7->p7_sock, &rfds);
 
-		struct timeval timeout;
-		timeout.tv_sec = 1;
-		timeout.tv_usec = 0;
+		clock_gettime(CLOCK_MONOTONIC, &pselect_start);
 
-		selectRetval = select(pnf_p7->p7_sock+1, &rfds, NULL, NULL, &timeout);
+		//setting the timeout
+
+		if((pselect_start.tv_sec > slot_start.tv_sec) || ((pselect_start.tv_sec == slot_start.tv_sec) && (pselect_start.tv_nsec > slot_start.tv_nsec)))
+		{
+			// overran the end of the subframe we do not want to wait
+			timeout.tv_sec = 0;
+			timeout.tv_nsec = 0;
+
+			//struct timespec overrun = pnf_timespec_sub(pselect_start, sf_start);
+			//NFAPI_TRACE(NFAPI_TRACE_INFO, "Subframe overrun detected of %d.%d running to catchup\n", overrun.tv_sec, overrun.tv_nsec);
+		}
+		else
+		{
+			// still time before the end of the subframe wait
+			timeout = pnf_timespec_sub(slot_start, pselect_start);
+		}
+
+		selectRetval = pselect(pnf_p7->p7_sock+1, &rfds, NULL, NULL, &timeout, NULL);
+
 
 		uint32_t now_hr_time = pnf_get_current_time_hr();
 
@@ -3294,6 +3356,17 @@ int pnf_nr_p7_message_pump(pnf_p7_t* pnf_p7)
 		if(selectRetval == 0)
 		{	
 			// timeout
+
+			//update slot start timing
+			slot_start = pnf_timespec_add(slot_start, slot_duration);
+
+			//increment sfn/slot
+			if (++pnf_p7->slot == 20)
+                        {
+                                pnf_p7->slot = 0;
+                                pnf_p7->sfn = (pnf_p7->sfn + 1) % 1024;
+                        }
+
 			continue;
 		}
 		else if (selectRetval == -1 && (errno == EINTR))
