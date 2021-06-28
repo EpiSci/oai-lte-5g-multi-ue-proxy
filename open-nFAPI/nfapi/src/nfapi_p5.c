@@ -300,7 +300,7 @@ static uint8_t pack_pnf_config_request(void *msg, uint8_t **ppWritePackedMsg, ui
 {
 	nfapi_pnf_config_request_t *pNfapiMsg = (nfapi_pnf_config_request_t*)msg;
 	return (pack_tlv(NFAPI_PNF_PHY_RF_TAG, &pNfapiMsg->pnf_phy_rf_config, ppWritePackedMsg, end, &pack_pnf_phy_rf_config_value) && 
-			//push8(pNfapiMsg->num_tlvs,ppWritePackedMsg,end) && 
+			push8(pNfapiMsg->num_tlvs,ppWritePackedMsg,end) &&
 			pack_vendor_extension_tlv(pNfapiMsg->vendor_extension, ppWritePackedMsg, end , config));
 }
 

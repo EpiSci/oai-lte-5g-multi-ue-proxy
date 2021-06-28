@@ -1,12 +1,12 @@
 /*
  * Copyright 2017 Cisco Systems, Inc.
- * 
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  * http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -27,11 +27,13 @@
 #define NFAPI_PNF_PARAM_GENERAL_OUI_LENGTH 3
 #define NFAPI_MAX_NUM_RF_BANDS 16
 
+#define NFAPI_MAX_PACKED_MESSAGE_SIZE 8192
+
 // The following definition control the size of arrays used in the interface.
 // These may be changed if desired. They are used in the encoder to make sure 
 // that the user has not specified a 'count' larger than the max array, and also
 // used by the decoder when decode an array. If the 'count' received is larger
-// than the array it is to be stored in the decode fails. 
+// than the array it is to be stored in the decode fails.
 #define NFAPI_MAX_NUM_ANTENNAS 8
 #define NFAPI_MAX_NUM_SUBBANDS 13
 #define NFAPI_MAX_BF_VECTORS 8
@@ -187,7 +189,6 @@ typedef enum {
 	NFAPI_UL_NODE_SYNC = 0x0180,
 	NFAPI_DL_NODE_SYNC,
 	NFAPI_TIMING_INFO,
-
 
 	NFAPI_RSSI_REQUEST = 0x0200,
 	NFAPI_RSSI_RESPONSE,
@@ -2513,19 +2514,23 @@ typedef struct {
 typedef struct {
 	nfapi_p7_message_header_t header;
 	uint32_t last_sfn_sf;
+
 	uint32_t time_since_last_timing_info;
 	uint32_t dl_config_jitter;
 	uint32_t tx_request_jitter;
 	uint32_t ul_config_jitter;
 	uint32_t hi_dci0_jitter;
+
 	int32_t dl_config_latest_delay;
 	int32_t tx_request_latest_delay;
 	int32_t ul_config_latest_delay;
 	int32_t hi_dci0_latest_delay;
+
 	int32_t dl_config_earliest_arrival;
 	int32_t tx_request_earliest_arrival;
 	int32_t ul_config_earliest_arrival;
 	int32_t hi_dci0_earliest_arrival;
+	
 	nfapi_vendor_extension_tlv_t vendor_extension;
 } nfapi_timing_info_t;
 
@@ -2874,11 +2879,7 @@ typedef struct {
 	nfapi_rx_ue_information rx_ue_information;
 	nfapi_rx_indication_rel8_t rx_indication_rel8;
 	nfapi_rx_indication_rel9_t rx_indication_rel9;
-	/* TODO: LTE code uses rx_ind_data and the nr code uses data. Once uplink
-	   5G nFAPI code has been added, we need to remove the data member
-	   and replace it with rx_ind_data */
 	uint8_t rx_ind_data[NFAPI_RX_IND_DATA_MAX];
-	uint8_t* data;
 } nfapi_rx_indication_pdu_t;
 
 #define NFAPI_RX_IND_MAX_PDU 100
