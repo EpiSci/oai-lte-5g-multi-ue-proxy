@@ -2647,9 +2647,7 @@ static uint8_t pack_rx_ulsch_indication_body_value(void *tlv, uint8_t **ppWriteP
 			length = pdu->rx_indication_rel8.length;
 		}
 
-		// LTE code
 		if( pusharray8(value->rx_pdu_list[i].rx_ind_data, NFAPI_RX_IND_DATA_MAX, length, ppWritePackedMsg, end) == 0)
-		// nr code --> if( pusharray8(value->rx_pdu_list[i].data, length, length, ppWritePackedMsg, end) == 0)
 			return 0;
 	}
 	return 1;
