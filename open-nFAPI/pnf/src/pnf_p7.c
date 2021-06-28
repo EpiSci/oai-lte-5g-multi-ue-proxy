@@ -922,6 +922,10 @@ int pnf_p7_slot_ind(pnf_p7_t* pnf_p7, uint16_t phy_id, uint16_t sfn, uint16_t sl
 
 	// save the curren time, sfn and slot
 	pnf_p7->slot_start_time_hr = pnf_get_current_time_hr();
+	pnf_p7->sfn = sfn;
+
+	pnf_p7->slot = slot;
+
 
 
 
