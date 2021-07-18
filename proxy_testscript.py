@@ -422,14 +422,15 @@ class Scenario:
 
 # ----------------------------------------------------------------------------
 
-def get_analysis_messages(filename: str) -> Generator:
+def get_analysis_messages(filename: str) -> Generator[str, None, None]:
     """
     Find all the LOG_A log messages in the given log file `filename`
     and yield them one by one.  The file is a .bz2 compressed log.
     """
     LOGGER.info('Scanning %s', filename)
-    with bz2.open(filename, 'rt') as fh:
-        for line in fh:
+    with bz2.open(filename, 'rb') as fh:
+        for line_bytes in fh:
+            line = line_bytes.decode('utf-8', 'backslashreplace')
             line = line.rstrip('\r\n')
 
             # Log messages have a header like the following:
