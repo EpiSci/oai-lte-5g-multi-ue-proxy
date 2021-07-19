@@ -72,7 +72,7 @@ case "$node_type" in
         cmd=(
             taskset --cpu-list "$cpu"
             ./ran_build/build/lte-uesoftmodem
-            -O ../ci-scripts/conf_files/ue.nfapi.conf
+            -O ../ci-scripts/conf_files/proxy_ue.nfapi.conf
             --L2-emul 5
             --nokrnmod 1
             --noS1
@@ -95,7 +95,7 @@ case "$node_type" in
         cmd=(
             taskset --cpu-list "$cpu"
             ./ran_build/build/nr-uesoftmodem
-            -O ../ci-scripts/conf_files/nr-ue.nfapi.conf
+            -O ../ci-scripts/conf_files/proxy_nr-ue.nfapi.conf
             --nokrnmod 1
             --noS1
             --nfapi 5
