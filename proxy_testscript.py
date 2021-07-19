@@ -13,7 +13,7 @@ import glob
 import bz2
 import subprocess
 from subprocess import Popen
-from typing import Optional, Dict, List, Generator
+from typing import Optional, Dict, List, Generator, Union
 
 WORKSPACE_DIR = os.path.abspath(os.path.dirname(sys.argv[0]))
 
@@ -31,7 +31,7 @@ parser.add_argument('--num-ues', '-u', metavar='N', type=int, default=1,
 The number of UEs to launch (default: %(default)s)
 """)
 
-parser.add_argument('--duration', '-d', metavar='SECONDS', type=int, default=15,
+parser.add_argument('--duration', '-d', metavar='SECONDS', type=int, default=30,
                     help="""
 How long to run the test before stopping to examine the logs
 """)
@@ -217,7 +217,7 @@ class Scenario:
     def launch_proxy(self) -> Popen:
         log_name = '{}/nfapi.log'.format(OPTS.log_dir)
         LOGGER.info('Launch Proxy: %s', log_name)
-        cmd = '{WORKSPACE_DIR}/build/proxy {NUM_UES} {SOFTMODEM_MODE}' \
+        cmd = 'exec {WORKSPACE_DIR}/build/proxy {NUM_UES} {SOFTMODEM_MODE}' \
               .format(WORKSPACE_DIR=WORKSPACE_DIR, NUM_UES=len(self.ue_hostname), \
                       SOFTMODEM_MODE=f'--{OPTS.mode}')
         proc = Popen(redirect_output(cmd, log_name), shell=True)
@@ -265,7 +265,7 @@ class Scenario:
             log_name = '{}/{}.log'.format(OPTS.log_dir, hostname)
             LOGGER.info('Launch nrUE%d: %s', num, log_name)
             cmd = 'NODE_NUMBER={NODE_ID} {RUN_OAI} nrue' \
-                  .format(NODE_ID=len(self.ue_node_id) + self.ue_node_id[num],
+                  .format(NODE_ID=self.ue_node_id[num],
                           RUN_OAI=RUN_OAI)
             if OPTS.mode == 'nsa':
                 cmd += ' --nsa'
@@ -301,11 +301,11 @@ class Scenario:
 
         proxy_proc = self.launch_proxy()
 
-        if self.ue_hostname:
-            ue_proc = self.launch_ue()
-
         if self.nrue_hostname:
             nrue_proc = self.launch_nrue()
+
+        if self.ue_hostname:
+            ue_proc = self.launch_ue()
 
         # ------------------------------------------------------------------------------------
         # Let the simulation run for a while
@@ -365,16 +365,24 @@ class Scenario:
                     LOGGER.critical('NRUE%d process ended early: %r', nrue_number, status)
 
         LOGGER.info('kill main simulation processes...')
-        all_procs = ['proxy']
+        cmd = ['sudo', 'killall']
+        # TODO: softmodem processes tend to crash while trying to shutdown.
+        # They don't actually need to do anything on shutdown, so for now we
+        # use -KILL because the softmodem processes can't catch that signal
+        # and so they don't get a chance to try to shutdown
+        cmd.append('-KILL')
         if enb_proc:
-            all_procs.append('lte-softmodem')
+            cmd.append('lte-softmodem')
         if gnb_proc:
-            all_procs.append('nr-softmodem')
+            cmd.append('nr-softmodem')
         if ue_proc:
-            all_procs.append('lte-uesoftmodem')
+            cmd.append('lte-uesoftmodem')
         if nrue_proc:
-            all_procs.append('nr-uesoftmodem')
-        subprocess.run(['sudo', 'killall'] + all_procs)
+            cmd.append('nr-uesoftmodem')
+        subprocess.run(cmd)
+        proxy_proc.kill()
+
+        # Wait for the processes to end
         proxy_proc.wait()
         if enb_proc:
             enb_proc.wait()
@@ -414,14 +422,15 @@ class Scenario:
 
 # ----------------------------------------------------------------------------
 
-def get_analysis_messages(filename: str) -> Generator:
+def get_analysis_messages(filename: str) -> Generator[str, None, None]:
     """
     Find all the LOG_A log messages in the given log file `filename`
     and yield them one by one.  The file is a .bz2 compressed log.
     """
     LOGGER.info('Scanning %s', filename)
-    with bz2.open(filename, 'rt') as fh:
-        for line in fh:
+    with bz2.open(filename, 'rb') as fh:
+        for line_bytes in fh:
+            line = line_bytes.decode('utf-8', 'backslashreplace')
             line = line.rstrip('\r\n')
 
             # Log messages have a header like the following:
@@ -443,6 +452,11 @@ def get_analysis_messages(filename: str) -> Generator:
                     pass
                 else:
                     LOGGER.warning('%s', line)
+
+def chown(files: Union[str, List[str]]) -> None:
+    if isinstance(files, str):
+        files = [files]
+    subprocess.run(['sudo', 'chown', '--changes', str(os.getuid())] + files)
 
 def set_core_pattern() -> None:
     # Set the core_pattern so we can save the core files from any crashes.
@@ -478,7 +492,7 @@ def save_core_files() -> bool:
 
     # Core files tend to be owned by root and not readable by others.
     # Change the ownership so we can both read them and then remove them.
-    subprocess.run(['sudo', 'chown', str(os.getuid())] + core_files)
+    chown(core_files)
 
     jobs = CompressJobs()
     for core_file in core_files:
@@ -669,12 +683,11 @@ def analyze_gnb_logs(scenario: Scenario) -> bool:
             found.add('configured')
             continue
 
-        # 2075586.912997 00006cd4 [NR_RRC] A [UE d39c]
+        # 2075586.912997 00006cd4 [NR_RRC] A
         # Handling of reconfiguration complete message at RRC gNB is pending
-        match = re.search(r'\[NR_RRC\] A \[UE (\w+)\] Handling of reconfiguration '
-                           'complete message at RRC gNB is pending', line)
-        if match:
-            found.add('rrc complete ' + match.group(1))
+        if 'Handling of reconfiguration complete message at RRC gNB is pending' in line:
+            timestamp = line.split()[0]
+            found.add('rrc complete ' + timestamp)
             continue
 
         # 2075586.763190 00006cd4 [NR_RRC] A Successfully decoded UE NR
@@ -683,13 +696,20 @@ def analyze_gnb_logs(scenario: Scenario) -> bool:
             found.add('nr capabilites')
             continue
 
+        # 364915.873598 000062e2 [NR_MAC] A (ue 0, rnti 0xb094) CFRA procedure succeeded!
+        match = re.search(r'\[NR_MAC\] A \(ue \d+, (rnti \w+)\) CFRA procedure succeeded!$', line)
+        if match:
+            found.add(f'cfra {match.group(1)}')
+            continue
+
     LOGGER.debug('found: %r', found)
 
     num_ues = len(scenario.ue_hostname)
     LOGGER.debug('num UEs: %d', num_ues)
 
-    if len(found) != 2 + num_ues:
-        LOGGER.error('gNB failed -- found %d %r', len(found), found)
+    num_expect = 2 + 2 * num_ues
+    if len(found) != num_expect:
+        LOGGER.error('gNB failed -- found %d/%d %r', len(found), num_expect, found)
         return False
 
     LOGGER.info('gNB passed')
@@ -703,6 +723,12 @@ def analyze_nrue_logs(scenario: Scenario) -> bool:
     num_failed = 0
     for nrue_number, nrue_hostname in scenario.nrue_hostname.items():
         found = set()
+        expected = {
+            'sent cap',
+            'cap encoded',
+            'reconf encoded',
+            'rrc meas sent',
+        }
         for line in get_analysis_messages('{}/{}.log.bz2'.format(OPTS.log_dir, nrue_hostname)):
             # 2075586.628184 00006d66 [NR_RRC] A Sent initial NRUE Capability
             # response to LTE UE
@@ -734,7 +760,8 @@ def analyze_nrue_logs(scenario: Scenario) -> bool:
             LOGGER.info('NRUE%d passed', nrue_number)
         else:
             num_failed += 1
-            LOGGER.error('NRUE%d failed -- found %d %r', nrue_number, len(found), found)
+            LOGGER.error('NRUE%d failed -- found %d/%d %r', nrue_number, len(found), len(expected), found)
+            LOGGER.error('NRUE%d failed -- missed %d %r', nrue_number, len(expected - found), expected - found)
 
     if num_failed != 0:
         LOGGER.critical('%d of %d NRUEs failed', num_failed, len(scenario.nrue_hostname))
@@ -791,7 +818,6 @@ def main() -> int:
         return 1
 
     LOGGER.info('PASSED')
-
     return 0
 
 sys.exit(main())

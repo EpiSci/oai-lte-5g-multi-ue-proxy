@@ -825,11 +825,6 @@ void vnf_handle_rx_ulsch_indication(void *pRecvMsg, int recvMsgLen, vnf_p7_t* vn
 			}
 		}
 
-		uint16_t i = 0;
-		for(i = 0; i < ind.rx_indication_body.number_of_pdus; ++i)
-		{
-			vnf_p7_codec_free(vnf_p7, ind.rx_indication_body.rx_pdu_list[i].data);
-		}
 		vnf_p7_codec_free(vnf_p7, ind.rx_indication_body.rx_pdu_list);
 		vnf_p7_codec_free(vnf_p7, ind.vendor_extension);
 	}

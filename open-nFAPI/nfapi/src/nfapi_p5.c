@@ -300,7 +300,7 @@ static uint8_t pack_pnf_config_request(void *msg, uint8_t **ppWritePackedMsg, ui
 {
 	nfapi_pnf_config_request_t *pNfapiMsg = (nfapi_pnf_config_request_t*)msg;
 	return (pack_tlv(NFAPI_PNF_PHY_RF_TAG, &pNfapiMsg->pnf_phy_rf_config, ppWritePackedMsg, end, &pack_pnf_phy_rf_config_value) && 
-			//push8(pNfapiMsg->num_tlvs,ppWritePackedMsg,end) && 
+			push8(pNfapiMsg->num_tlvs,ppWritePackedMsg,end) &&
 			pack_vendor_extension_tlv(pNfapiMsg->vendor_extension, ppWritePackedMsg, end , config));
 }
 
@@ -416,6 +416,7 @@ static uint8_t unpack_uint16_tlv_value(void* tlv, uint8_t **ppReadPackedMsg, uin
 	nfapi_uint16_tlv_t* value = (nfapi_uint16_tlv_t*)tlv;
 	return pull16(ppReadPackedMsg, &value->value, end);
 }
+
 static uint8_t pack_int16_tlv_value(void* tlv, uint8_t **ppWritePackedMsg, uint8_t *end)
 {
 	nfapi_int16_tlv_t* value = (nfapi_int16_tlv_t*)tlv;
@@ -499,16 +500,7 @@ static uint8_t pack_embms_mbsfn_config_value(void* tlv, uint8_t **ppWritePackedM
                 pusharray8(value->fourframes_flag, 8,value->num_mbsfn_config,ppWritePackedMsg, end) &&
                 pusharrays32(value->mbsfn_subframeconfig, 8, value->num_mbsfn_config, ppWritePackedMsg, end));
 }
-//static uint8_t unpack_embms_mbsfn_config_value(void* tlv, uint8_t **ppReadPackedMsg, uint8_t* end)
-//{
-//     nfapi_embms_mbsfn_config_t* value = (nfapi_embms_mbsfn_config_t*)tlv;
-//
-//     return ( pull16(ppReadPackedMsg, &value->num_mbsfn_config, end) &&
-//              pull16(ppReadPackedMsg, &value->radioframe_allocation_period, end) &&
-//              pull16(ppReadPackedMsg, &value->radioframe_allocation_offset, end) &&
-//              pull8(ppReadPackedMsg, &value->fourframes_flag, end) &&
-//                      pullarrays32(ppReadPackedMsg, value->mbsfn_subframeconfig, 8, value->num_mbsfn_config, end));
-//}
+
 static uint8_t pack_param_response(void *msg, uint8_t **ppWritePackedMsg, uint8_t *end, nfapi_p4_p5_codec_config_t* config)
 {
 	nfapi_param_response_t *pNfapiMsg = (nfapi_param_response_t*)msg;
@@ -1072,12 +1064,12 @@ static uint8_t pack_nr_p5_message_body(nfapi_p4_p5_message_header_t *header, uin
 					}
 					else
 					{
-						NFAPI_TRACE(NFAPI_TRACE_ERROR, "VE NFAPI message ID %d. No ve ecoder provided\n", header->message_id);
+						NFAPI_TRACE(NFAPI_TRACE_ERROR, "%s VE NFAPI message ID %d. No ve ecoder provided\n", __FUNCTION__, header->message_id);
 					}
 				}
 				else
 				{
-					NFAPI_TRACE(NFAPI_TRACE_ERROR, "NFAPI Unknown message ID %d\n", header->message_id);
+					NFAPI_TRACE(NFAPI_TRACE_ERROR, "%s NFAPI Unknown message ID %d\n", __FUNCTION__, header->message_id);
 				}
 			}
 			break;
@@ -1176,12 +1168,12 @@ static uint8_t pack_p5_message_body(nfapi_p4_p5_message_header_t *header, uint8_
 					}
 					else
 					{
-						NFAPI_TRACE(NFAPI_TRACE_ERROR, "VE NFAPI message ID %d. No ve ecoder provided\n", header->message_id);
+						NFAPI_TRACE(NFAPI_TRACE_ERROR, "%s VE NFAPI message ID %d. No ve ecoder provided\n", __FUNCTION__, header->message_id);
 					}
 				}
 				else
 				{
-					NFAPI_TRACE(NFAPI_TRACE_ERROR, "NFAPI Unknown message ID %d\n", header->message_id);
+					NFAPI_TRACE(NFAPI_TRACE_ERROR, "%s NFAPI Unknown message ID %d\n", __FUNCTION__, header->message_id);
 				}
 			}
 			break;
@@ -1897,15 +1889,6 @@ static uint8_t unpack_nr_param_response(uint8_t **ppReadPackedMsg, uint8_t *end,
 		{ NFAPI_NR_NFAPI_TIMING_INFO_MODE_TAG, &pNfapiMsg->nfapi_config.timing_info_mode, &unpack_uint8_tlv_value},
 		{ NFAPI_NR_NFAPI_TIMING_INFO_PERIOD_TAG, &pNfapiMsg->nfapi_config.timing_info_period, &unpack_uint8_tlv_value},
 	};
-	// print ppReadPackedMsg
-	uint8_t *ptr = *ppReadPackedMsg;
-	printf("\n Read message unpack_param_response: ");
-	while(ptr < end){
-		printf(" %d ", *ptr);
-		ptr++;
-	}
-	printf("\n");
-
 
 	return ( pull8(ppReadPackedMsg, &pNfapiMsg->error_code, end) &&
 			 pull8(ppReadPackedMsg, &pNfapiMsg->num_tlv, end) &&
@@ -2324,7 +2307,7 @@ static int check_nr_unpack_length(nfapi_nr_phy_msg_type_e msgId, uint32_t unpack
 				retLen = sizeof(nfapi_stop_response_t);
 			break;
 		default:
-			NFAPI_TRACE(NFAPI_TRACE_ERROR, "Unknown message ID %d\n", msgId);
+			NFAPI_TRACE(NFAPI_TRACE_ERROR, "%s Unknown message ID %d\n", __FUNCTION__, msgId);
 			break;
 	}
 
@@ -2429,7 +2412,7 @@ static int check_unpack_length(nfapi_message_id_e msgId, uint32_t unpackedBufLen
 			break;
 
 		default:
-			NFAPI_TRACE(NFAPI_TRACE_ERROR, "Unknown message ID %d\n", msgId);
+			NFAPI_TRACE(NFAPI_TRACE_ERROR, "%s Unknown message ID %d\n", __FUNCTION__, msgId);
 			break;
 	}
 
@@ -2483,14 +2466,6 @@ int nfapi_nr_p5_message_unpack(void *pMessageBuf, uint32_t messageBufLen, void *
 		return -1;
 	}
 
-	uint8_t *ptr = pReadPackedMessage;
-	printf("\n Read message unpack: ");
-	while(ptr < end){
-		printf(" %d ", *ptr);
-		ptr++;
-	}
-	printf("\n");
-	
 	// clean the supplied buffer for - tag value blanking
 	(void)memset(pUnpackedBuf, 0, unpackedBufLen);
 
@@ -2598,12 +2573,12 @@ int nfapi_nr_p5_message_unpack(void *pMessageBuf, uint32_t messageBufLen, void *
 				}
 				else
 				{
-					NFAPI_TRACE(NFAPI_TRACE_ERROR, "VE NFAPI message ID %d. No ve decoder provided\n", pMessageHeader->message_id);
+					NFAPI_TRACE(NFAPI_TRACE_ERROR, "%s VE NFAPI message ID %d. No ve decoder provided\n", __FUNCTION__, pMessageHeader->message_id);
 				}
 			}
 			else
 			{
-				NFAPI_TRACE(NFAPI_TRACE_ERROR, "NFAPI Unknown P5 message ID %d\n", pMessageHeader->message_id);
+				NFAPI_TRACE(NFAPI_TRACE_ERROR, "%s NFAPI Unknown P5 message ID %d\n", __FUNCTION__, pMessageHeader->message_id);
 			}
 			break;
 	}
@@ -2629,14 +2604,6 @@ int nfapi_p5_message_unpack(void *pMessageBuf, uint32_t messageBufLen, void *pUn
 		return -1;
 	}
 
-	uint8_t *ptr = pReadPackedMessage;
-	printf("\n Read message unpack: ");
-	while(ptr < end){
-		printf(" %d ", *ptr);
-		ptr++;
-	}
-	printf("\n");
-	
 	// clean the supplied buffer for - tag value blanking
 	(void)memset(pUnpackedBuf, 0, unpackedBufLen);
 
@@ -2744,12 +2711,12 @@ int nfapi_p5_message_unpack(void *pMessageBuf, uint32_t messageBufLen, void *pUn
 				}
 				else
 				{
-					NFAPI_TRACE(NFAPI_TRACE_ERROR, "VE NFAPI message ID %d. No ve decoder provided\n", pMessageHeader->message_id);
+					NFAPI_TRACE(NFAPI_TRACE_ERROR, "%s VE NFAPI message ID %d. No ve decoder provided\n", __FUNCTION__, pMessageHeader->message_id);
 				}
 			}
 			else
 			{
-				NFAPI_TRACE(NFAPI_TRACE_ERROR, "NFAPI Unknown P5 message ID %d\n", pMessageHeader->message_id);
+				NFAPI_TRACE(NFAPI_TRACE_ERROR, "%s NFAPI Unknown P5 message ID %d\n", __FUNCTION__, pMessageHeader->message_id);
 			}
 			break;
 	}
