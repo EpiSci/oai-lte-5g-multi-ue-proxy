@@ -217,7 +217,7 @@ class Scenario:
     def launch_proxy(self) -> Popen:
         log_name = '{}/nfapi.log'.format(OPTS.log_dir)
         LOGGER.info('Launch Proxy: %s', log_name)
-        cmd = 'exec {WORKSPACE_DIR}/build/proxy {NUM_UES} {SOFTMODEM_MODE}' \
+        cmd = 'exec sudo {WORKSPACE_DIR}/build/proxy {NUM_UES} {SOFTMODEM_MODE}' \
               .format(WORKSPACE_DIR=WORKSPACE_DIR, NUM_UES=len(self.ue_hostname), \
                       SOFTMODEM_MODE=f'--{OPTS.mode}')
         proc = Popen(redirect_output(cmd, log_name), shell=True)
@@ -371,6 +371,7 @@ class Scenario:
         # use -KILL because the softmodem processes can't catch that signal
         # and so they don't get a chance to try to shutdown
         cmd.append('-KILL')
+        cmd.append('proxy')
         if enb_proc:
             cmd.append('lte-softmodem')
         if gnb_proc:
@@ -380,7 +381,6 @@ class Scenario:
         if nrue_proc:
             cmd.append('nr-uesoftmodem')
         subprocess.run(cmd)
-        proxy_proc.kill()
 
         # Wait for the processes to end
         proxy_proc.wait()

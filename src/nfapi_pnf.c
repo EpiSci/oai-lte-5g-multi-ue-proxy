@@ -87,6 +87,8 @@ void pnf_deallocate(void *ptr)
 
 void pnf_set_thread_priority(int priority)
 {
+    NFAPI_TRACE(NFAPI_TRACE_INFO, "This is priority %d\n", priority);
+
     struct sched_param schedParam =
     {
         .sched_priority = priority,
@@ -94,7 +96,8 @@ void pnf_set_thread_priority(int priority)
 
     if (sched_setscheduler(0, SCHED_RR, &schedParam) != 0)
     {
-        printf("failed to set SCHED_RR\n");
+        NFAPI_TRACE(NFAPI_TRACE_ERROR, "failed to set SCHED_RR %s\n", strerror(errno));
+        abort();
     }
 }
 /*
