@@ -11,7 +11,7 @@ proxy_testscript=$this_dir/proxy_testscript.py
 
 validate=true
 num_runs=1
-log_dir=$HOME
+log_dir=.
 
 while (( $# > 0 )) && [[ $1 = -* ]]; do
     arg=$1; shift
@@ -46,7 +46,7 @@ EOF
             exit 0
             ;;
         (*)
-            echo >&2 "$this: unknown option '$arg', try --help"
+            echo >&2 "$this_script: unknown option '$arg', try --help"
             exit 1
             ;;
     esac
