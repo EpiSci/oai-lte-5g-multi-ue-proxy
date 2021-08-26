@@ -25,6 +25,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <errno.h>
+#include <assert.h>
 
 #include <stdio.h>
 
@@ -55,7 +56,7 @@ nfapi_vnf_config_t* nfapi_vnf_config_create()
 	_this->_public.codec_config.deallocate = &free;
 	
 
-	return &(_this->_public);
+	return (nfapi_vnf_config_t* )_this;
 }
 
 void nfapi_vnf_config_destory(nfapi_vnf_config_t* config)
@@ -68,10 +69,6 @@ int nfapi_nr_vnf_start(nfapi_vnf_config_t* config)
 	// Verify that config is not null
 	if(config == 0)
 		return -1;
-
-	// Make sure to set the defined trace function before using NFAPI_TRACE
-	if(config->trace)
-		nfapi_trace_g = (nfapi_trace_fn_t)config->trace;
 
 	NFAPI_TRACE(NFAPI_TRACE_INFO, "%s()\n", __FUNCTION__);
 
@@ -477,14 +474,7 @@ int nfapi_nr_vnf_start(nfapi_vnf_config_t* config)
 
 int nfapi_vnf_start(nfapi_vnf_config_t* config)
 {
-	// Verify that config is not null
-	if(config == 0)
-		return -1;
-
-	// Make sure to set the defined trace function before using NFAPI_TRACE
-	if(config->trace)
-		nfapi_trace_g = (nfapi_trace_fn_t)config->trace;
-
+	assert(config != 0);
 	NFAPI_TRACE(NFAPI_TRACE_INFO, "%s()\n", __FUNCTION__);
 
 	int p5ListenSock, p5Sock; 
@@ -928,6 +918,7 @@ int nfapi_nr_vnf_pnf_config_req(nfapi_vnf_config_t* config, int p5_idx, nfapi_nr
 	return vnf_nr_pack_and_send_p5_message(_this, p5_idx, &req->header, sizeof(nfapi_nr_pnf_config_request_t));
 }
 
+
 int nfapi_vnf_pnf_config_req(nfapi_vnf_config_t* config, int p5_idx, nfapi_pnf_config_request_t* req)
 {
 	if(config == 0 || req == 0)
@@ -1049,7 +1040,8 @@ int nfapi_vnf_config_req(nfapi_vnf_config_t* config, int p5_idx, nfapi_config_re
 
 	return vnf_pack_and_send_p5_message(_this, p5_idx, &req->header, sizeof(nfapi_config_request_t));
 }
-int nfapi_vnf_start_req(nfapi_vnf_config_t* config, int p5_idx, nfapi_start_request_t* req)
+
+int nfapi_vnf_start_req(nfapi_vnf_config_t* config, int p5_idx, nfapi_start_request_t * req)
 {
 	if(config == 0 || req == 0)
 		return -1;
@@ -1068,6 +1060,7 @@ int nfapi_nr_vnf_start_req(nfapi_vnf_config_t* config, int p5_idx, nfapi_nr_star
 
 	return vnf_nr_pack_and_send_p5_message(_this, p5_idx, &req->header, sizeof(nfapi_nr_start_request_scf_t));
 }
+
 
 int nfapi_vnf_stop_req(nfapi_vnf_config_t* config, int p5_idx, nfapi_stop_request_t* req)
 {
@@ -1159,9 +1152,9 @@ int nfapi_vnf_allocate_phy(nfapi_vnf_config_t* config, int p5_idx, uint16_t* phy
 	info->p5_idx = p5_idx;
 	info->phy_id = vnf->next_phy_id++;
 
-	info->timing_window = 30;       // This seems to override what gets set by the user - why???
+	info->timing_window = 30;       // This seems to override what gets set by the user - why??? //TODO: Change in NR in terms of microsecends,what should be the value?
 	info->timing_info_mode = 0x03;
-	info->timing_info_period = 128;
+	info->timing_info_period = 10; // Melissa come back to this
 
 	nfapi_vnf_phy_info_list_add(config, info);
 

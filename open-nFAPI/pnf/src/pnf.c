@@ -1969,12 +1969,6 @@ int pnf_send_message(pnf_t* pnf, uint8_t *msg, uint32_t len, uint16_t stream)
 {
 	if (pnf->sctp)
 	{
-		printf("\nPNF SENDS: \n");
-		for(int i=0; i<len; i++){
-			printf("%d", msg[i]);
-		}
-		printf("\n");
-
 		if (sctp_sendmsg(pnf->p5_sock, msg, len, NULL, 0, 42/*config->sctp_stream_number*/, 0, stream/*P5_STREAM_ID*/, 0, 0) < 0)
 		{
 			NFAPI_TRACE(NFAPI_TRACE_ERROR, "sctp_sendmsg failed errno: %d\n", errno);
@@ -2005,8 +1999,7 @@ int pnf_read_dispatch_message(pnf_t* pnf)
 	uint32_t header_buffer_size = NFAPI_HEADER_LENGTH;
 	uint8_t header_buffer[header_buffer_size];
 
-	uint32_t stack_buffer_size = 32; //should it be the size of then sctp_notificatoin structure
-	uint8_t stack_buffer[stack_buffer_size];
+	uint8_t stack_buffer[32];
 
 	uint8_t* dynamic_buffer = 0;
 
@@ -2041,7 +2034,7 @@ int pnf_read_dispatch_message(pnf_t* pnf)
 		// now have the size of the mesage
 	}
 
-	if(message_size > stack_buffer_size)
+	if(message_size > sizeof(stack_buffer))
 	{
 		dynamic_buffer = (uint8_t*)malloc(message_size);
 
@@ -2066,13 +2059,6 @@ int pnf_read_dispatch_message(pnf_t* pnf)
 		}
 		else
 		{
-			// print the received message
-			printf("\n MESSAGE RECEIVED: \n");
-			for(int i=0; i<message_size; i++){
-				printf("%d", read_buffer[i]);
-			}
-			printf("\n");
-
 			if (flags & MSG_NOTIFICATION)
 			{
 				NFAPI_TRACE(NFAPI_TRACE_INFO, "Notification received from %s:%u\n", inet_ntoa(addr.sin_addr), ntohs(addr.sin_port));
@@ -2134,8 +2120,7 @@ int pnf_nr_read_dispatch_message(pnf_t* pnf)
 	uint32_t header_buffer_size = NFAPI_HEADER_LENGTH;
 	uint8_t header_buffer[header_buffer_size];
 
-	uint32_t stack_buffer_size = 32; //should it be the size of then sctp_notificatoin structure
-	uint8_t stack_buffer[stack_buffer_size];
+	uint8_t stack_buffer[1024];
 
 	uint8_t* dynamic_buffer = 0;
 
@@ -2170,7 +2155,7 @@ int pnf_nr_read_dispatch_message(pnf_t* pnf)
 		// now have the size of the mesage
 	}
 
-	if(message_size > stack_buffer_size)
+	if(message_size > sizeof(stack_buffer))
 	{
 		dynamic_buffer = (uint8_t*)malloc(message_size);
 
@@ -2195,13 +2180,6 @@ int pnf_nr_read_dispatch_message(pnf_t* pnf)
 		}
 		else
 		{
-			// print the received message
-			printf("\n MESSAGE RECEIVED: \n");
-			for(int i=0; i<message_size; i++){
-				printf("%d", read_buffer[i]);
-			}
-			printf("\n");
-
 			if (flags & MSG_NOTIFICATION)
 			{
 				NFAPI_TRACE(NFAPI_TRACE_INFO, "Notification received from %s:%u\n", inet_ntoa(addr.sin_addr), ntohs(addr.sin_port));

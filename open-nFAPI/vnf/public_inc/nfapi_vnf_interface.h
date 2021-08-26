@@ -20,6 +20,7 @@
 #include "nfapi_interface.h"
 #include "nfapi_nr_interface_scf.h"
 #include "nfapi_nr_interface.h"
+
 #include "debug.h"
 
 #include "netinet/in.h"
@@ -183,7 +184,7 @@ typedef struct nfapi_vnf_config
 	 */
 	int (*pnf_config_resp)(nfapi_vnf_config_t* config, int p5_idx, nfapi_pnf_config_response_t* resp);
 	int (*pnf_nr_config_resp)(nfapi_vnf_config_t* config, int p5_idx, nfapi_nr_pnf_config_response_t* resp);
-	
+
 	/*! A callback for the PNF_START.resp
 	 *  \param config A pointer to the vnf configuration
 	 *  \param p5_idx The p5 index used to indicate a particular pnf p5 connection
@@ -205,7 +206,7 @@ typedef struct nfapi_vnf_config
 	 */
 	int (*pnf_start_resp)(nfapi_vnf_config_t* config, int p5_idx, nfapi_pnf_start_response_t* resp);
 	int (*pnf_nr_start_resp)(nfapi_vnf_config_t* config, int p5_idx, nfapi_nr_pnf_start_response_t* resp);
-	
+
 	/*! A callback for the PNF_STOP.resp
 	 *  \param config A pointer to the vnf configuration
 	 *  \param p5_idx The p5 index used to indicate a particular pnf p5 connection
@@ -271,7 +272,7 @@ typedef struct nfapi_vnf_config
 	 */
 	int (*nr_config_resp)(nfapi_vnf_config_t* config, int p5_idx, nfapi_nr_config_response_scf_t* resp);
 	int (*config_resp)(nfapi_vnf_config_t* config, int p5_idx, nfapi_config_response_t* resp);
-	
+
 	/*! A callback for the START.resp
      *  \param config A pointer to the vnf configuration
 	 *  \param p5_idx The p5 index used to indicate a particular pnf p5 connection
@@ -475,6 +476,7 @@ void nfapi_vnf_config_destory(nfapi_vnf_config_t* config);
  * This function will not return untill nfapi_vnf_stop is called
  */
 int nfapi_nr_vnf_start(nfapi_vnf_config_t* config);
+
 int nfapi_vnf_start(nfapi_vnf_config_t* config);
 
 /*! Stop the VNF library. 
@@ -758,21 +760,7 @@ typedef struct nfapi_vnf_p7_config
 	 *  use the codec_config.deallocate function to release it at a future point
 	 */	
 	int (*rach_indication)(struct nfapi_vnf_p7_config* config, nfapi_rach_indication_t* ind);
-
-        /*! A callback for the NR RACH.indication
-     *  \param config A pointer to the vnf p7 configuration
-	 *  \param ind A data structure for the decoded NR RACH.indication This will
-	 *              have been allocated on the stack.
-	 *  \return not currently used.
-	 *
-	 *  The ind may contain pointers to dyanmically allocated sub structures
-	 *  such as the pdu. The dyanmically allocated structure will
-	 *  be deallocated on return. If the client wishes to 'keep' the structures
-	 *  then the substructure pointers should be set to 0 and then the client should
-	 *  use the codec_config.deallocate function to release it at a future point
-	 */
-	int (*nr_rach_indication)(struct nfapi_vnf_p7_config* config, nfapi_nr_rach_indication_t* ind);
-
+	
 	/*! A callback for the SRS.indication
      *  \param config A pointer to the vnf p7 configuration
 	 *  \param ind A data structure for the decoded SRS.indication This will 
@@ -856,7 +844,15 @@ typedef struct nfapi_vnf_p7_config
 	 *  use the codec_config.deallocate function to release it at a future point
 	 */	
 	int (*nrach_indication)(struct nfapi_vnf_p7_config* config, nfapi_nrach_indication_t* ind);		
-	
+
+	//The NR indication functions below copy uplink information received at the VNF into the UL info struct
+	int (*nr_slot_indication)(nfapi_nr_slot_indication_scf_t* ind);
+	int (*nr_crc_indication)(nfapi_nr_crc_indication_t* ind);
+	int (*nr_rx_data_indication)(nfapi_nr_rx_data_indication_t* ind);
+	int (*nr_uci_indication)(nfapi_nr_uci_indication_t* ind);
+	int (*nr_rach_indication)(nfapi_nr_rach_indication_t* ind);
+	int (*nr_srs_indication)(nfapi_nr_srs_indication_t* ind);
+
 	/*! A callback for any vendor extension messages
      *  \param config A pointer to the vnf p7 configuration
 	 *  \param msg A data structure for the decoded vendor extention message allocated
@@ -907,6 +903,7 @@ void nfapi_vnf_p7_config_destory(nfapi_vnf_p7_config_t* config);
  
 int nfapi_vnf_p7_start(nfapi_vnf_p7_config_t* config);
 int nfapi_nr_vnf_p7_start(nfapi_vnf_p7_config_t* config);
+
 
 /*! Stop the VNF P7 library. 
  *  \param config A pointer to an vnf p7 configuration structure
@@ -973,7 +970,6 @@ int nfapi_vnf_p7_nr_dl_config_req(nfapi_vnf_p7_config_t* config, nfapi_nr_dl_tti
  */
 int nfapi_vnf_p7_ul_config_req(nfapi_vnf_p7_config_t* config, nfapi_ul_config_request_t* req);
 int nfapi_vnf_p7_ul_tti_req(nfapi_vnf_p7_config_t* config, nfapi_nr_ul_tti_request_t* req);
-
 /*! Send the HI_DCI0.request
  *  \param config A pointer to the vnf p7 configuration
  *  \param req A data structure for the decoded HI_DCI0.request.
@@ -984,7 +980,6 @@ int nfapi_vnf_p7_ul_tti_req(nfapi_vnf_p7_config_t* config, nfapi_nr_ul_tti_reque
  */
 int nfapi_vnf_p7_hi_dci0_req(nfapi_vnf_p7_config_t* config, nfapi_hi_dci0_request_t* req);
 int nfapi_vnf_p7_ul_dci_req(nfapi_vnf_p7_config_t* config, nfapi_nr_ul_dci_request_t* req);
-
 /*! Send the TX.req
  *  \param config A pointer to the vnf p7 configuration
  *  \param req A data structure for the decoded HI_DCI0.request.
@@ -995,7 +990,6 @@ int nfapi_vnf_p7_ul_dci_req(nfapi_vnf_p7_config_t* config, nfapi_nr_ul_dci_reque
  */
 int nfapi_vnf_p7_tx_req(nfapi_vnf_p7_config_t* config, nfapi_tx_request_t* req);
 int nfapi_vnf_p7_tx_data_req(nfapi_vnf_p7_config_t* config, nfapi_nr_tx_data_request_t* req);
-
 /*! Send the LBT_DL_CONFIG.requst
  *  \param config A pointer to the vnf p7 configuration
  *  \param req A data structure for the decoded LBT_DL_CONFIG.request.
