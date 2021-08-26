@@ -846,6 +846,13 @@ int nfapi_pnf_p7_nb_harq_ind(nfapi_pnf_p7_config_t* config, nfapi_nb_harq_indica
  */
 int nfapi_pnf_p7_nrach_ind(nfapi_pnf_p7_config_t* config, nfapi_nrach_indication_t* ind);
 
+/*! Send the NR_SLOT.indication
+ * \param config A pointer to a PNF P7 config
+ * \param ind A pointer to the nr slot indication message structure
+ * \return 0 means success, -1 means failure
+ */
+int nfapi_pnf_p7_nr_slot_ind(nfapi_pnf_p7_config_t* config, nfapi_nr_slot_indication_scf_t* ind);
+
 /*! Send the NR_RX_DATA.indication
  * \param config A pointer to a PNF P7 config
  * \param ind A pointer to the nr rx data indication message structure

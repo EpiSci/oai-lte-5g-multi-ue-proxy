@@ -30,31 +30,6 @@ extern "C" {
 #define ERR strerror(errno)
 #define NUM_ITEMS(A) (sizeof(A) / sizeof((A)[0]))
 
-typedef struct _phy_info
-{
-    bool enabled;
-    uint16_t phy_id;
-    uint16_t sfn_sf;
-
-    pthread_t thread;
-
-    int pnf_p7_port;
-    char *pnf_p7_addr;
-
-    int vnf_p7_port;
-    char *vnf_p7_addr;
-
-    nfapi_pnf_p7_config_t *config;
-
-} phy_info_t;
-
-typedef struct _pnf_info
-{
-    uint8_t num_phys;
-    phy_info_t phys[8];
-
-} pnf_info_t;
-
 typedef struct
 {
     bool enabled;
@@ -88,19 +63,19 @@ typedef struct
 
 typedef enum
 {
-    None = 0,
-    P5Msg = 1,
-    P7Msg = 2
+    nf_msg_type_none = 0,
+    nf_msg_type_p5 = 1,
+    nf_msg_type_p7 = 2
 
-} MsgType;
+} nf_msg_type_t;
 
-typedef struct
+typedef struct nf_msg_t
 {
-    uint32_t message_size;
+    uint32_t msg_size;
     uint8_t read_buffer[1024];
-    MsgType mType;
+    nf_msg_type_t msg_type;
     int header_id;
-} nf_msg;
+} nf_msg_t;
 
 void show_backtrace(void);
 
@@ -119,10 +94,10 @@ void create_p7_tx_socket(pnf_config_t *config, int phy_id, int port);
 
 int SendOAIMsg(pnf_config_t *config, uint8_t *msgBuffer, uint32_t msgLen);
 int SendOAIP7Msg(pnf_config_t *config, uint8_t *msgBuffer, uint32_t msgLen);
-int PnfReadMsg(pnf_config_t *pnf, nf_msg *pnf_msg);
-int ReadP5Msg(pnf_config_t *pnf, nf_msg *p5nf_msg);
-int ReadP7Msg(pnf_config_phy_t *pnf_p7, nf_msg *p7nf_msg);
-int selectReadSocket(pnf_config_t *pnf, nf_msg *pnf_msg);
+int PnfReadMsg(pnf_config_t *pnf, nf_msg_t *pnf_msg);
+int ReadP5Msg(pnf_config_t *pnf, nf_msg_t *p5nf_msg);
+int ReadP7Msg(pnf_config_phy_t *pnf_p7, nf_msg_t *p7nf_msg);
+int selectReadSocket(pnf_config_t *pnf, nf_msg_t *pnf_msg);
 int checkMsgType(nfapi_message_id_e header);
 
 pnf_config_phy_t *get_pnf_phy_from_p7_rx_socket(pnf_config_t *, int);
@@ -142,4 +117,25 @@ uint16_t nfapi_get_sfnslot(const void *msg, size_t length);
 
 #ifdef __cplusplus
 }
-#endif
+
+#include <string>
+
+inline std::string hexdump(const void *data, size_t data_len)
+{
+    char buf[512];
+    return hexdump(data, data_len, buf, sizeof(buf));
+}
+
+inline std::string hexdumpP5(const void *data, size_t data_len)
+{
+    char buf[512];
+    return hexdumpP5(data, data_len, buf, sizeof(buf));
+}
+
+inline std::string hexdumpP7(const void *data, size_t data_len)
+{
+    char buf[512];
+    return hexdumpP7(data, data_len, buf, sizeof(buf));
+}
+
+#endif // __cplusplus

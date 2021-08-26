@@ -85,7 +85,7 @@ void nfapi_vnf_pnf_list_add(nfapi_vnf_config_t* config, nfapi_vnf_pnf_info_t* no
 
 nfapi_vnf_pnf_info_t* nfapi_vnf_pnf_list_find(nfapi_vnf_config_t* config, int p5_idx)
 {
-	NFAPI_TRACE(NFAPI_TRACE_ERROR, "%s : config->pnf_list:%p\n", __FUNCTION__, config->pnf_list);
+	NFAPI_TRACE(NFAPI_TRACE_DEBUG, "config->pnf_list:%p\n", config->pnf_list);
 
 	nfapi_vnf_pnf_info_t* curr = config->pnf_list;
 	while(curr != 0)
@@ -169,6 +169,7 @@ void vnf_handle_pnf_param_response(void *pRecvMsg, int recvMsgLen, nfapi_vnf_con
 			config->codec_config.deallocate(msg.vendor_extension);
 	}
 }
+
 
 void vnf_nr_handle_pnf_config_response(void *pRecvMsg, int recvMsgLen, nfapi_vnf_config_t* config, int p5_idx)
 {
@@ -465,6 +466,7 @@ void vnf_nr_handle_param_response(void *pRecvMsg, int recvMsgLen, nfapi_vnf_conf
 	}
 }
 
+
 void vnf_nr_handle_config_response(void *pRecvMsg, int recvMsgLen, nfapi_vnf_config_t* config, int p5_idx)
 {
 
@@ -504,6 +506,7 @@ void vnf_nr_handle_config_response(void *pRecvMsg, int recvMsgLen, nfapi_vnf_con
 
 void vnf_handle_config_response(void *pRecvMsg, int recvMsgLen, nfapi_vnf_config_t* config, int p5_idx)
 {
+
 	// ensure it's valid
 	if (pRecvMsg == NULL || config == NULL)
 	{
@@ -518,9 +521,13 @@ void vnf_handle_config_response(void *pRecvMsg, int recvMsgLen, nfapi_vnf_config
 		// unpack the message
 		if (nfapi_p5_message_unpack(pRecvMsg, recvMsgLen, &msg, sizeof(msg), &config->codec_config) >=0 )
 		{
-			if(config->config_resp)
-			{
-				(config->config_resp)(config, p5_idx, &msg);
+			// check the error code:
+
+			if (msg.error_code == NFAPI_MSG_OK){
+				if(config->config_resp)
+				{
+					(config->config_resp)(config, p5_idx, &msg);
+				}
 			}
 		}
 		else
@@ -1044,7 +1051,7 @@ void vnf_handle_vendor_extension(void* pRecvMsg, int recvMsgLen, nfapi_vnf_confi
 		}
 		else
 		{
-			NFAPI_TRACE(NFAPI_TRACE_INFO, "%s failed to allocate vendor extention structure\n");
+			NFAPI_TRACE(NFAPI_TRACE_INFO, "failed to allocate vendor extention structure\n");
 		}
 	}
 }
@@ -1233,6 +1240,7 @@ void vnf_handle_p4_p5_message(void *pRecvMsg, int recvMsgLen, int p5_idx, nfapi_
 	}
 }
 
+
 int vnf_nr_read_dispatch_message(nfapi_vnf_config_t* config, nfapi_vnf_pnf_info_t* pnf)
 {
 	if(1)
@@ -1375,6 +1383,7 @@ int vnf_read_dispatch_message(nfapi_vnf_config_t* config, nfapi_vnf_pnf_info_t* 
 		
 		uint32_t header_buffer_size = NFAPI_HEADER_LENGTH;
 		uint8_t header_buffer[header_buffer_size];
+		memset(header_buffer, 0, header_buffer_size);
 
 		uint32_t stack_buffer_size = 32; //should it be the size of then sctp_notificatoin structure
 		uint8_t stack_buffer[stack_buffer_size];
@@ -1385,6 +1394,7 @@ int vnf_read_dispatch_message(nfapi_vnf_config_t* config, nfapi_vnf_pnf_info_t* 
 		uint32_t message_size = 0;
 
 		struct sockaddr_in addr;
+		memset(&addr, 0, sizeof(addr));
 		socklen_t addr_len = sizeof(addr);
 
 		struct sctp_sndrcvinfo sndrcvinfo;
@@ -1460,6 +1470,12 @@ int vnf_read_dispatch_message(nfapi_vnf_config_t* config, nfapi_vnf_pnf_info_t* 
 					// handle now if complete message in one or more segments
 					if ((flags & 0x80) == 0x80)
 					{
+						// printf("\nVNF RECEIVES:\n");
+						// for(int i=0; i<message_size; i++){
+						// 	printf("%d", read_buffer[i]);
+						// }
+						// printf("\n");
+
 						vnf_handle_p4_p5_message(read_buffer, message_size, pnf->p5_idx, config);
 					}
 					else
@@ -1487,6 +1503,12 @@ int vnf_read_dispatch_message(nfapi_vnf_config_t* config, nfapi_vnf_pnf_info_t* 
 
 static int vnf_send_p5_msg(nfapi_vnf_pnf_info_t* pnf, const void *msg, int len, uint8_t stream)
 {
+	// printf("\n MESSAGE SENT: \n");
+	// for(int i=0; i<len; i++){
+	// 	printf("%d", *(uint8_t *)(msg + i));
+	// }
+	// printf("\n");
+
 	//NFAPI_TRACE(NFAPI_TRACE_ERROR, "%s len:%d stream:%d\n", __FUNCTION__, len, stream);
 
 	int result = sctp_sendmsg(pnf->p5_sock, msg, len, (struct sockaddr*)&pnf->p5_pnf_sockaddr, sizeof(pnf->p5_pnf_sockaddr),1, 0, stream, 0, 4);
@@ -1529,6 +1551,7 @@ int vnf_nr_pack_and_send_p5_message(vnf_t* vnf, uint16_t p5_idx, nfapi_p4_p5_mes
 		return -1;
 	}
 }
+
 
 int vnf_pack_and_send_p5_message(vnf_t* vnf, uint16_t p5_idx, nfapi_p4_p5_message_header_t* msg, uint16_t msg_len)
 {
