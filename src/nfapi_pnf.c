@@ -26,7 +26,7 @@ extern "C" {
 #include "nfapi_pnf.h"
 #include "nfapi.h"
 #include "queue.h"
-#include "softmodem_mode.h"
+#include "proxy.h"
 #include <inttypes.h>
 #include <assert.h>
 #include <sys/mman.h>
