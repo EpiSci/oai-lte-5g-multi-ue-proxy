@@ -53,6 +53,9 @@ extern "C" {
 
 #include "fapi_stub.h"
 
+// UE NEM IDs are consecutive starting at MIN_UE_NEM_ID.
+// i.e., in the range [MIN_UE_NEM_ID..MIN_UE_NEM_ID+num_ues-1]
+#define MIN_UE_NEM_ID 2
 #define MAX_SUBFRAME_MSGS 8
 #define MAX_SLOT_MSGS 8
 
@@ -239,11 +242,13 @@ void *oai_slot_task(void *context);
 void oai_subframe_init();
 void oai_slot_init();
 void oai_subframe_flush_msgs_from_ue();
-void oai_subframe_handle_msg_from_ue(const void *msg, size_t len, uint16_t pktsrc_index);
-void oai_slot_handle_msg_from_ue(const void *msg, size_t len, uint16_t pktsrc_index);
+void oai_subframe_handle_msg_from_ue(const void *msg, size_t len, uint16_t nem_id);
+void oai_slot_handle_msg_from_ue(const void *msg, size_t len, uint16_t nem_id);
 
-void transfer_downstream_nfapi_msg_to_emane(void *msg);
-void transfer_downstream_sfn_sf_to_emane(uint16_t sfn_sf);
+void transfer_downstream_nfapi_msg_to_proxy(void *msg);
+void transfer_downstream_nfapi_msg_to_nr_proxy(void *msg);
+void transfer_downstream_sfn_sf_to_proxy(uint16_t sfn_sf);
+void transfer_downstream_sfn_slot_to_proxy(uint16_t sfn_slot);
 
 uint16_t sfn_sf_add(uint16_t a, uint16_t add_val);
 void sfn_slot_add(uint16_t *sfn, uint16_t *slot, uint16_t add_val);
