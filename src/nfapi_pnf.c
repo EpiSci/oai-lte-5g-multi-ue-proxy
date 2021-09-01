@@ -29,10 +29,6 @@ extern "C" {
 #include "proxy.h"
 #include <inttypes.h>
 #include <assert.h>
-#include <sys/mman.h>
-#include <fcntl.h>
-#include <semaphore.h>
-#include <sys/stat.h>
 
 #ifdef NDEBUG
 #  warning assert is disabled
@@ -91,6 +87,8 @@ void pnf_deallocate(void *ptr)
 
 void pnf_set_thread_priority(int priority)
 {
+    NFAPI_TRACE(NFAPI_TRACE_INFO, "This is priority %d\n", priority);
+
     struct sched_param schedParam =
     {
         .sched_priority = priority,
@@ -98,7 +96,8 @@ void pnf_set_thread_priority(int priority)
 
     if (sched_setscheduler(0, SCHED_RR, &schedParam) != 0)
     {
-        NFAPI_TRACE(NFAPI_TRACE_ERROR, "failed to set SCHED_RR\n");
+        NFAPI_TRACE(NFAPI_TRACE_ERROR, "failed to set SCHED_RR %s\n", strerror(errno));
+        abort();
     }
 }
 /*
@@ -2692,7 +2691,7 @@ static void oai_slot_aggregate_rach_ind(slot_msgs_t *msgs)
 
         if (nfapi_nr_p7_message_unpack(msg->data, msg->length, &ind, sizeof(ind), NULL) < 0)
         {
-            NFAPI_TRACE(NFAPI_TRACE_ERROR,  "rach unpack failed");
+            NFAPI_TRACE(NFAPI_TRACE_ERROR,  "nr rach unpack failed");
             continue;
         }
         oai_nfapi_nr_rach_indication(&ind);
@@ -4226,11 +4225,10 @@ static uint16_t sfn_slot_counter(uint16_t *sfn, uint16_t *slot)
                               exit(EXIT_FAILURE); \
                          } while (0)
 
-struct shmbuf {
-    sem_t  semlte;
-    sem_t  semnr;
-    uint16_t sf_slot_tick;
-};
+uint16_t sf_slot_tick;
+pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
+pthread_cond_t cond_sf_slot = PTHREAD_COND_INITIALIZER;
+
 
 void *oai_subframe_task(void *context)
 {
@@ -4239,34 +4237,7 @@ void *oai_subframe_task(void *context)
     uint16_t sf = 0;
     bool are_queues_empty = true;
     softmodem_mode_t softmodem_mode = (softmodem_mode_t) context;
-    struct shmbuf *shmp = NULL;
     NFAPI_TRACE(NFAPI_TRACE_INFO, "Subframe Task thread");
-
-    if (softmodem_mode == SOFTMODEM_NSA)
-    {
-        int fd = shm_open("/emane_shm", O_CREAT | O_NONBLOCK | O_RDWR,
-                            S_IRUSR | S_IWUSR);
-        if (fd == -1)
-            errExit("shm_open failed");
-
-        if (ftruncate(fd, sizeof(struct shmbuf)) == -1)
-            errExit("ftruncate failed");
-
-        shmp = mmap(NULL, sizeof(*shmp), PROT_READ | PROT_WRITE,
-                                         MAP_SHARED, fd, 0);
-        if (shmp == MAP_FAILED)
-            errExit("mmap failed");
-
-        if (sem_init(&shmp->semlte, 1, 0) == -1)
-            errExit("sem_init-semlte failed");
-
-        if (sem_init(&shmp->semnr, 1, 0) == -1)
-            errExit("sem_init-semnr failed");
-
-        if (sem_wait(&shmp->semlte) == -1)
-            errExit("sem_wait");
-    }
-
     while (true)
     {
 
@@ -4274,9 +4245,9 @@ void *oai_subframe_task(void *context)
 
         uint64_t iteration_start = clock_usec();
 
-        transfer_downstream_sfn_sf_to_emane(sfn_sf_tx); // send to oai UE
-        NFAPI_TRACE(NFAPI_TRACE_INFO, "Frame %u Subframe %u sent to OAI ue at time %" PRIu64, sfn_sf_tx >> 4,
-                    sfn_sf_tx & 0XF, iteration_start);
+        transfer_downstream_sfn_sf_to_proxy(sfn_sf_tx); // send to oai UE
+        NFAPI_TRACE(NFAPI_TRACE_DEBUG, "Frame %u Subframe %u sent to OAI ue", sfn_sf_tx >> 4,
+                    sfn_sf_tx & 0XF);
 
         if (are_queues_empty)
         {
@@ -4298,21 +4269,27 @@ void *oai_subframe_task(void *context)
 
         if(softmodem_mode == SOFTMODEM_NSA)
         {
-            shmp->sf_slot_tick |= LTE_PROXY_DONE;
-            if (shmp->sf_slot_tick == BOTH_LTE_NR_DONE)
+            if (pthread_mutex_lock(&lock) != 0)
+                errExit("failed to lock mutex");
+
+            sf_slot_tick |= LTE_PROXY_DONE;
+            if (sf_slot_tick == BOTH_LTE_NR_DONE)
             {
-                if (sem_post(&shmp->semnr) == -1)
-                    errExit("sem_post failed");
+                if (pthread_cond_broadcast(&cond_sf_slot) != 0)
+                    errExit("failed to broadcast on the condition");
             }
             else
             {
-                while ( shmp->sf_slot_tick != BOTH_LTE_NR_DONE)
+                while ( sf_slot_tick != BOTH_LTE_NR_DONE)
                 {
-                    if (sem_wait(&shmp->semlte) == -1)
-                        errExit("sem_wait failed");
+                    if (pthread_cond_wait(&cond_sf_slot, &lock) != 0)
+                        errExit("failed to wait on the condition");
                 }
-                shmp->sf_slot_tick = 0;
+                sf_slot_tick = 0;
             }
+
+            if (pthread_mutex_unlock(&lock) != 0)
+                errExit("failed to unlock mutex");
         }
 
         uint64_t aggregation_done = clock_usec();
@@ -4322,8 +4299,6 @@ void *oai_subframe_task(void *context)
             add_sleep_time(iteration_start, poll_end, subframe_sent, aggregation_done);
         }
     }
-    //TODO: Needs to move into SIGTERM handler function.
-    shm_unlink("/emane_shm");
 }
 
 void *oai_slot_task(void *context)
@@ -4333,24 +4308,8 @@ void *oai_slot_task(void *context)
     uint16_t slot = 0;
     bool are_queues_empty = true;
     softmodem_mode_t softmodem_mode = (softmodem_mode_t) context;
-    struct shmbuf *shmp = NULL;
-    uint16_t slot_tick = 0;
     NFAPI_TRACE(NFAPI_TRACE_INFO, "Slot Task thread");
-
-    if (softmodem_mode == SOFTMODEM_NSA)
-    {
-        int fd = shm_open("/emane_shm", O_RDWR, 0);
-        if (fd == -1)
-            errExit("shm_open failed");
-
-        shmp = mmap(NULL, sizeof(*shmp), PROT_READ | PROT_WRITE,
-                                         MAP_SHARED, fd, 0);
-        if (shmp == MAP_FAILED)
-            errExit("mmap failed");
-
-        if (sem_post(&shmp->semlte) == -1)
-            errExit("sem_post failed");
-    }
+    uint16_t slot_tick = 0;
 
     while (true)
     {
@@ -4358,9 +4317,9 @@ void *oai_slot_task(void *context)
 
         uint64_t iteration_start = clock_usec();
 
-        transfer_downstream_sfn_sf_to_emane(sfn_slot_tx); // send to oai UE
-        NFAPI_TRACE(NFAPI_TRACE_INFO, "Frame %u Slot %u sent to OAI ue at time %" PRIu64, NFAPI_SFNSLOT2SFN(sfn_slot_tx),
-                   NFAPI_SFNSLOT2SLOT(sfn_slot_tx), iteration_start);
+        transfer_downstream_sfn_slot_to_proxy(sfn_slot_tx); // send to oai UE
+        NFAPI_TRACE(NFAPI_TRACE_DEBUG, "Frame %u Slot %u sent to OAI ue", NFAPI_SFNSLOT2SFN(sfn_slot_tx),
+                   NFAPI_SFNSLOT2SLOT(sfn_slot_tx));
 
         if (are_queues_empty)
         {
@@ -4382,20 +4341,27 @@ void *oai_slot_task(void *context)
 
         if ((++slot_tick == NR_PROXY_DONE) && (softmodem_mode == SOFTMODEM_NSA))
         {
-            shmp->sf_slot_tick |= NR_PROXY_DONE;
-            if (shmp->sf_slot_tick == BOTH_LTE_NR_DONE)
+            if (pthread_mutex_lock(&lock) != 0)
+                errExit("failed to lock mutex");
+
+            sf_slot_tick |= NR_PROXY_DONE;
+            if (sf_slot_tick == BOTH_LTE_NR_DONE)
             {
-                if (sem_post(&shmp->semlte) == -1)
-                    errExit("sem_post failed");
+                if (pthread_cond_broadcast(&cond_sf_slot) != 0)
+                    errExit("failed to broadcast on the condition");
             }
             else{
-                while ( shmp->sf_slot_tick != BOTH_LTE_NR_DONE)
+                while ( sf_slot_tick != BOTH_LTE_NR_DONE)
                 {
-                    if (sem_wait(&shmp->semnr) == -1)
-                        errExit("sem_wait failed");
+                    if (pthread_cond_wait(&cond_sf_slot, &lock) != 0)
+                        errExit("failed to wait on the condition");
                 }
-                shmp->sf_slot_tick = 0;
+                sf_slot_tick = 0;
             }
+
+            if (pthread_mutex_unlock(&lock)!= 0)
+                errExit("failed to unlock mutex");
+
             slot_tick = 0;
         }
 
@@ -4408,7 +4374,7 @@ void *oai_slot_task(void *context)
     }
 }
 
-void oai_subframe_handle_msg_from_ue(const void *msg, size_t len, uint16_t pktsrc_index)
+void oai_subframe_handle_msg_from_ue(const void *msg, size_t len, uint16_t nem_id)
 {
     if (len == 4) // Dummy packet ignore
     {
@@ -4417,9 +4383,11 @@ void oai_subframe_handle_msg_from_ue(const void *msg, size_t len, uint16_t pktsr
     uint16_t sfn_sf = nfapi_get_sfnsf(msg, len);
     NFAPI_TRACE(NFAPI_TRACE_INFO, "(eNB) Adding %s uplink message to queue prior to sending to eNB. Frame: %d, Subframe: %d",
                 nfapi_get_message_id(msg, len), NFAPI_SFNSF2SFN(sfn_sf), NFAPI_SFNSF2SF(sfn_sf));
-    if (pktsrc_index < 0 || pktsrc_index >= num_ues)
+
+    int i = (int)nem_id - MIN_UE_NEM_ID;
+    if (i < 0 || i >= num_ues)
     {
-        NFAPI_TRACE(NFAPI_TRACE_ERROR, "Pkt source index out of range: %d", pktsrc_index);
+        NFAPI_TRACE(NFAPI_TRACE_ERROR, "nem_id out of range: %d", nem_id);
         return;
     }
 
@@ -4430,14 +4398,14 @@ void oai_subframe_handle_msg_from_ue(const void *msg, size_t len, uint16_t pktsr
     assert(len < sizeof(p->data));
     memcpy(p->data, msg, len);
 
-    if (!put_queue(&msgs_from_ue[pktsrc_index], p))
+    if (!put_queue(&msgs_from_ue[i], p))
     {
         p->magic = 0;
         free(p);
     }
 }
 
-void oai_slot_handle_msg_from_ue(const void *msg, size_t len, uint16_t pktsrc_index)
+void oai_slot_handle_msg_from_ue(const void *msg, size_t len, uint16_t nem_id)
 {
     if (len == 4) // Dummy packet ignore
     {
@@ -4446,9 +4414,11 @@ void oai_slot_handle_msg_from_ue(const void *msg, size_t len, uint16_t pktsrc_in
     uint16_t sfn_slot = nfapi_get_sfnslot(msg, len);
     NFAPI_TRACE(NFAPI_TRACE_INFO, "(Proxy) Adding %s uplink message to queue prior to sending to gNB. Frame: %d, Slot: %d",
                 nfapi_nr_get_message_id(msg, len), NFAPI_SFNSLOT2SFN(sfn_slot), NFAPI_SFNSLOT2SLOT(sfn_slot));
-    if (pktsrc_index < 0 || pktsrc_index >= num_ues)
+
+    int i = (int)nem_id - MIN_UE_NEM_ID;
+    if (i < 0 || i >= num_ues)
     {
-        NFAPI_TRACE(NFAPI_TRACE_ERROR, "Pkt source index out of range: %d", pktsrc_index);
+        NFAPI_TRACE(NFAPI_TRACE_ERROR, "nem_id out of range: %d", nem_id);
         return;
     }
 
@@ -4459,7 +4429,7 @@ void oai_slot_handle_msg_from_ue(const void *msg, size_t len, uint16_t pktsrc_in
     assert(len < sizeof(p->data));
     memcpy(p->data, msg, len);
 
-    if (!put_queue(&msgs_from_nr_ue[pktsrc_index], p))
+    if (!put_queue(&msgs_from_nr_ue[i], p))
     {
         p->magic = 0;
         free(p);

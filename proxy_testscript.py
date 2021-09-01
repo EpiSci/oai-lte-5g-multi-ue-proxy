@@ -217,7 +217,7 @@ class Scenario:
     def launch_proxy(self) -> Popen:
         log_name = '{}/nfapi.log'.format(OPTS.log_dir)
         LOGGER.info('Launch Proxy: %s', log_name)
-        cmd = 'exec sudo {WORKSPACE_DIR}/build/proxy {NUM_UES} {SOFTMODEM_MODE}' \
+        cmd = 'exec sudo -E {WORKSPACE_DIR}/build/proxy {NUM_UES} {SOFTMODEM_MODE}' \
               .format(WORKSPACE_DIR=WORKSPACE_DIR, NUM_UES=len(self.ue_hostname), \
                       SOFTMODEM_MODE=f'--{OPTS.mode}')
         proc = Popen(redirect_output(cmd, log_name), shell=True)
@@ -396,6 +396,8 @@ class Scenario:
 
         if proxy_proc:
             # Save Proxy nFAPI eNB and UE logs.
+            nfapi_log_file = glob.glob('{}/nfapi.log'.format(WORKSPACE_DIR))
+            chown(nfapi_log_file)
             jobs = CompressJobs()
             jobs.compress('{}/nfapi.log'.format(WORKSPACE_DIR),
                           '{}/nfapi-eNB.log'.format(OPTS.log_dir))
