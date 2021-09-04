@@ -730,6 +730,7 @@ def analyze_nrue_logs(scenario: Scenario) -> bool:
             'cap encoded',
             'reconf encoded',
             'rrc meas sent',
+            'rar',
         }
         for line in get_analysis_messages('{}/{}.log.bz2'.format(OPTS.log_dir, nrue_hostname)):
             # 2075586.628184 00006d66 [NR_RRC] A Sent initial NRUE Capability
@@ -756,9 +757,15 @@ def analyze_nrue_logs(scenario: Scenario) -> bool:
                 found.add('rrc meas sent')
                 continue
 
-        LOGGER.debug('found: %r', found)
+            # 1314472.368736 0000008f [NR_MAC] A [UE 0][RAPROC][926.7]
+            # Found RAR with the intended RAPID 63
+            if 'Found RAR with the intended RAPID' in line:
+                found.add('rar')
+                continue
 
-        if len(found) == 4:
+        LOGGER.debug('found: %r', found)
+        num_expect = len(expected)
+        if len(found) == num_expect:
             LOGGER.info('NRUE%d passed', nrue_number)
         else:
             num_failed += 1
