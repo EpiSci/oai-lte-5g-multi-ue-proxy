@@ -3295,7 +3295,7 @@ static uint8_t pack_nr_uci_indication(void *msg, uint8_t **ppWritePackedMsg, uin
 
 	for(int i=0; i<pNfapiMsg->num_ucis;i++)	
 	{
-		if(!pack_nr_uci_indication_body(pNfapiMsg->uci_list,ppWritePackedMsg,end))
+		if(!pack_nr_uci_indication_body(&pNfapiMsg->uci_list[i], ppWritePackedMsg,end))
 		return 0;
 	}
 

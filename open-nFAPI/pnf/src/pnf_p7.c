@@ -1493,10 +1493,6 @@ uint8_t is_nr_p7_request_in_window(uint16_t sfn,uint16_t slot, const char* name,
 	// 	}
 
 	// }
-	NFAPI_TRACE(NFAPI_TRACE_NOTE, "David curr PNF vs recv req sfn slot = %4d.%2d vs %4d.%2d (delta:%d) [max:%d] in %s\n", 
-			phy->sfn, phy->slot, sfn, slot,
-			(current_sfn_slot_dec - recv_sfn_slot_dec), timing_window,
-			name);
 	if(current_sfn_slot_dec <= recv_sfn_slot_dec + timing_window){
 		in_window = 1;
 		NFAPI_TRACE(NFAPI_TRACE_NOTE, "[%d] %s is in window %d\n", current_sfn_slot_dec, name, recv_sfn_slot_dec);
@@ -1508,10 +1504,7 @@ uint8_t is_nr_p7_request_in_window(uint16_t sfn,uint16_t slot, const char* name,
   
 	else
 	{ 	
-		NFAPI_TRACE(NFAPI_TRACE_NOTE, "David out of window curr PNF vs recv req sfn slot = %4d.%2d vs %4d.%2d (delta:%d) [max:%d] in %s\n", 
-			phy->sfn, phy->slot, sfn, slot,
-			(current_sfn_slot_dec - recv_sfn_slot_dec), timing_window,
-			name);		
+		
 		NFAPI_TRACE(NFAPI_TRACE_NOTE, "[%d] %s is out of window %d (delta:%d) [max:%d]\n", current_sfn_slot_dec, name, recv_sfn_slot_dec,  (current_sfn_slot_dec - recv_sfn_slot_dec), timing_window);
 		in_window = 1;
 		

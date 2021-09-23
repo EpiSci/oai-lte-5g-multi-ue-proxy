@@ -249,6 +249,8 @@ class Scenario:
         LOGGER.info('Launch gNB: %s', log_name)
         cmd = 'NODE_NUMBER=0 {RUN_OAI} gnb' \
               .format(RUN_OAI=RUN_OAI)
+        if OPTS.mode == 'nsa':
+            cmd += ' --nsa'
         proc = Popen(redirect_output(cmd, log_name), shell=True)
 
         # TODO: Sleep time needed so eNB and UEs don't start at the exact same
