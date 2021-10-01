@@ -71,7 +71,7 @@ The following is launching order for network elements (eNB, gNB, Proxy, nrUE, an
 cd ~/openairinterface5g
 source oaienv
 cd cmake_targets
-sudo -E ./ran_build/build/lte-softmodem -O ../ci-scripts/conf_files/proxy_rcc.band7.tm1.nfapi.conf --noS1 --nsa | tee eNB.log 2>&1
+sudo -E ./ran_build/build/lte-softmodem -O ../ci-scripts/conf_files/episci/proxy_rcc.band7.tm1.nfapi.conf --noS1 --nsa | tee eNB.log 2>&1
 ```
 
 2. Open a terminal and launch gNB
@@ -80,7 +80,7 @@ sudo -E ./ran_build/build/lte-softmodem -O ../ci-scripts/conf_files/proxy_rcc.ba
 cd ~/openairinterface5g
 source oaienv
 cd cmake_targets
-sudo -E ./ran_build/build/nr-softmodem -O ../targets/PROJECTS/GENERIC-LTE-EPC/CONF/proxy_rcc.band78.tm1.106PRB.nfapi.conf --nfapi 2 --noS1 --nsa | tee gNB.log 2>&1
+sudo -E ./ran_build/build/nr-softmodem -O ../ci-scripts/conf_files/episci/proxy_rcc.band78.tm1.106PRB.nfapi.conf --nfapi 2 --noS1 --nsa | tee gNB.log 2>&1
 ```
 
 3. Open a terminal and launch proxy
@@ -108,7 +108,7 @@ cd ~/openairinterface5g
 source oaienv
 cd cmake_targets
 NODE_ID=2
-sudo -E ./ran_build/build/nr-uesoftmodem -O ../ci-scripts/conf_files/proxy_nr-ue.nfapi.conf --nokrnmod 1 --noS1 --nfapi 5 --node-number $NODE_ID --nsa | tee nrue_$NODE_ID.log 2>&1
+sudo -E ./ran_build/build/nr-uesoftmodem -O ../ci-scripts/conf_files/episci/proxy_nr-ue.nfapi.conf --nokrnmod 1 --noS1 --nfapi 5 --node-number $NODE_ID --nsa | tee nrue_$NODE_ID.log 2>&1
 ```
 
 5. Open a terminal and launch UE
@@ -120,7 +120,7 @@ cd ~/openairinterface5g
 source oaienv
 cd cmake_targets
 NODE_ID=2
-sudo -E ./ran_build/build/lte-uesoftmodem -O ../ci-scripts/conf_files/proxy_ue.nfapi.conf --L2-emul 5 --nokrnmod 1 --noS1 --num-ues 1 --node-number $NODE_ID --nsa | tee ue_$NODE_ID.log 2>&1
+sudo -E ./ran_build/build/lte-uesoftmodem -O ../ci-scripts/conf_files/episci/proxy_ue.nfapi.conf --L2-emul 5 --nokrnmod 1 --noS1 --num-ues 1 --node-number $NODE_ID --nsa | tee ue_$NODE_ID.log 2>&1
 ```
 
 6. Checking log result
