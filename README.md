@@ -46,7 +46,7 @@ cd .../oai-lte-multi-ue-proxy
 make
 ```
 
-## Run the proxy with script ##
+## Run with the proxy_testscript.py (Recommended) ##
 
 ```shell
 NUMBER_OF_UES=1
