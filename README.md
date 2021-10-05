@@ -82,7 +82,7 @@ sudo -E ./ran_build/build/nr-softmodem -O ../ci-scripts/conf_files/episci/proxy_
 NUMBER_OF_UES is the total number of UEs.
 
 ```shell
-cd ~/oai-lte-multi-ue-proxy
+cd .../oai-lte-multi-ue-proxy
 NUMBER_OF_UES=1
 sudo -E ./build/proxy $NUMBER_OF_UES --nsa enb_ipaddr gnb_ipaddr proxy_ipaddr ue_ipaddr
 ```
