@@ -32,7 +32,7 @@ Build and install the EpiSys version of the OAI repository.
 2. git checkout episys-merge-nsa
 3. Open a terminal and clone [oai-lte-multi-ue-proxy](https://github.com/EpiSci/oai-lte-multi-ue-proxy.git) repo.
 4. git checkout master
-5. If you run proxy in loopback mode, add the following loopback interface for VNF in gNB as following.
+5. If you run the proxy in loopback mode, add the following loopback interface for the VNF in the gNB.
 
 ```shell
 sudo ifconfig lo: 127.0.0.2 netmask 255.0.0.0 up
