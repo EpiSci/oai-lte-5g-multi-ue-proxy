@@ -117,7 +117,7 @@ node_id=2
 sudo -E ./ran_build/build/lte-uesoftmodem -O ../ci-scripts/conf_files/episci/proxy_ue.nfapi.conf --L2-emul 5 --nokrnmod 1 --noS1 --num-ues 1 --node-number $node_id --nsa | tee ue_$node_id.log 2>&1
 ```
 
-6. Checking log result
+6. Checking the log results
 
 After running the programs for 30 seconds or more, stop the processes using Ctrl-C.
 Open the log files and check the following logs to verify the run results.
