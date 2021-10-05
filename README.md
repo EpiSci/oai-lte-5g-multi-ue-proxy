@@ -133,4 +133,4 @@ The following is an example of how to search for a particular log in the generat
 cat gNB.log | grep -n 'CFRA procedure succeeded'
 ```
 
-For the further detailed information, refer to log section of the proxy_testscript.py script.
+For more information, refer to the analyze_log section of the proxy_testscript.py script.
