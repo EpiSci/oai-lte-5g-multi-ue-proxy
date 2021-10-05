@@ -113,7 +113,7 @@ The UE node_id starts at 2.
 cd .../openairinterface5g
 source oaienv
 cd cmake_targets
-NODE_ID=2
+node_id=2
 sudo -E ./ran_build/build/lte-uesoftmodem -O ../ci-scripts/conf_files/episci/proxy_ue.nfapi.conf --L2-emul 5 --nokrnmod 1 --noS1 --num-ues 1 --node-number $NODE_ID --nsa | tee ue_$NODE_ID.log 2>&1
 ```
 
