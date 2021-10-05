@@ -125,7 +125,7 @@ Open the log files and check the following logs to verify the run results.
 - gNB.log : search for "CFRA procedure succeeded" log message for each UE.
 - eNB.log : search for "Sent rrcReconfigurationComplete to gNB".
 - nrue_1.log : search for "Found RAR with the intended RAPID".
-- ue_1.log : search for "Sent RRC_CONFIG_COMPLETE_REQ to the NR UE" one time.
+- ue_1.log : search for "Sent RRC_CONFIG_COMPLETE_REQ to the NR UE".
 
 The following is an example of how to search for a particular log in the generated log file.
 
