@@ -62,7 +62,7 @@ The launch order is important, as follows.
 1. Open a terminal and launch eNB
 
 ```shell
-cd ~/openairinterface5g
+cd .../openairinterface5g
 source oaienv
 cd cmake_targets
 sudo -E ./ran_build/build/lte-softmodem -O ../ci-scripts/conf_files/episci/proxy_rcc.band7.tm1.nfapi.conf --noS1 --nsa | tee eNB.log 2>&1
