@@ -1,6 +1,6 @@
 # Description #
 
-This repository contains the Multi-UE Proxy to allow UEs to communicate with a single eNB (LTE mode), or both an eNB and gNB (NSA mode) using the customized OpenAirInterface (OAI) software. Standalone (NR mode) is still under development in the OAI develop branch. When this development is complete this Multi-UE Proxy will offer NR support as well. The OAI code is located at https://gitlab.eurecom.fr/oai/openairinterface5g. The UEs communicate to the eNB via the bypass PHY layer. Various multi-UE scenarios can be tested without the overhead of a PHY layer. This proxy currently requires EpiSci's modified version of the OAI repo available at: https://github.com/EpiSci/openairinterface5G.
+This repository contains the Multi-UE Proxy to allow UEs to communicate with a single eNB (LTE mode), or both an eNB and gNB (NSA mode) using the customized OpenAirInterface (OAI) software. Standalone (NR mode) is still under development in the OAI develop branch. When this development is complete this Multi-UE Proxy will offer NR support as well. The OAI code is located at https://gitlab.eurecom.fr/oai/openairinterface5g. The UEs communicate to the eNB via the bypass PHY layer. Various multi-UE scenarios can be tested without the overhead of a PHY layer.
 
 The LTE mode functional description of this multi-UE proxy is shown in the following image:
 
