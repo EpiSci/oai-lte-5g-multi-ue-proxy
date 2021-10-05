@@ -42,7 +42,7 @@ sudo ifconfig lo: 127.0.0.2 netmask 255.0.0.0 up
 ## Build the proxy ##
 
 ```shell
-cd ~/oai-lte-multi-ue-proxy
+cd .../oai-lte-multi-ue-proxy
 make
 ```
 
