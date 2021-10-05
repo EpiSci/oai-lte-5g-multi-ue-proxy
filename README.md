@@ -98,7 +98,7 @@ ue_ipaddr = 127.0.0.1
 nrUE NODE_ID starts from 2 from the first nrUE. If you run one more nrUE, the next NODE_ID = 3 in additional terminal.
 
 ```shell
-cd ~/openairinterface5g
+cd .../openairinterface5g
 source oaienv
 cd cmake_targets
 NODE_ID=2
