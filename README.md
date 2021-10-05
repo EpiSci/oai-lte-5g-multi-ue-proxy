@@ -83,7 +83,7 @@ NUMBER_OF_UES is the total number of UEs.
 
 ```shell
 cd .../oai-lte-multi-ue-proxy
-NUMBER_OF_UES=1
+number_of_ues=1
 sudo -E ./build/proxy $NUMBER_OF_UES --nsa enb_ipaddr gnb_ipaddr proxy_ipaddr ue_ipaddr
 ```
 
