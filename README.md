@@ -49,7 +49,7 @@ make
 ## Run with the proxy_testscript.py (Recommended) ##
 
 ```shell
-./proxy_testscript.py -u $NUMBER_OF_UES --mode=nsa
+./proxy_testscript.py --num-ues 1 --mode=nsa
 ```
 
 See `./proxy_testscript.py --help` for more information.
