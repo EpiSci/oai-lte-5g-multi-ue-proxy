@@ -84,7 +84,7 @@ NUMBER_OF_UES is the total number of UEs.
 ```shell
 cd .../oai-lte-multi-ue-proxy
 number_of_ues=1
-sudo -E ./build/proxy $NUMBER_OF_UES --nsa enb_ipaddr gnb_ipaddr proxy_ipaddr ue_ipaddr
+sudo -E ./build/proxy $number_of_ues --nsa enb_ipaddr gnb_ipaddr proxy_ipaddr ue_ipaddr
 ```
 
 If you do not specify the parameters ending with ipaddr, the default IP addresses are the following.
