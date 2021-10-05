@@ -27,7 +27,6 @@ The multi-UE proxy includes the following:
 ## Prerequsites ##
 
 Build and install the EpiSys version of the OAI repository.
-In the following, we assume that the packages were installed in home folder.
 
 1. Open a terminal and clone [openairinterface5g](https://gitlab.eurecom.fr/oai/openairinterface5g.git) repo.
 2. git checkout episys-merge-nsa
