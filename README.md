@@ -55,7 +55,7 @@ make
 See `./proxy_testscript.py --help` for more information.
 
 
-## Run the proxy without script ##
+## Run without the proxy_testscript.py (Advanced) ##
 
 The following is launching order for network elements (eNB, gNB, Proxy, nrUE, and UE).
 
