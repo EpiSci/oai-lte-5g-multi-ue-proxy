@@ -110,7 +110,7 @@ sudo -E ./ran_build/build/nr-uesoftmodem -O ../ci-scripts/conf_files/episci/prox
 The UE node_id starts at 2.
 
 ```shell
-cd ~/openairinterface5g
+cd .../openairinterface5g
 source oaienv
 cd cmake_targets
 NODE_ID=2
