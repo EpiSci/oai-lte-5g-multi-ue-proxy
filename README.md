@@ -102,7 +102,7 @@ cd .../openairinterface5g
 source oaienv
 cd cmake_targets
 node_id=2
-sudo -E ./ran_build/build/nr-uesoftmodem -O ../ci-scripts/conf_files/episci/proxy_nr-ue.nfapi.conf --nokrnmod 1 --noS1 --nfapi 5 --node-number $NODE_ID --nsa | tee nrue_$NODE_ID.log 2>&1
+sudo -E ./ran_build/build/nr-uesoftmodem -O ../ci-scripts/conf_files/episci/proxy_nr-ue.nfapi.conf --nokrnmod 1 --noS1 --nfapi 5 --node-number $node_id --nsa | tee nrue_$node_id.log 2>&1
 ```
 
 5. Open a terminal and launch UE
