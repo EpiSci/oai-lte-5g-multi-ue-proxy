@@ -57,7 +57,7 @@ See `./proxy_testscript.py --help` for more information.
 
 ## Run without the proxy_testscript.py (Advanced) ##
 
-The following is launching order for network elements (eNB, gNB, Proxy, nrUE, and UE).
+The launch order is important, as follows.
 
 1. Open a terminal and launch eNB
 
