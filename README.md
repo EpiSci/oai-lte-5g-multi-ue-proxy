@@ -71,7 +71,7 @@ sudo -E ./ran_build/build/lte-softmodem -O ../ci-scripts/conf_files/episci/proxy
 2. Open a terminal and launch gNB
 
 ```shell
-cd ~/openairinterface5g
+cd .../openairinterface5g
 source oaienv
 cd cmake_targets
 sudo -E ./ran_build/build/nr-softmodem -O ../ci-scripts/conf_files/episci/proxy_rcc.band78.tm1.106PRB.nfapi.conf --nfapi 2 --noS1 --nsa | tee gNB.log 2>&1
