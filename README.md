@@ -107,7 +107,7 @@ sudo -E ./ran_build/build/nr-uesoftmodem -O ../ci-scripts/conf_files/episci/prox
 
 5. Open a terminal and launch UE
 
-UE NODE_ID starts from 2 from the first UE. If you run one more UE, the next NODE_ID = 3 in additional terminal.
+The UE node_id starts at 2.
 
 ```shell
 cd ~/openairinterface5g
