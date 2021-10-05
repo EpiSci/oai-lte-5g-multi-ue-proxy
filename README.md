@@ -122,7 +122,7 @@ sudo -E ./ran_build/build/lte-uesoftmodem -O ../ci-scripts/conf_files/episci/pro
 After running the programs for 30 seconds or more, stop the processes using Ctrl-C.
 Open the log files and check the following logs to verify the run results.
 
-- gNB.log : search for "CFRA procedure succeeded" logs for the number of UE times together with the unique rnti value.
+- gNB.log : search for "CFRA procedure succeeded" log message for each UE.
 - eNB.log : search for "Sent rrcReconfigurationComplete to gNB" one time.
 - nrue_1.log : search for "Found RAR with the intended RAPID" one time.
 - ue_1.log : search for "Sent RRC_CONFIG_COMPLETE_REQ to the NR UE" one time.
