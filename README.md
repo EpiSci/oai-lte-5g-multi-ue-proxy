@@ -101,7 +101,7 @@ nrUE NODE_ID starts from 2 from the first nrUE. If you run one more nrUE, the ne
 cd .../openairinterface5g
 source oaienv
 cd cmake_targets
-NODE_ID=2
+node_id=2
 sudo -E ./ran_build/build/nr-uesoftmodem -O ../ci-scripts/conf_files/episci/proxy_nr-ue.nfapi.conf --nokrnmod 1 --noS1 --nfapi 5 --node-number $NODE_ID --nsa | tee nrue_$NODE_ID.log 2>&1
 ```
 
