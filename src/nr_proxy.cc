@@ -120,7 +120,7 @@ int Multi_UE_NR_Proxy::init_oai_socket(const char *addr, int tx_port, int rx_por
 
 void Multi_UE_NR_Proxy::receive_message_from_nr_ue(int ue_idx)
 {
-    char buffer[1024];
+    char buffer[NFAPI_MAX_PACKED_MESSAGE_SIZE];
     socklen_t addr_len = sizeof(address_rx_);
 
     while(true)
@@ -157,7 +157,7 @@ void Multi_UE_NR_Proxy::oai_gnb_downlink_nfapi_task(void *msg_org)
 {
     lock_guard_t lock(mutex);
 
-    char buffer[1024];
+    char buffer[NFAPI_MAX_PACKED_MESSAGE_SIZE];
     int encoded_size = nfapi_nr_p7_message_pack(msg_org, buffer, sizeof(buffer), nullptr);
     if (encoded_size <= 0)
     {
