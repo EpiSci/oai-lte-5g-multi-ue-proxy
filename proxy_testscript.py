@@ -217,8 +217,12 @@ class Scenario:
     def launch_proxy(self) -> Popen:
         log_name = '{}/nfapi.log'.format(OPTS.log_dir)
         LOGGER.info('Launch Proxy: %s', log_name)
+        if OPTS.mode == 'nr':
+            num_proxy_ues = len(self.nrue_hostname)
+        else:
+            num_proxy_ues = len(self.ue_hostname)
         cmd = 'exec sudo -E {WORKSPACE_DIR}/build/proxy {NUM_UES} {SOFTMODEM_MODE}' \
-              .format(WORKSPACE_DIR=WORKSPACE_DIR, NUM_UES=len(self.ue_hostname), \
+              .format(WORKSPACE_DIR=WORKSPACE_DIR, NUM_UES=num_proxy_ues, \
                       SOFTMODEM_MODE=f'--{OPTS.mode}')
         proc = Popen(redirect_output(cmd, log_name), shell=True)
         time.sleep(2)
@@ -251,6 +255,8 @@ class Scenario:
               .format(RUN_OAI=RUN_OAI)
         if OPTS.mode == 'nsa':
             cmd += ' --nsa'
+        if OPTS.mode == 'nr':
+            cmd += ' --sa'
         proc = Popen(redirect_output(cmd, log_name), shell=True)
 
         # TODO: Sleep time needed so eNB and UEs don't start at the exact same
@@ -267,10 +273,12 @@ class Scenario:
             log_name = '{}/{}.log'.format(OPTS.log_dir, hostname)
             LOGGER.info('Launch nrUE%d: %s', num, log_name)
             cmd = 'NODE_NUMBER={NODE_ID} {RUN_OAI} nrue' \
-                  .format(NODE_ID=self.ue_node_id[num],
+                  .format(NODE_ID=self.nrue_node_id[num],
                           RUN_OAI=RUN_OAI)
             if OPTS.mode == 'nsa':
                 cmd += ' --nsa'
+            if OPTS.mode == 'nr':
+                cmd += ' --sa'
             procs[num] = Popen(redirect_output(cmd, log_name), shell=True)
 
             # TODO: Sleep time needed so eNB and NRUEs don't start at the
