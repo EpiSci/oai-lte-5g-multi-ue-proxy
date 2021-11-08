@@ -48,11 +48,16 @@ case "$node_type" in
 
     (gnb)
         echo "Node $NODE_NUMBER: gNB"
+        if [[ " $* " = *" --sa "* ]]; then
+            conf=proxy_gnb.band78.sa.fr1.106PRB.usrpn310.conf
+        else
+            conf=proxy_rcc.band78.tm1.106PRB.nfapi.conf
+        fi
         cmd=(
             # Keep the gNB on processor 1 (the second processor) by default
             taskset --cpu-list 1
             ./ran_build/build/nr-softmodem
-            -O ../ci-scripts/conf_files/episci/proxy_rcc.band78.tm1.106PRB.nfapi.conf
+            -O "../ci-scripts/conf_files/episci/$conf"
             --nfapi 2
             --noS1
         )
@@ -97,9 +102,9 @@ case "$node_type" in
             ./ran_build/build/nr-uesoftmodem
             -O ../ci-scripts/conf_files/episci/proxy_nr-ue.nfapi.conf
             --nokrnmod 1
-            --noS1
             --nfapi 5
             --node-number "$NODE_NUMBER"
+            --emulate-l1
         )
         ;;
 
