@@ -60,6 +60,7 @@ case "$node_type" in
             -O "../ci-scripts/conf_files/episci/$conf"
             --nfapi 2
             --noS1
+            --emulate-l1
         )
         ;;
 
