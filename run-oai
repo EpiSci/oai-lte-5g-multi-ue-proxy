@@ -43,6 +43,7 @@ case "$node_type" in
             ./ran_build/build/lte-softmodem
             -O ../ci-scripts/conf_files/episci/proxy_rcc.band7.tm1.nfapi.conf
             --noS1
+            --emulate-l1
         )
         ;;
 
