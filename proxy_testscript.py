@@ -217,8 +217,12 @@ class Scenario:
     def launch_proxy(self) -> Popen:
         log_name = '{}/nfapi.log'.format(OPTS.log_dir)
         LOGGER.info('Launch Proxy: %s', log_name)
+        if OPTS.mode == 'nr':
+            num_proxy_ues = len(self.nrue_hostname)
+        else:
+            num_proxy_ues = len(self.ue_hostname)
         cmd = 'exec sudo -E {WORKSPACE_DIR}/build/proxy {NUM_UES} {SOFTMODEM_MODE}' \
-              .format(WORKSPACE_DIR=WORKSPACE_DIR, NUM_UES=len(self.ue_hostname), \
+              .format(WORKSPACE_DIR=WORKSPACE_DIR, NUM_UES=num_proxy_ues, \
                       SOFTMODEM_MODE=f'--{OPTS.mode}')
         proc = Popen(redirect_output(cmd, log_name), shell=True)
         time.sleep(2)
@@ -251,6 +255,8 @@ class Scenario:
               .format(RUN_OAI=RUN_OAI)
         if OPTS.mode == 'nsa':
             cmd += ' --nsa'
+        if OPTS.mode == 'nr':
+            cmd += ' --sa'
         proc = Popen(redirect_output(cmd, log_name), shell=True)
 
         # TODO: Sleep time needed so eNB and UEs don't start at the exact same
@@ -267,10 +273,12 @@ class Scenario:
             log_name = '{}/{}.log'.format(OPTS.log_dir, hostname)
             LOGGER.info('Launch nrUE%d: %s', num, log_name)
             cmd = 'NODE_NUMBER={NODE_ID} {RUN_OAI} nrue' \
-                  .format(NODE_ID=self.ue_node_id[num],
+                  .format(NODE_ID=self.nrue_node_id[num],
                           RUN_OAI=RUN_OAI)
             if OPTS.mode == 'nsa':
                 cmd += ' --nsa'
+            if OPTS.mode == 'nr':
+                cmd += ' --sa'
             procs[num] = Popen(redirect_output(cmd, log_name), shell=True)
 
             # TODO: Sleep time needed so eNB and NRUEs don't start at the
@@ -674,10 +682,69 @@ def analyze_ue_logs(scenario: Scenario) -> bool:
     LOGGER.info('All UEs passed')
     return True
 
+def analyze_gnb_sa_logs(scenario: Scenario) -> bool:
+    found = set()
+    for line in get_analysis_messages('{}/gNB.log.bz2'.format(OPTS.log_dir)):
+        # 3203303.646606 00013e0d [PHY] A Configuring MIB for instance 0, :
+        # (Nid_cell 0,DL freq 3619200000, UL freq 3619200000)
+        if 'A Configuring MIB for instance' in line:
+            found.add('config')
+            continue
+
+        # 3202155.061316 00011c68 [MAC] A UL_info[Frame 574, Slot 0] Calling
+        # initiate_ra_proc RACH:SFN/SLOT:573/19
+        if 'Calling initiate_ra_proc' in line:
+            found.add('initiate_ra_proc')
+            continue
+
+        # 3202155.064875 00011c68 [NR_MAC] A [gNB 0][RAPROC] CC_id 0 Frame
+        # 574, slotP 7: Generating RA-Msg2 DCI, rnti 0x10b, state 1,
+        # CoreSetType 2
+        if 'Generating RA-Msg2 DCI' in line:
+            found.add('gen-ra-2')
+            continue
+
+        # 3202155.070758 00011c68 [NR_MAC] A [RAPROC] RA-Msg3 received
+        # (sdu_lenP 8)
+        if '[RAPROC] RA-Msg3 received' in line:
+            found.add(f'ra-3-rcvd')
+            continue
+
+        # 3202155.082313 00011c68 [NR_MAC] A [gNB 0] [RAPROC] CC_id 0 Frame
+        # 576, slotP 1: Generating RA-Msg4 DCI, state 4
+        if 'Generating RA-Msg4 DCI' in line:
+            found.add('gen-ra-4')
+            continue
+
+        # 3202155.086422 00011c68 [NR_MAC] A (ue 0, rnti 0x78bf) Received Ack
+        # of RA-Msg4. CBRA procedure succeeded!
+        #863243.079367 0000f754 [NR_MAC] A (ue 0, rnti 0xc882) Received Ack
+        # of RA-Msg4. CBRA procedure succeeded!
+        match = re.search(r'\[NR_MAC\] A \(ue \d+, (rnti \w+)\) Received Ack of RA-Msg4. CBRA procedure succeeded!$', line)
+        if match:
+            found.add(f'cbra {match.group(1)}')
+            continue
+
+    LOGGER.debug('found: %r', found)
+
+    num_nrues = len(scenario.nrue_hostname)
+    LOGGER.debug('num NRUEs: %d', num_nrues)
+
+    num_expect = 5 + num_nrues
+    if len(found) != num_expect:
+        LOGGER.error('gNB failed -- found %d/%d %r', len(found), num_expect, found)
+        return False
+
+    LOGGER.info('gNB passed')
+    return True
+
 def analyze_gnb_logs(scenario: Scenario) -> bool:
     if not scenario.gnb_hostname:
         LOGGER.info('No gNB in this scenario')
         return True
+
+    if OPTS.mode == 'nr':
+        return analyze_gnb_sa_logs(scenario)
 
     found = set()
     for line in get_analysis_messages('{}/gNB.log.bz2'.format(OPTS.log_dir)):
@@ -719,10 +786,69 @@ def analyze_gnb_logs(scenario: Scenario) -> bool:
     LOGGER.info('gNB passed')
     return True
 
+def analyze_nrue_sa_logs(scenario: Scenario) -> bool:
+    num_failed = 0
+    for nrue_number, nrue_hostname in scenario.nrue_hostname.items():
+        found = set()
+        expected = {
+            'mib-rcvd',
+            'sib1-decoded',
+            'rar-rcvd',
+            'msg3-sent',
+            'msg4-rcvd',
+        }
+        for line in get_analysis_messages('{}/{}.log.bz2'.format(OPTS.log_dir, nrue_hostname)):
+            # 3202155.022115 00011e0e [NR_RRC] A Configuring MAC for first MIB
+            # reception
+            if '[NR_RRC] A Configuring MAC for first MIB reception' in line:
+                found.add('mib-rcvd')
+                continue
+
+            # 3202155.022529 00011e6b [NR_RRC] A SIB1 decoded
+            if '[NR_RRC] A SIB1 decoded' in line:
+                found.add('sib1-decoded')
+                continue
+
+            # 3202155.066126 00011e0e [NR_MAC] A [UE 0][RAPROC][574.7] Found
+            # RAR with the intended RAPID 5
+            if 'Found RAR with the intended RAPID' in line:
+                found.add('rar-rcvd')
+                continue
+
+            # 3202155.068634 00011e0e [NR_MAC] A [RAPROC][920.17] RA-Msg3 transmitted
+            if 'RA-Msg3 transmitted' in line:
+                found.add('msg3-sent')
+                continue
+
+            # 3202155.083934 00011e0e [MAC] A [UE 0][576.1][RAPROC] RA
+            # procedure succeeded. CB-RA: Contention Resolution is successful.
+            if 'CB-RA: Contention Resolution is successful' in line:
+                found.add('msg4-rcvd')
+                continue
+
+        LOGGER.debug('found: %r', found)
+        num_expect = len(expected)
+        if len(found) == num_expect:
+            LOGGER.info('NRUE%d passed', nrue_number)
+        else:
+            num_failed += 1
+            LOGGER.error('NRUE%d failed -- found %d/%d %r', nrue_number, len(found), len(expected), found)
+            LOGGER.error('NRUE%d failed -- missed %d %r', nrue_number, len(expected - found), expected - found)
+
+    if num_failed != 0:
+        LOGGER.critical('%d of %d NRUEs failed', num_failed, len(scenario.nrue_hostname))
+        return False
+
+    LOGGER.info('All NRUEs passed')
+    return True
+
 def analyze_nrue_logs(scenario: Scenario) -> bool:
     if not scenario.nrue_hostname:
         LOGGER.info('No NRUEs in this scenario')
         return True
+
+    if OPTS.mode == 'nr':
+        return analyze_nrue_sa_logs(scenario)
 
     num_failed = 0
     for nrue_number, nrue_hostname in scenario.nrue_hostname.items():
