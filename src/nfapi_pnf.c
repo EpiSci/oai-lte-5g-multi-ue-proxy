@@ -4267,7 +4267,7 @@ void *oai_subframe_task(void *context)
 
         oai_subframe_aggregate_messages(subframe_msgs);
 
-        if(softmodem_mode == SOFTMODEM_NSA)
+        if (softmodem_mode == SOFTMODEM_NSA)
         {
             if (pthread_mutex_lock(&lock) != 0)
                 errExit("failed to lock mutex");
@@ -4339,7 +4339,7 @@ void *oai_slot_task(void *context)
 
         oai_slot_aggregate_messages(slot_msgs);
 
-        if ((++slot_tick == NR_PROXY_DONE) && (softmodem_mode == SOFTMODEM_NSA))
+        if (++slot_tick == NR_PROXY_DONE && softmodem_mode == SOFTMODEM_NSA)
         {
             if (pthread_mutex_lock(&lock) != 0)
                 errExit("failed to lock mutex");
