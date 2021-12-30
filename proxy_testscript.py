@@ -410,10 +410,7 @@ class Scenario:
             chown(nfapi_log_file)
             jobs = CompressJobs()
             jobs.compress('{}/nfapi.log'.format(WORKSPACE_DIR),
-                          '{}/nfapi-eNB.log'.format(OPTS.log_dir))
-            for ue_number, ue_hostname in self.ue_hostname.items():
-                jobs.compress('{}/nfapi.log'.format(WORKSPACE_DIR),
-                              '{}/nfapi-{}.log'.format(OPTS.log_dir, ue_hostname))
+                          '{}/nfapi-proxy.log'.format(OPTS.log_dir))
             jobs.wait()
 
         # Compress eNB.log, UE*.log, gNB.log and NRUE*.log
