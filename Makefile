@@ -45,7 +45,7 @@ DEPS = $(OBJS:.o=.d)
 
 INC_FLAGS := $(addprefix -I,$(INC_DIRS))
 
-LDFLAGS = -lasan -pthread  -lpthread -lz -lsctp 
+LDFLAGS = -lasan -pthread -lpthread -lz -lsctp -rdynamic
 
 MKDIR_P ?= mkdir -p
 

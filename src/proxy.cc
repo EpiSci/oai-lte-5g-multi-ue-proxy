@@ -1,5 +1,6 @@
 #include <sys/stat.h>
 #include <sstream>
+#include <sys/resource.h>
 #include "proxy.h"
 #include "lte_proxy.h"
 #include "nr_proxy.h"
@@ -128,6 +129,13 @@ int main(int argc, char *argv[])
        process.  Otherwise, the host machine would need to be rebooted */
     std::clog << "max_seconds: " << max_seconds << std::endl;
     alarm(max_seconds);
+
+    /* Enable core dumps */
+    {
+        struct rlimit lim = { RLIM_INFINITY, RLIM_INFINITY };
+        if (setrlimit(RLIMIT_CORE, &lim) == -1)
+            std::clog << program_name << ": setrlimit: " << strerror(errno) << '\n';
+    }
 
     switch (softmodem_mode)
     {
