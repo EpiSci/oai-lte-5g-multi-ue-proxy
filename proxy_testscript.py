@@ -431,36 +431,32 @@ class Scenario:
 
 # ----------------------------------------------------------------------------
 
+def get_lines(filename: str) -> Generator[str, None, None]:
+    """
+    Yield each line of the given .bz2 compressed log file
+    """
+    with bz2.open(filename, 'rb') as fh:
+        for line_bytes in fh:
+            line = line_bytes.decode('utf-8', 'backslashreplace')
+            line = line.rstrip('\r\n')
+            yield line
+
 def get_analysis_messages(filename: str) -> Generator[str, None, None]:
     """
     Find all the LOG_A log messages in the given log file `filename`
     and yield them one by one.  The file is a .bz2 compressed log.
     """
     LOGGER.info('Scanning %s', filename)
-    with bz2.open(filename, 'rb') as fh:
-        for line_bytes in fh:
-            line = line_bytes.decode('utf-8', 'backslashreplace')
-            line = line.rstrip('\r\n')
-
-            # Log messages have a header like the following:
-            # '4789629.289157 00000057 [MAC] A Message...'
-            # The 'A' indicates this is a LOG_A message intended for automated analysis.
-            #
-            # The second field (00000057) is the thread ID.  This field was not
-            # present in earlier versions of the OAI code.
-            fields = line.split(maxsplit=4)
-            if len(fields) == 5 and (fields[2] == 'A' or fields[3] == 'A'):
-                yield line
-
-            # Look for -fsanitize=address problems.  But ignore heap leaks for
-            # now because there are many due to failure to cleanup on shutdown.
-            if 'Sanitizer' in line:
-                if 'LeakSanitizer' in line:
-                    pass
-                elif line.startswith('SUMMARY: '):
-                    pass
-                else:
-                    LOGGER.warning('%s', line)
+    for line in get_lines(filename):
+        # Log messages have a header like the following:
+        # '4789629.289157 00000057 [MAC] A Message...'
+        # The 'A' indicates this is a LOG_A message intended for automated analysis.
+        #
+        # The second field (00000057) is the thread ID.  This field was not
+        # present in earlier versions of the OAI code.
+        fields = line.split(maxsplit=4)
+        if len(fields) == 5 and (fields[2] == 'A' or fields[3] == 'A'):
+            yield line
 
 def chown(files: Union[str, List[str]]) -> None:
     if isinstance(files, str):
@@ -904,6 +900,39 @@ def analyze_nrue_logs(scenario: Scenario) -> bool:
     LOGGER.info('All NRUEs passed')
     return True
 
+def summarize_logs(filename: str) -> None:
+    if not os.path.exists(filename):
+        LOGGER.info('No file %s', filename)
+        return
+
+    errors = 0
+    warnings = 0
+    stack_traces = 0
+    sanitizer_issues = 0
+    for line in get_lines(filename):
+        if ' [E] ' in line:
+            errors += 1
+        if ' [W] ' in line:
+            warnings += 1
+        if '---stack trace---' in line:
+            stack_traces += 1
+
+        # Look for -fsanitize=address problems.  But ignore heap leaks for
+        # now because there are many due to failure to cleanup on shutdown.
+        if 'Sanitizer' in line:
+            if 'LeakSanitizer' in line:
+                pass
+            elif line.startswith('SUMMARY: '):
+                pass
+            else:
+                sanitizer_issues += 1
+
+    if errors + warnings + stack_traces + sanitizer_issues != 0:
+        LOGGER.warning('%d errors, %d warnings, %d stack traces, %d sanitizer issues in %s',
+                       errors, warnings, stack_traces, sanitizer_issues, filename)
+    else:
+        LOGGER.info('Nothing unusual in %s', filename)
+
 def main() -> int:
     scenario = Scenario()
 
@@ -946,6 +975,15 @@ def main() -> int:
 
     if not analyze_nrue_logs(scenario):
         passed = False
+
+    # Summarize any interesting entries in the logs
+    summarize_logs('{}/nfapi-proxy.log.bz2'.format(OPTS.log_dir))
+    summarize_logs('{}/eNB.log.bz2'.format(OPTS.log_dir))
+    for _ue_number, ue_hostname in scenario.ue_hostname.items():
+        summarize_logs('{}/{}.log.bz2'.format(OPTS.log_dir, ue_hostname))
+    summarize_logs('{}/gNB.log.bz2'.format(OPTS.log_dir))
+    for _nrue_number, nrue_hostname in scenario.nrue_hostname.items():
+        summarize_logs('{}/{}.log.bz2'.format(OPTS.log_dir, nrue_hostname))
 
     if not passed:
         LOGGER.critical('FAILED')

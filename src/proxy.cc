@@ -199,7 +199,7 @@ bool is_numeric(const std::string &s)
 void remove_log_file()
 {
     static const char log_name[] = "nfapi.log";
-    if (remove(log_name) != 0 && errno != ENFILE)
+    if (remove(log_name) != 0 && errno != ENOENT)
     {
         std::clog << program_name << ": remove " << log_name
                   << ": " << strerror(errno) << std::endl;
