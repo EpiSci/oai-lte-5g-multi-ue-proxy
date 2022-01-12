@@ -605,13 +605,13 @@ int unpack_tlv_list(unpack_tlv_t unpack_fns[], uint16_t size, uint8_t **ppReadPa
   nfapi_tl_t generic_tl;
   uint8_t numBadTags = 0;
   uint16_t idx = 0;
-  uint8_t tagMatch = 0;
 
   while ((uint8_t *)(*ppReadPackedMsg) < end) {
     // unpack the tl and process the values accordingly
     if(unpack_tl(ppReadPackedMsg, &generic_tl, end) == 0)
       return 0;
 
+    uint8_t tagMatch = 0;
     uint8_t *pStartOfValue = *ppReadPackedMsg;
 
     for(idx = 0; idx < size; ++idx) {
