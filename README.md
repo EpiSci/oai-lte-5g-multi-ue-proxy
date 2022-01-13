@@ -83,16 +83,7 @@ See `./proxy_testscript.py --help` for more information.
 
 The launch order is important, as follows.
 
-1. Modify the OAI logging mechanism
-In the OAI repo, be sure to set the following boolean option to True.
-To modify this value, open openairinterface5g/cmake_targets/CMakeLists.txt
-and apply the following change:
-```shell
-- add_boolean_option(LOG_MINIMAL         False "Activate EpiSci's log minimal logging mechanism" )
-+ add_boolean_option(LOG_MINIMAL         True "Activate EpiSci's log minimal logging mechanism" )
-```
-
-2. Open a terminal and launch eNB
+1. Open a terminal and launch eNB
 
 ```shell
 cd .../openairinterface5g
@@ -101,7 +92,7 @@ cd cmake_targets
 sudo -E ./ran_build/build/lte-softmodem -O ../ci-scripts/conf_files/episci/proxy_rcc.band7.tm1.nfapi.conf --noS1 --nsa | tee eNB.log 2>&1
 ```
 
-3. Open a terminal and launch gNB
+2. Open a terminal and launch gNB
 
 ```shell
 cd .../openairinterface5g
@@ -110,7 +101,7 @@ cd cmake_targets
 sudo -E ./ran_build/build/nr-softmodem -O ../ci-scripts/conf_files/episci/proxy_rcc.band78.tm1.106PRB.nfapi.conf --nfapi 2 --noS1 --nsa | tee gNB.log 2>&1
 ```
 
-4. Open a terminal and launch proxy
+3. Open a terminal and launch proxy
 
 NUMBER_OF_UES is the total number of UEs.
 
@@ -126,7 +117,7 @@ gnb_ipaddr = 127.0.0.2
 proxy_ipaddr = 127.0.0.1
 ue_ipaddr = 127.0.0.1
 
-5. Open a terminal and launch nrUE
+4. Open a terminal and launch nrUE
 
 nrUE NODE_ID starts from 2 from the first nrUE. If you run one more nrUE, the next NODE_ID = 3 in additional terminal.
 
@@ -138,7 +129,7 @@ node_id=2
 sudo -E ./ran_build/build/nr-uesoftmodem -O ../ci-scripts/conf_files/episci/proxy_nr-ue.nfapi.conf --nokrnmod 1 --noS1 --nfapi 5 --node-number $node_id --nsa | tee nrue_$node_id.log 2>&1
 ```
 
-6. Open a terminal and launch UE
+5. Open a terminal and launch UE
 
 The UE node_id starts at 2.
 
@@ -150,7 +141,7 @@ node_id=2
 sudo -E ./ran_build/build/lte-uesoftmodem -O ../ci-scripts/conf_files/episci/proxy_ue.nfapi.conf --L2-emul 5 --nokrnmod 1 --noS1 --num-ues 1 --node-number $node_id --nsa | tee ue_$node_id.log 2>&1
 ```
 
-7. Checking the log results
+6. Checking the log results
 
 After running the programs for 30 seconds or more, stop the processes using Ctrl-C.
 Open the log files and check the following logs to verify the run results.
