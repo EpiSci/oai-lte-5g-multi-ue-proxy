@@ -49,7 +49,7 @@ source oaienv
 cd cmake_targets
 ./build_oai --UE --eNB --nrUE --gNB --log-minimal
 ```
---log-minimal is important for oai_testscrip.py to evaluate the results
+--log-minimal is important for proxy_testscript.py to evaluate the results
 
 ## Build the proxy ##
 
