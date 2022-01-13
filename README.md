@@ -1,6 +1,6 @@
 # Description #
 
-This repository contains the Multi-UE Proxy to allow UEs to communicate with a single eNB (LTE mode), or both an eNB and gNB (NSA mode) using the customized OpenAirInterface (OAI) software. Standalone (NR mode) is still under development in the OAI develop branch. When this development is complete this Multi-UE Proxy will offer NR support as well. The OAI code is located at https://gitlab.eurecom.fr/oai/openairinterface5g. The UEs communicate to the eNB via the bypass PHY layer. Various multi-UE scenarios can be tested without the overhead of a PHY layer.
+This repository contains the Multi-UE Proxy to allow UEs to communicate with a single eNB (LTE mode), or both an eNB and gNB (NSA mode), or a single gNB (SA/NR mode) using the customized OpenAirInterface (OAI) software. The OAI code is located at https://gitlab.eurecom.fr/oai/openairinterface5g. The UEs communicate to the eNB via the bypass PHY layer. Various multi-UE scenarios can be tested without the overhead of a PHY layer.
 
 The LTE mode functional description of this multi-UE proxy is shown in the following image:
 
@@ -9,6 +9,10 @@ The LTE mode functional description of this multi-UE proxy is shown in the follo
 The NSA mode functional description of this multi-UE proxy is shown in the following image:
 
 ![NSA Mode Open Source Proxy Functional Diagram](functional_diagram_nsa_mode.png)
+
+The SA mode functional description of this multi-UE proxy is shown in the following image:
+
+![SA Mode Open Source Proxy Functional Diagram](SA_Mode_Open_Source_Proxy_Functional_Diagram.PNG)
 
 ## Included Features ##
 
@@ -29,7 +33,7 @@ The multi-UE proxy includes the following:
 Build and install the EpiSys version of the OAI repository.
 
 1. Open a terminal and clone [openairinterface5g](https://gitlab.eurecom.fr/oai/openairinterface5g.git) repo.
-2. git checkout episys-merge-nsa
+2. git checkout develop
 3. Open a terminal and clone [oai-lte-multi-ue-proxy](https://github.com/EpiSci/oai-lte-multi-ue-proxy.git) repo.
 4. git checkout master
 5. If you run the proxy in loopback mode, add the following loopback interface for the VNF in the gNB.
@@ -37,7 +41,15 @@ Build and install the EpiSys version of the OAI repository.
 ```shell
 sudo ifconfig lo: 127.0.0.2 netmask 255.0.0.0 up
 ```
+## Build OAI ##
 
+```shell
+cd .../openairinterface5g
+source oaienv
+cd cmake_targets
+./build_oai --UE --eNB --nrUE --gNB --log-minimal
+```
+--log-minimal is important for proxy_testscript.py to evaluate the results
 
 ## Build the proxy ##
 
@@ -46,10 +58,22 @@ cd .../oai-lte-multi-ue-proxy
 make
 ```
 
-## Run with the proxy_testscript.py (Recommended) ##
+## Run LTE mode with the proxy_testscript.py (Recommended) ##
+
+```shell
+./proxy_testscript.py --num-ues 1 --mode=lte
+```
+
+## Run NSA mode with the proxy_testscript.py (Recommended) ##
 
 ```shell
 ./proxy_testscript.py --num-ues 1 --mode=nsa
+```
+
+## Run SA mode with the proxy_testscript.py (Recommended) ##
+
+```shell
+./proxy_testscript.py --num-ues 1 --mode=nr
 ```
 
 See `./proxy_testscript.py --help` for more information.
