@@ -12,7 +12,7 @@ The NSA mode functional description of this multi-UE proxy is shown in the follo
 
 The SA mode functional description of this multi-UE proxy is shown in the following image:
 
-![SA Mode Open Source Proxy Functional Diagram](SA_Mode_Open_Source_Proxy_Functional_Diagram.PNG)
+![SA Mode Open Source Proxy Functional Diagram](SA_Mode_Open_Source_Proxy_Functional_Diagram.png)
 
 ## Included Features ##
 
