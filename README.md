@@ -47,9 +47,8 @@ sudo ifconfig lo: 127.0.0.2 netmask 255.0.0.0 up
 cd .../openairinterface5g
 source oaienv
 cd cmake_targets
-./build_oai --UE --eNB --nrUE --gNB --log-minimal
+./build_oai --UE --eNB --nrUE --gNB
 ```
---log-minimal is important for proxy_testscript.py to evaluate the results
 
 ## Build the proxy ##
 
