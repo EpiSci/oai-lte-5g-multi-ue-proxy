@@ -4321,11 +4321,6 @@ void *oai_slot_task(void *context)
         NFAPI_TRACE(NFAPI_TRACE_DEBUG, "Frame %u Slot %u sent to OAI ue", NFAPI_SFNSLOT2SFN(sfn_slot_tx),
                    NFAPI_SFNSLOT2SLOT(sfn_slot_tx));
 
-        if (are_queues_empty)
-        {
-            usleep(312);//Assumes two slots per subframe.
-        }
-
         uint64_t poll_end = clock_usec();
         oai_slot_ind(sfn, slot);
         uint64_t slot_sent = clock_usec();

@@ -284,7 +284,7 @@ class Scenario:
             # TODO: Sleep time needed so eNB and NRUEs don't start at the
             # exact same time When nodes start at the same time, occasionally
             # eNB will only recognize one NRUE
-            time.sleep(1)
+            time.sleep(3)
 
         return procs
 
