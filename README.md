@@ -1,8 +1,14 @@
 # Description #
 
-This repository contains the Multi-UE Proxy to allow UEs to communicate with a single eNB (LTE mode), or both an eNB and gNB (NSA mode), or a single gNB (SA/NR mode) using the customized OpenAirInterface (OAI) software. The OAI code is located at https://gitlab.eurecom.fr/oai/openairinterface5g. The UEs communicate to the eNB via the bypass PHY layer. Various multi-UE scenarios can be tested without the overhead of a PHY layer.
+This repository contains the Multi-UE Proxy to allow UEs to communicate with a
+single eNB (LTE mode), or both an eNB and gNB (NSA mode), or a single gNB
+(SA/NR mode) using the customized OpenAirInterface (OAI) software. The OAI
+code is located at https://gitlab.eurecom.fr/oai/openairinterface5g. The UEs
+communicate to the eNB via the bypass PHY layer. Various multi-UE scenarios
+can be tested without the overhead of a PHY layer.
 
-The LTE mode functional description of this multi-UE proxy is shown in the following image:
+The LTE mode functional description of this multi-UE proxy is shown in the
+following image:
 
 ![LTE Mode Open Source Proxy Functional Diagram](functional_diagram.png)
 
@@ -41,6 +47,7 @@ Build and install the EpiSys version of the OAI repository.
 ```shell
 sudo ifconfig lo: 127.0.0.2 netmask 255.0.0.0 up
 ```
+
 ## Build OAI ##
 
 ```shell
@@ -80,20 +87,22 @@ See `./proxy_testscript.py --help` for more information.
 
 ## Run without the proxy_testscript.py (Advanced) ##
 
-The launch order is important, as follows. Note, there are three different modes
-to run the proxy in: LTE, NSA and SA mode. Please refer to the table below to
-determine which executables to launch and the necessary flags to add to each command, depending on the mode. LTE mode does not require any additional flags. Steps 1-5 below describe in detail how to launch NSA mode specifically. For example, in SA mode, you will replace the `--nsa` flag with `--sa`, and only launch NRUE(s), a gNB and the proxy.
+The launch order is important, as follows.  Note, there are three different
+proxy modes: LTE, NSA and SA.  Please refer to the table below to determine
+which executables to launch and the necessary flags for each command.  Steps
+1-5 below show how to launch NSA mode.  For example, in SA mode, replace the
+`--nsa` flag with `--sa` and only launch NRUE(s), a gNB and the proxy.
 
-| Mode | Executables    | Flags  |
-| ---- |----------------|--------|
-| LTE  | lte-softmodem   |       |
-|      | lte-uesoftmodem |       |
-| NSA  | lte-softmodem   | --nsa |
-|      | lte-uesoftmodem | --nsa |
-|      | nr-softmodem    | --nsa |
-|      | nr-uesoftmodem  | --nsa |
-| SA   | nr-softmodem    | --sa  |
-|      | nr-uesoftmodem  | --sa  |
+| Mode | Executables     | Flags  |
+|------|-----------------|--------|
+| LTE  | lte-softmodem   | (none) |
+|      | lte-uesoftmodem | (none) |
+| NSA  | lte-softmodem   | --nsa  |
+|      | lte-uesoftmodem | --nsa  |
+|      | nr-softmodem    | --nsa  |
+|      | nr-uesoftmodem  | --nsa  |
+| SA   | nr-softmodem    | --sa   |
+|      | nr-uesoftmodem  | --sa   |
 
 1. Open a terminal and launch eNB
 
@@ -125,15 +134,17 @@ number_of_ues=1
 sudo -E ./build/proxy $number_of_ues --nsa enb_ipaddr gnb_ipaddr proxy_ipaddr ue_ipaddr
 ```
 
-If you do not specify the parameters ending with ipaddr, the default IP addresses are the following.
-enb_ipaddr = 127.0.0.1
-gnb_ipaddr = 127.0.0.2
-proxy_ipaddr = 127.0.0.1
-ue_ipaddr = 127.0.0.1
+If you do not specify the parameters ending with ipaddr, the default IP addresses are as follows:
+
+- enb_ipaddr = 127.0.0.1
+- gnb_ipaddr = 127.0.0.2
+- proxy_ipaddr = 127.0.0.1
+- ue_ipaddr = 127.0.0.1
 
 4. Open a terminal and launch nrUE
 
-nrUE NODE_ID starts from 2 from the first nrUE. If you run one more nrUE, the next NODE_ID = 3 in additional terminal.
+nrUE NODE_ID starts from 2 from the first nrUE. If you run one more nrUE, the
+next NODE_ID = 3 in additional terminal.
 
 ```shell
 cd .../openairinterface5g
@@ -162,8 +173,9 @@ sudo -E ./ran_build/build/lte-uesoftmodem -O ../ci-scripts/conf_files/episci/pro
 
 6. Checking the log results
 
-After running the programs for 30 seconds or more, stop the processes using Ctrl-C.
-Open the log files and check the following logs to verify the run results.
+After running the programs for 30 seconds or more, stop the processes using
+Ctrl-C.  Open the log files and check the following logs to verify the run
+results.
 
 - gNB.log : search for "CFRA procedure succeeded" log message for each UE.
 - eNB.log : search for "Sent rrcReconfigurationComplete to gNB".
