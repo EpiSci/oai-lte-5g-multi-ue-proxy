@@ -80,7 +80,20 @@ See `./proxy_testscript.py --help` for more information.
 
 ## Run without the proxy_testscript.py (Advanced) ##
 
-The launch order is important, as follows.
+The launch order is important, as follows. Note, there are three different modes
+to run the proxy in: LTE, NSA and SA mode. Please refer to the table below to
+determine which executables to launch and the necessary flags to add to each command, depending on the mode. LTE mode does not require any additional flags. Steps 1-5 below describe in detail how to launch NSA mode specifically. For example, in SA mode, you will replace the `--nsa` flag with `--sa`, and only launch NRUE(s), a gNB and the proxy.
+
+| Mode | Executables    | Flags  |
+| ---- |----------------|--------|
+| LTE  | lte-softmodem   |       |
+|      | lte-uesoftmodem |       |
+| NSA  | lte-softmodem   | --nsa |
+|      | lte-uesoftmodem | --nsa |
+|      | nr-softmodem    | --nsa |
+|      | nr-uesoftmodem  | --nsa |
+| SA   | nr-softmodem    | --sa  |
+|      | nr-uesoftmodem  | --sa  |
 
 1. Open a terminal and launch eNB
 
@@ -88,7 +101,8 @@ The launch order is important, as follows.
 cd .../openairinterface5g
 source oaienv
 cd cmake_targets
-sudo -E ./ran_build/build/lte-softmodem -O ../ci-scripts/conf_files/episci/proxy_rcc.band7.tm1.nfapi.conf --noS1 --nsa | tee eNB.log 2>&1
+sudo -E ./ran_build/build/lte-softmodem -O ../ci-scripts/conf_files/episci/proxy_rcc.band7.tm1.nfapi.conf \
+--noS1 --emulate-l1 --nsa --log_config.global_log_options level,nocolor,time,thread_id | tee eNB.log 2>&1
 ```
 
 2. Open a terminal and launch gNB
@@ -97,7 +111,8 @@ sudo -E ./ran_build/build/lte-softmodem -O ../ci-scripts/conf_files/episci/proxy
 cd .../openairinterface5g
 source oaienv
 cd cmake_targets
-sudo -E ./ran_build/build/nr-softmodem -O ../ci-scripts/conf_files/episci/proxy_rcc.band78.tm1.106PRB.nfapi.conf --nfapi 2 --noS1 --nsa | tee gNB.log 2>&1
+sudo -E ./ran_build/build/nr-softmodem -O ../ci-scripts/conf_files/episci/proxy_rcc.band78.tm1.106PRB.nfapi.conf \
+--nfapi 2 --noS1 --nsa --emulate-l1 --log_config.global_log_options level,nocolor,time,thread_id | tee gNB.log 2>&1
 ```
 
 3. Open a terminal and launch proxy
@@ -125,7 +140,9 @@ cd .../openairinterface5g
 source oaienv
 cd cmake_targets
 node_id=2
-sudo -E ./ran_build/build/nr-uesoftmodem -O ../ci-scripts/conf_files/episci/proxy_nr-ue.nfapi.conf --nokrnmod 1 --noS1 --nfapi 5 --node-number $node_id --nsa | tee nrue_$node_id.log 2>&1
+sudo -E ./ran_build/build/nr-uesoftmodem -O ../ci-scripts/conf_files/episci/proxy_nr-ue.nfapi.conf --nokrnmod 1 \
+--noS1 --nfapi 5 --node-number $node_id --emulate-l1 --nsa \
+--log_config.global_log_options level,nocolor,time,thread_id | tee nrue_$node_id.log 2>&1
 ```
 
 5. Open a terminal and launch UE
@@ -137,7 +154,10 @@ cd .../openairinterface5g
 source oaienv
 cd cmake_targets
 node_id=2
-sudo -E ./ran_build/build/lte-uesoftmodem -O ../ci-scripts/conf_files/episci/proxy_ue.nfapi.conf --L2-emul 5 --nokrnmod 1 --noS1 --num-ues 1 --node-number $node_id --nsa | tee ue_$node_id.log 2>&1
+sudo -E ./ran_build/build/lte-uesoftmodem -O ../ci-scripts/conf_files/episci/proxy_ue.nfapi.conf --L2-emul 5 \
+--nokrnmod 1 --noS1 --num-ues 1 --node-number $node_id --nsa \
+--log_config.global_log_options level,nocolor,time,thread_id | tee ue_$node_id.log 2>&1
+
 ```
 
 6. Checking the log results
