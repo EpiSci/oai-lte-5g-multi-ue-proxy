@@ -47,6 +47,12 @@ Build and install the EpiSys version of the OAI repository.
 ```shell
 sudo ifconfig lo: 127.0.0.2 netmask 255.0.0.0 up
 ```
+6. Verify that SCTP is enabled with the following command.
+
+```
+$ checksctp
+SCTP supported
+```
 
 ## Build OAI ##
 
