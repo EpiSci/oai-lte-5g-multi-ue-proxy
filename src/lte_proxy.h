@@ -26,7 +26,7 @@
 class Multi_UE_Proxy
 {
 public:
-    Multi_UE_Proxy(int num_of_ues, std::string enb_ip, std::string proxy_ip, std::string ue_ip);
+    Multi_UE_Proxy(int id, int num_of_ues, std::string enb_ip, std::string proxy_ip, std::string ue_ip);
     ~Multi_UE_Proxy() = default;
     void configure(std::string enb_ip, std::string proxy_ip, std::string ue_ip);
     int init_oai_socket(const char *addr, int tx_port, int rx_port, int ue_idx);
@@ -53,10 +53,11 @@ private:
     int ue_rx_socket_ = -1;
     int ue_rx_socket[100];
     int ue_tx_socket[100];
-    std::uint16_t id ;
+    int id ;
     std::recursive_mutex mutex;
     using lock_guard_t = std::lock_guard<std::recursive_mutex>;
     std::vector<std::thread> threads;
     bool stop_thread = false;
-    int port_delta = 2;
+    const int port_delta = 2;
+    const int enb_port_delta = 600;
 };

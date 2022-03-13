@@ -8,24 +8,30 @@ namespace
     Multi_UE_Proxy *instance;
 }
 
-Multi_UE_Proxy::Multi_UE_Proxy(int num_of_ues,  std::string enb_ip, std::string proxy_ip, std::string ue_ip)
+Multi_UE_Proxy::Multi_UE_Proxy(int object_id, int num_of_ues, std::string enb_ip, std::string proxy_ip, std::string ue_ip)
 {
     assert(instance == NULL);
     instance = this;
     num_ues = num_of_ues ;
+    id = object_id;
 
     configure(enb_ip, proxy_ip, ue_ip);
 
-    oai_subframe_init();
+    oai_subframe_init(id);
 }
 
 void Multi_UE_Proxy::start(softmodem_mode_t softmodem_mode)
 {
     pthread_t thread;
+    vnf_p5port = 50001 + id * enb_port_delta;
+    vnf_p7port = 50011 + id * enb_port_delta;
+    pnf_p7port = 50010 + id * enb_port_delta;
+
+    struct oai_task_args args {softmodem_mode, id};
 
     configure_nfapi_pnf(vnf_ipaddr.c_str(), vnf_p5port, pnf_ipaddr.c_str(), pnf_p7port, vnf_p7port);
 
-    if (pthread_create(&thread, NULL, &oai_subframe_task, (void *)softmodem_mode) != 0)
+    if (pthread_create(&thread, NULL, &oai_subframe_task, (void *)&args) != 0)
     {
         NFAPI_TRACE(NFAPI_TRACE_ERROR, "pthread_create failed for calling oai_subframe_task");
     }
@@ -48,18 +54,14 @@ void Multi_UE_Proxy::configure(std::string enb_ip, std::string proxy_ip, std::st
     oai_ue_ipaddr = ue_ip;
     vnf_ipaddr = enb_ip;
     pnf_ipaddr = proxy_ip;
-    vnf_p5port = 50001;
-    vnf_p7port = 50011;
-    pnf_p7port = 50010;
-
     std::cout<<"VNF is on IP Address "<<vnf_ipaddr<<std::endl;
     std::cout<<"PNF is on IP Address "<<pnf_ipaddr<<std::endl;
     std::cout<<"OAI-UE is on IP Address "<<oai_ue_ipaddr<<std::endl;
 
     for (int ue_idx = 0; ue_idx < num_ues; ue_idx++)
     {
-        int oai_rx_ue_port = 3211 + ue_idx * port_delta;
-        int oai_tx_ue_port = 3212 + ue_idx * port_delta;
+        int oai_rx_ue_port = 3211 + id * enb_port_delta + ue_idx * port_delta;
+        int oai_tx_ue_port = 3212 + id * enb_port_delta + ue_idx * port_delta;
         init_oai_socket(oai_ue_ipaddr.c_str(), oai_tx_ue_port, oai_rx_ue_port, ue_idx);
     }
 }
@@ -147,7 +149,7 @@ void Multi_UE_Proxy::receive_message_from_ue(int ue_idx)
             NFAPI_TRACE(NFAPI_TRACE_INFO , "(Proxy) Proxy has received %d uplink message from OAI UE at socket. Frame: %d, Subframe: %d",
                     header.message_id, NFAPI_SFNSF2SFN(sfn_sf), NFAPI_SFNSF2SF(sfn_sf));
         }
-        oai_subframe_handle_msg_from_ue(buffer, buflen, ue_idx + 2);
+        oai_subframe_handle_msg_from_ue(id, buffer, buflen, ue_idx + 2);
     }
 }
 

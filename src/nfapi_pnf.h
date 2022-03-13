@@ -239,10 +239,10 @@ void handle_nr_nfapi_ssb_pdu(PHY_VARS_gNB *gNB,int frame,int slot,
 
 void *oai_subframe_task(void *context);
 void *oai_slot_task(void *context);
-void oai_subframe_init();
+void oai_subframe_init(int enb_id);
 void oai_slot_init();
 void oai_subframe_flush_msgs_from_ue();
-void oai_subframe_handle_msg_from_ue(const void *msg, size_t len, uint16_t nem_id);
+void oai_subframe_handle_msg_from_ue(int enb_id, const void *msg, size_t len, uint16_t nem_id);
 void oai_slot_handle_msg_from_ue(const void *msg, size_t len, uint16_t nem_id);
 
 void transfer_downstream_nfapi_msg_to_proxy(void *msg);
@@ -258,11 +258,12 @@ int get_slot_delta(uint16_t a, uint16_t b);
 uint16_t sfn_sf_subtract(uint16_t a, uint16_t sub_val);
 
 
-bool dequeue_ue_msgs(subframe_msgs_t *subframe_msgs, uint16_t sfn_sf_tx);
+bool dequeue_ue_msgs(int enb_id, subframe_msgs_t *subframe_msgs, uint16_t sfn_sf_tx);
 void add_sleep_time(uint64_t start, uint64_t poll, uint64_t send, uint64_t agg);
 
 extern int num_ues;
 
+#define MAX_ENB 2
 #define MAX_UES 64
 
 #ifdef __cplusplus

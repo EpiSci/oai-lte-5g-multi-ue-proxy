@@ -2440,14 +2440,14 @@ void oai_slot_ind(uint16_t sfn, uint16_t slot)
 }
 
 // Queues of message_buffer_t pointers, one queue per UE
-static queue_t msgs_from_ue[MAX_UES];
+static queue_t msgs_from_ue[MAX_ENB][MAX_UES];
 static queue_t msgs_from_nr_ue[MAX_UES];
 
-void oai_subframe_init()
+void oai_subframe_init(int enb_id)
 {
     for (int i = 0; i < num_ues; i++)
     {
-        init_queue(&msgs_from_ue[i]);
+        init_queue(&msgs_from_ue[enb_id][i]);
     }
 }
 
@@ -4014,7 +4014,7 @@ static void oai_slot_aggregate_messages(slot_msgs_t *slot_msgs)
 //     }
 // }
 
-bool dequeue_ue_msgs(subframe_msgs_t *subframe_msgs, uint16_t sfn_sf_tx)
+bool dequeue_ue_msgs(int enb_id, subframe_msgs_t *subframe_msgs, uint16_t sfn_sf_tx)
 {
     // Dequeue for all UE responses, and discard any with the wrong sfn/sf value.
     // There might be multiple messages from a given UE with the same sfn/sf value.
@@ -4024,7 +4024,7 @@ bool dequeue_ue_msgs(subframe_msgs_t *subframe_msgs, uint16_t sfn_sf_tx)
     {
         for (;;)
         {
-            message_buffer_t *msg = get_queue(&msgs_from_ue[i]);
+            message_buffer_t *msg = get_queue(&msgs_from_ue[enb_id][i]);
             if (!msg)
             {
                 break;
@@ -4049,7 +4049,7 @@ bool dequeue_ue_msgs(subframe_msgs_t *subframe_msgs, uint16_t sfn_sf_tx)
             }
             if (master_sfn_sf != msg_sfn_sf)
             {
-                if (!requeue(&msgs_from_ue[i], msg))
+                if (!requeue(&msgs_from_ue[enb_id][i], msg))
                 {
                     msg->magic = 0;
                     free(msg);
@@ -4236,7 +4236,8 @@ void *oai_subframe_task(void *context)
     uint16_t sfn = 0;
     uint16_t sf = 0;
     bool are_queues_empty = true;
-    softmodem_mode_t softmodem_mode = (softmodem_mode_t) context;
+    softmodem_mode_t softmodem_mode = ((struct oai_task_args*)context)->softmodem_mode;
+    int enb_id = ((struct oai_task_args*)context)->node_id;
     NFAPI_TRACE(NFAPI_TRACE_INFO, "Subframe Task thread");
     while (true)
     {
@@ -4263,7 +4264,7 @@ void *oai_subframe_task(void *context)
         */
         subframe_msgs_t subframe_msgs[MAX_UES];
         memset(subframe_msgs, 0, sizeof(subframe_msgs));
-        are_queues_empty = dequeue_ue_msgs(subframe_msgs, sfn_sf_tx);
+        are_queues_empty = dequeue_ue_msgs(enb_id, subframe_msgs, sfn_sf_tx);
 
         oai_subframe_aggregate_messages(subframe_msgs);
 
@@ -4369,7 +4370,7 @@ void *oai_slot_task(void *context)
     }
 }
 
-void oai_subframe_handle_msg_from_ue(const void *msg, size_t len, uint16_t nem_id)
+void oai_subframe_handle_msg_from_ue(int enb_id, const void *msg, size_t len, uint16_t nem_id)
 {
     if (len == 4) // Dummy packet ignore
     {
@@ -4393,7 +4394,7 @@ void oai_subframe_handle_msg_from_ue(const void *msg, size_t len, uint16_t nem_i
     assert(len < sizeof(p->data));
     memcpy(p->data, msg, len);
 
-    if (!put_queue(&msgs_from_ue[i], p))
+    if (!put_queue(&msgs_from_ue[enb_id][i], p))
     {
         p->magic = 0;
         free(p);
