@@ -59,13 +59,26 @@ If SCTP is not supported, then do the following.
 sudo insmod /lib/modules/$(uname -r)/kernel/net/sctp/sctp.ko
 ```
 
+7. If you plan to use the EPC or 5GCN, be sure to follow the instructions listed in Eurecom's respective repository.
+- The EPC is used for both LTE and NSA mode. The 5GCN is used for SA mode.
+- The EPC installation and deployment instructions are found here:
+https://github.com/OPENAIRINTERFACE/openair-epc-fed/blob/master/docs/DEPLOY_HOME_MAGMA_MME.md
+- The 5GCN installation and deployment instructions are found here:
+https://gitlab.eurecom.fr/oai/cn5g/oai-cn5g-fed/-/blob/master/docs/DEPLOY_HOME.md
+- It is critical to update the configuration files in the eNB/gNB/UE/NRUE if running with the 5GCN/EPC.\
+Instructions to update the configuration files are oulined in the EPC/5GCN documentation
+- Each softmodem command will not have the `--noS1` when running with the EPC or 5GCN.
+-  The UE and NRUE launch commands will have a `--ue-idx-standalone $node_id` flag added
+when running with the ECP/5GCN to distinguish USIM information for multiple UEs.
+
+
 ## Build OAI ##
 
 ```shell
 cd .../openairinterface5g
 source oaienv
 cd cmake_targets
-./build_oai --UE --eNB --nrUE --gNB
+sudo ./build_oai --UE --eNB --nrUE --gNB
 ```
 
 ## Build the proxy ##
@@ -115,8 +128,8 @@ which executables to launch and the necessary flags for each command.  Steps
 | SA   | nr-softmodem    | --sa   |
 |      | nr-uesoftmodem  | --sa   |
 
-1. Open a terminal and launch eNB
-
+### 1. Open a terminal and launch eNB ###
+#### 1.a Launch eNB without EPC support ####
 ```shell
 cd .../openairinterface5g
 source oaienv
@@ -125,8 +138,23 @@ sudo -E ./ran_build/build/lte-softmodem -O ../ci-scripts/conf_files/episci/proxy
 --noS1 --emulate-l1 --nsa --log_config.global_log_options level,nocolor,time,thread_id | tee eNB.log 2>&1
 ```
 
-2. Open a terminal and launch gNB
+#### 1.b Launch eNB with EPC support ####
+```
+cd .../openairinterface5g
+source oaienv
+cd cmake_targets
+cd ran_build/build
+../../../targets/bin/conf2uedata -c ../../../ci-scripts/conf_files/episci/episci_ue_test_sfr.conf -o .
+../../../targets/bin/usim -g -c ../../../ci-scripts/conf_files/episci/episci_ue_test_sfr.conf -o .
+../../../targets/bin/nvram -g -c ../../../ci-scripts/conf_files/episci/episci_ue_test_sfr.conf -o .
+cp .u* ../../../cmake_targets
+cd ../..
+sudo -E ./ran_build/build/lte-softmodem -O ../ci-scripts/conf_files/episci/proxy_rcc.band7.tm1.nfapi.conf \
+--emulate-l1 --nsa --log_config.global_log_options level,nocolor,time,thread_id | tee eNB.log 2>&1
+```
 
+### 2. Open a terminal and launch gNB ###
+#### 2.a Launch gNB without EPC/5GCN support ####
 ```shell
 cd .../openairinterface5g
 source oaienv
@@ -135,8 +163,16 @@ sudo -E ./ran_build/build/nr-softmodem -O ../ci-scripts/conf_files/episci/proxy_
 --nfapi 2 --noS1 --nsa --emulate-l1 --log_config.global_log_options level,nocolor,time,thread_id | tee gNB.log 2>&1
 ```
 
-3. Open a terminal and launch proxy
+#### 2.b Launch gNB with EPC/5GCN support ####
+```shell
+cd .../openairinterface5g
+source oaienv
+cd cmake_targets
+sudo -E ./ran_build/build/nr-softmodem -O ../ci-scripts/conf_files/episci/proxy_rcc.band78.tm1.106PRB.nfapi.conf \
+--nfapi 2 --nsa --emulate-l1 --log_config.global_log_options level,nocolor,time,thread_id | tee gNB.log 2>&1
+```
 
+### 3. Open a terminal and launch proxy ###
 NUMBER_OF_UES is the total number of UEs.
 
 ```shell
@@ -152,10 +188,10 @@ If you do not specify the parameters ending with ipaddr, the default IP addresse
 - proxy_ipaddr = 127.0.0.1
 - ue_ipaddr = 127.0.0.1
 
-4. Open a terminal and launch nrUE
-
-nrUE NODE_ID starts from 2 from the first nrUE. If you run one more nrUE, the
-next NODE_ID = 3 in additional terminal.
+### 4. Open a terminal and launch nrUE ###
+#### 4.a Launch nrUE without EPC/5GCN support ####
+- nrUE NODE_ID starts from 2 from the first nrUE. If you run one more nrUE, the
+- next NODE_ID = 3 in additional terminal.
 
 ```shell
 cd .../openairinterface5g
@@ -166,10 +202,23 @@ sudo -E ./ran_build/build/nr-uesoftmodem -O ../ci-scripts/conf_files/episci/prox
 --noS1 --nfapi 5 --node-number $node_id --emulate-l1 --nsa \
 --log_config.global_log_options level,nocolor,time,thread_id | tee nrue_$node_id.log 2>&1
 ```
+#### 4.b Launch nrUE with EPC/5GCN support ####
+- nrUE NODE_ID starts from 2 from the first nrUE. If you run one more nrUE, the
+- next NODE_ID = 3 in additional terminal.
 
-5. Open a terminal and launch UE
+```shell
+cd .../openairinterface5g
+source oaienv
+cd cmake_targets
+node_id=2
+sudo -E ./ran_build/build/nr-uesoftmodem -O ../ci-scripts/conf_files/episci/proxy_nr-ue.nfapi.conf --nokrnmod 1 \
+--ue-idx-standalone $node_id --nfapi 5 --node-number $node_id --emulate-l1 --nsa \
+--log_config.global_log_options level,nocolor,time,thread_id | tee nrue_$node_id.log 2>&1
+```
 
-The UE node_id starts at 2.
+### 5. Open a terminal and launch UE ###
+#### 5.a Launch UE without EPC support ####
+- The UE node_id starts at 2.
 
 ```shell
 cd .../openairinterface5g
@@ -179,10 +228,22 @@ node_id=2
 sudo -E ./ran_build/build/lte-uesoftmodem -O ../ci-scripts/conf_files/episci/proxy_ue.nfapi.conf --L2-emul 5 \
 --nokrnmod 1 --noS1 --num-ues 1 --node-number $node_id --nsa \
 --log_config.global_log_options level,nocolor,time,thread_id | tee ue_$node_id.log 2>&1
-
 ```
 
-6. Checking the log results
+#### 5.b Launch UE with EPC support ####
+- The UE node_id starts at 2.
+
+```shell
+cd .../openairinterface5g
+source oaienv
+cd cmake_targets
+node_id=2
+sudo -E ./ran_build/build/lte-uesoftmodem -O ../ci-scripts/conf_files/episci/proxy_ue.nfapi.conf --L2-emul 5 \
+--nokrnmod 1 --ue-idx-standalone $node_id --num-ues 1 --node-number $node_id --nsa \
+--log_config.global_log_options level,nocolor,time,thread_id | tee ue_$node_id.log 2>&1
+```
+
+### 6. Checking the log results ###
 
 After running the programs for 30 seconds or more, stop the processes using
 Ctrl-C.  Open the log files and check the following logs to verify the run
