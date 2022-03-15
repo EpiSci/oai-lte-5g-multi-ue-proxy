@@ -101,7 +101,13 @@ int main(int argc, char *argv[])
     {
     case 0:
         // Use all the default addresses
-        enb_ipaddrs.push_back("127.0.0.1");
+        if (softmodem_mode == SOFTMODEM_LTE_HANDOVER)
+        {
+            enb_ipaddrs.push_back("127.0.0.1");
+            enb_ipaddrs.push_back("127.0.0.2");
+        }
+        else
+            enb_ipaddrs.push_back("127.0.0.1");
         break;
     case 3:
         if (softmodem_mode != SOFTMODEM_LTE && softmodem_mode != SOFTMODEM_NR)
@@ -168,6 +174,7 @@ int main(int argc, char *argv[])
             Multi_UE_Proxy lte_target_proxy(1, ues, enb_ipaddrs[1], proxy_ipaddr, ue_ipaddr);
 
             std::thread lte_source_th( &Multi_UE_Proxy::start, &lte_source_proxy, softmodem_mode);
+            sleep(1);
             std::thread lte_target_th( &Multi_UE_Proxy::start, &lte_target_proxy, softmodem_mode);
 
             lte_source_th.join();

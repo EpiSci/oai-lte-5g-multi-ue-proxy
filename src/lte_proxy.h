@@ -59,5 +59,5 @@ private:
     std::vector<std::thread> threads;
     bool stop_thread = false;
     const int port_delta = 2;
-    const int enb_port_delta = 600;
+    const int enb_port_delta = 300;
 };

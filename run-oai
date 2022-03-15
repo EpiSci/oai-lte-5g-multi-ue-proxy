@@ -37,12 +37,18 @@ export MALLOC_CHECK_=3
 case "$node_type" in
     (enb)
         echo "Node $NODE_NUMBER: eNB"
+        if [ $NODE_NUMBER = "1" ]; then
+            conf=proxy_rcc.band7.tm1.nfapi.conf # Target eNB
+        else
+            conf=proxy_rcc.band7.tm1.nfapi_$NODE_NUMBER.conf # Source eNB
+        fi
         cmd=(
             # Keep the eNB on processor 1 (the second processor) by default
             taskset --cpu-list 1
             ./ran_build/build/lte-softmodem
-            -O ../ci-scripts/conf_files/episci/proxy_rcc.band7.tm1.nfapi.conf
+            -O "../ci-scripts/conf_files/episci/$conf"
             --noS1
+            --node-number "$NODE_NUMBER"
             --emulate-l1
             --log_config.global_log_options level,nocolor,time,thread_id
         )

@@ -5,19 +5,20 @@
 
 namespace
 {
-    Multi_UE_Proxy *instance;
+    Multi_UE_Proxy *instances[MAX_ENB];
 }
 
-Multi_UE_Proxy::Multi_UE_Proxy(int object_id, int num_of_ues, std::string enb_ip, std::string proxy_ip, std::string ue_ip)
+Multi_UE_Proxy::Multi_UE_Proxy(int pnf_id, int num_of_ues, std::string enb_ip, std::string proxy_ip, std::string ue_ip)
 {
-    assert(instance == NULL);
-    instance = this;
+    assert(instances[pnf_id] == NULL);
+    instances[pnf_id] = this;
+
     num_ues = num_of_ues ;
-    id = object_id;
+    id = pnf_id;
 
     configure(enb_ip, proxy_ip, ue_ip);
 
-    oai_subframe_init(id);
+    oai_subframe_init(pnf_id);
 }
 
 void Multi_UE_Proxy::start(softmodem_mode_t softmodem_mode)
@@ -29,7 +30,10 @@ void Multi_UE_Proxy::start(softmodem_mode_t softmodem_mode)
 
     struct oai_task_args args {softmodem_mode, id};
 
-    configure_nfapi_pnf(vnf_ipaddr.c_str(), vnf_p5port, pnf_ipaddr.c_str(), pnf_p7port, vnf_p7port);
+    configure_nfapi_pnf(id, vnf_ipaddr.c_str(), vnf_p5port, pnf_ipaddr.c_str(), pnf_p7port, vnf_p7port);
+
+    if (id > 0)
+        return;
 
     if (pthread_create(&thread, NULL, &oai_subframe_task, (void *)&args) != 0)
     {
@@ -261,16 +265,16 @@ void Multi_UE_Proxy::pack_and_send_downlink_sfn_sf_msg(uint16_t sfn_sf)
         {
             int sfn = NFAPI_SFNSF2SFN(sfn_sf);
             int sf = NFAPI_SFNSF2SF(sfn_sf);
-            NFAPI_TRACE(NFAPI_TRACE_ERROR, "Send sfn_sf_tx to OAI UE FAIL Frame: %d,Subframe: %d", sfn, sf);
+            NFAPI_TRACE(NFAPI_TRACE_DEBUG, "Send sfn_sf_tx to OAI UE FAIL Frame: %d,Subframe: %d", sfn, sf);
         }
     }
 }
 
-void transfer_downstream_nfapi_msg_to_proxy(void *msg)
+void transfer_downstream_nfapi_msg_to_proxy(int id, void *msg)
 {
-    instance->oai_enb_downlink_nfapi_task(msg);
+    instances[id]->oai_enb_downlink_nfapi_task(msg);
 }
-void transfer_downstream_sfn_sf_to_proxy(uint16_t sfn_sf)
+void transfer_downstream_sfn_sf_to_proxy(int id, uint16_t sfn_sf)
 {
-    instance->pack_and_send_downlink_sfn_sf_msg(sfn_sf);
+    instances[id]->pack_and_send_downlink_sfn_sf_msg(sfn_sf);
 }

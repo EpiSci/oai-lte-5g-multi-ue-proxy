@@ -1656,7 +1656,7 @@ void pnf_handle_dl_config_request(void* pRecvMsg, int recvMsgLen, pnf_p7_t* pnf_
 			}
 
 			// saving dl_config_request in subframe buffer
-			transfer_downstream_nfapi_msg_to_proxy((void *)req);
+			transfer_downstream_nfapi_msg_to_proxy(pnf_p7->_public.pnf_id, (void *)req);
 			pnf_p7->subframe_buffer[buffer_index].sfn_sf = req->sfn_sf;
 			pnf_p7->subframe_buffer[buffer_index].dl_config_req = req;
 
@@ -1807,7 +1807,7 @@ void pnf_handle_ul_config_request(void* pRecvMsg, int recvMsgLen, pnf_p7_t* pnf_
 
 				deallocate_nfapi_ul_config_request(pnf_p7->subframe_buffer[buffer_index].ul_config_req, pnf_p7);
 			}
-			transfer_downstream_nfapi_msg_to_proxy((void *)req);
+			transfer_downstream_nfapi_msg_to_proxy(pnf_p7->_public.pnf_id, (void *)req);
 			pnf_p7->subframe_buffer[buffer_index].sfn_sf = req->sfn_sf;
 			pnf_p7->subframe_buffer[buffer_index].ul_config_req = req;
 			
@@ -1944,7 +1944,7 @@ void pnf_handle_hi_dci0_request(void* pRecvMsg, int recvMsgLen, pnf_p7_t* pnf_p7
 				deallocate_nfapi_hi_dci0_request(pnf_p7->subframe_buffer[buffer_index].hi_dci0_req, pnf_p7);
 			}
 
-			transfer_downstream_nfapi_msg_to_proxy((void *)req);
+			transfer_downstream_nfapi_msg_to_proxy(pnf_p7->_public.pnf_id, (void *)req);
 			pnf_p7->subframe_buffer[buffer_index].sfn_sf = req->sfn_sf;
 			pnf_p7->subframe_buffer[buffer_index].hi_dci0_req = req;
 
@@ -2047,7 +2047,7 @@ void pnf_handle_tx_request(void* pRecvMsg, int recvMsgLen, pnf_p7_t* pnf_p7)
 				deallocate_nfapi_tx_request(pnf_p7->subframe_buffer[buffer_index].tx_req, pnf_p7);
 			}
 
-			transfer_downstream_nfapi_msg_to_proxy((void *)req);
+			transfer_downstream_nfapi_msg_to_proxy(pnf_p7->_public.pnf_id, (void *)req);
 			pnf_p7->subframe_buffer[buffer_index].sfn_sf = req->sfn_sf;
 			pnf_p7->subframe_buffer[buffer_index].tx_req = req;
 
