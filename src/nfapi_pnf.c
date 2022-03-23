@@ -4219,17 +4219,21 @@ static uint16_t sfn_slot_counter(uint16_t *sfn, uint16_t *slot)
     return (*sfn << 6) | *slot;
 }
 
-#define LTE_PROXY_DONE   1
-#define NR_PROXY_DONE    2
-#define BOTH_LTE_NR_DONE 3
+#define LTE_PROXY_DONE      1
+#define NR_PROXY_DONE       2
+#define BOTH_LTE_NR_DONE    3
+#define LTE_PROXY_0_DONE    1
+#define LTE_PROXY_1_DONE    2
+#define BOTH_LTE_PROXY_DONE 3
 #define errExit(msg)     do { NFAPI_TRACE(NFAPI_TRACE_ERROR, "%s", msg); \
                               exit(EXIT_FAILURE); \
                          } while (0)
 
 uint16_t sf_slot_tick;
+uint16_t sf0_sf1_tick;
 pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
 pthread_cond_t cond_sf_slot = PTHREAD_COND_INITIALIZER;
-
+pthread_cond_t cond_sf0_sf1 = PTHREAD_COND_INITIALIZER;
 
 void *oai_subframe_task(void *context)
 {
@@ -4239,6 +4243,7 @@ void *oai_subframe_task(void *context)
     bool are_queues_empty = true;
     softmodem_mode_t softmodem_mode = ((struct oai_task_args*)context)->softmodem_mode;
     int id = ((struct oai_task_args*)context)->node_id;
+    uint16_t sf_tick_1st = (id == 0) ? LTE_PROXY_0_DONE : LTE_PROXY_1_DONE;
     NFAPI_TRACE(NFAPI_TRACE_INFO, "Subframe Task thread");
     while (true)
     {
@@ -4269,7 +4274,31 @@ void *oai_subframe_task(void *context)
 
         oai_subframe_aggregate_messages(id, subframe_msgs);
 
-        if (softmodem_mode == SOFTMODEM_NSA)
+        if (softmodem_mode == SOFTMODEM_LTE_HANDOVER)
+        {
+            if (pthread_mutex_lock(&lock) != 0)
+                errExit("failed to lock mutex");
+
+            sf0_sf1_tick |= sf_tick_1st;
+            if (sf0_sf1_tick == BOTH_LTE_PROXY_DONE)
+            {
+                if (pthread_cond_broadcast(&cond_sf0_sf1) != 0)
+                    errExit("failed to broadcast on the condition");
+            }
+            else
+            {
+                while ( sf0_sf1_tick != BOTH_LTE_PROXY_DONE)
+                {
+                    if (pthread_cond_wait(&cond_sf0_sf1, &lock) != 0)
+                        errExit("failed to wait on the condition");
+                }
+                sf0_sf1_tick = 0;
+            }
+
+            if (pthread_mutex_unlock(&lock) != 0)
+                errExit("failed to unlock mutex");
+        }
+        else if (softmodem_mode == SOFTMODEM_NSA)
         {
             if (pthread_mutex_lock(&lock) != 0)
                 errExit("failed to lock mutex");
@@ -4293,7 +4322,6 @@ void *oai_subframe_task(void *context)
             if (pthread_mutex_unlock(&lock) != 0)
                 errExit("failed to unlock mutex");
         }
-
         uint64_t aggregation_done = clock_usec();
 
         if (are_queues_empty)

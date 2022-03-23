@@ -32,9 +32,6 @@ void Multi_UE_Proxy::start(softmodem_mode_t softmodem_mode)
 
     configure_nfapi_pnf(id, vnf_ipaddr.c_str(), vnf_p5port, pnf_ipaddr.c_str(), pnf_p7port, vnf_p7port);
 
-    if (id > 0)
-        return;
-
     if (pthread_create(&thread, NULL, &oai_subframe_task, (void *)&args) != 0)
     {
         NFAPI_TRACE(NFAPI_TRACE_ERROR, "pthread_create failed for calling oai_subframe_task");
