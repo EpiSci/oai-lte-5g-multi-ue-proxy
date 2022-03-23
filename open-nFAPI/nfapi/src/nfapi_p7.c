@@ -3053,7 +3053,7 @@ static uint8_t pack_nr_rx_data_indication(void *msg, uint8_t **ppWritePackedMsg,
 
 	for (int i = 0; i < pNfapiMsg->number_of_pdus; i++)
 	{
-		if (!pack_nr_rx_data_indication_body(&pNfapiMsg->pdu_list[i], ppWritePackedMsg, end))
+		if(!pack_nr_rx_data_indication_body(&(pNfapiMsg->pdu_list[i]), ppWritePackedMsg, end))	
 		        return 0;
 	}
 
