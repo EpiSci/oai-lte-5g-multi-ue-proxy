@@ -263,6 +263,8 @@ class Scenario:
                           RUN_OAI=RUN_OAI)
             if OPTS.mode == 'nsa':
                 cmd += ' --nsa'
+            if OPTS.mode == 'lte_handover':
+                cmd += f' --num-enbs {len(self.enb_node_id)}'
             procs[num] = Popen(redirect_output(cmd, log_name), shell=True)
 
             # TODO: Sleep time needed so eNB and UEs don't start at the exact

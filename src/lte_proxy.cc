@@ -154,7 +154,7 @@ void Multi_UE_Proxy::receive_message_from_ue(int ue_idx)
     }
 }
 
-void Multi_UE_Proxy::oai_enb_downlink_nfapi_task(void *msg_org)
+void Multi_UE_Proxy::oai_enb_downlink_nfapi_task(int id, void *msg_org)
 {
     lock_guard_t lock(mutex);
 
@@ -183,7 +183,7 @@ void Multi_UE_Proxy::oai_enb_downlink_nfapi_task(void *msg_org)
 
     for(int ue_idx = 0; ue_idx < num_ues; ue_idx++)
     {
-        address_tx_.sin_port = htons(3212 + ue_idx * port_delta);
+        address_tx_.sin_port = htons(3212 + id * enb_port_delta + ue_idx * port_delta);
         uint16_t id_=1;
         switch (msg.header.message_id)
         {
@@ -250,13 +250,13 @@ void Multi_UE_Proxy::oai_enb_downlink_nfapi_task(void *msg_org)
     }
 }
 
-void Multi_UE_Proxy::pack_and_send_downlink_sfn_sf_msg(uint16_t sfn_sf)
+void Multi_UE_Proxy::pack_and_send_downlink_sfn_sf_msg(int id, uint16_t sfn_sf)
 {
     lock_guard_t lock(mutex);
 
     for(int ue_idx = 0; ue_idx < num_ues; ue_idx++)
     {
-        address_tx_.sin_port = htons(3212 + ue_idx * port_delta);
+        address_tx_.sin_port = htons(3212 + id * enb_port_delta + ue_idx * port_delta);
         assert(ue_tx_socket[ue_idx] > 2);
         if (sendto(ue_tx_socket[ue_idx], &sfn_sf, sizeof(sfn_sf), 0, (const struct sockaddr *) &address_tx_, sizeof(address_tx_)) < 0)
         {
@@ -269,9 +269,9 @@ void Multi_UE_Proxy::pack_and_send_downlink_sfn_sf_msg(uint16_t sfn_sf)
 
 void transfer_downstream_nfapi_msg_to_proxy(int id, void *msg)
 {
-    instances[id]->oai_enb_downlink_nfapi_task(msg);
+    instances[id]->oai_enb_downlink_nfapi_task(id, msg);
 }
 void transfer_downstream_sfn_sf_to_proxy(int id, uint16_t sfn_sf)
 {
-    instances[id]->pack_and_send_downlink_sfn_sf_msg(sfn_sf);
+    instances[id]->pack_and_send_downlink_sfn_sf_msg(id, sfn_sf);
 }

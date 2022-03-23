@@ -30,9 +30,9 @@ public:
     ~Multi_UE_Proxy() = default;
     void configure(std::string enb_ip, std::string proxy_ip, std::string ue_ip);
     int init_oai_socket(const char *addr, int tx_port, int rx_port, int ue_idx);
-    void oai_enb_downlink_nfapi_task(void *msg);
+    void oai_enb_downlink_nfapi_task(int id, void *msg);
     void testcode_tx_packet_to_UE( int ue_tx_socket_);
-    void pack_and_send_downlink_sfn_sf_msg(uint16_t sfn_sf);
+    void pack_and_send_downlink_sfn_sf_msg(int id, uint16_t sfn_sf);
     void receive_message_from_ue(int ue_id);
     void send_ue_to_enb_msg(void *buffer, size_t buflen);
     void send_received_msg_to_proxy_queue(void *buffer, size_t buflen);
