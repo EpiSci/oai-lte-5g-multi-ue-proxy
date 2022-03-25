@@ -220,6 +220,7 @@ sudo -E ./ran_build/build/nr-uesoftmodem -O ../ci-scripts/conf_files/episci/prox
 
 - nrUE NODE_ID starts from 2 from the first nrUE. If you run one more nrUE, the
 - next NODE_ID = 3 in additional terminal.
+- IMSI config should match 5GCN configuration ($imsi)
 
 ```shell
 cd .../openairinterface5g
@@ -228,7 +229,8 @@ cd cmake_targets
 node_id=2
 sudo -E ./ran_build/build/nr-uesoftmodem -O ../ci-scripts/conf_files/episci/proxy_nr-ue.nfapi.conf --nokrnmod 1 \
 --ue-idx-standalone $node_id --nfapi 5 --node-number $node_id --emulate-l1 --nsa \
---log_config.global_log_options level,nocolor,time,thread_id | tee nrue_$node_id.log 2>&1
+--log_config.global_log_options level,nocolor,time,thread_id | tee nrue_$node_id.log 2>&1 \
+--uicc0.imsi $imsi
 ```
 
 ### 5. Open a terminal and launch UE ###
