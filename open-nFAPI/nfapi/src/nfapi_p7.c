@@ -3053,7 +3053,7 @@ static uint8_t pack_nr_rx_data_indication(void *msg, uint8_t **ppWritePackedMsg,
 
 	for (int i = 0; i < pNfapiMsg->number_of_pdus; i++)
 	{
-		if(!pack_nr_rx_data_indication_body(&(pNfapiMsg->pdu_list[i]), ppWritePackedMsg, end))	
+		if(!pack_nr_rx_data_indication_body(&(pNfapiMsg->pdu_list[i]), ppWritePackedMsg, end))
 		        return 0;
 	}
 
@@ -3402,6 +3402,7 @@ int nfapi_nr_p7_message_pack(void *pMessageBuf, void *pPackedBuf, uint32_t packe
 
 		case NFAPI_NR_PHY_MSG_TYPE_SLOT_INDICATION:
 			result = pack_nr_slot_indication(pMessageHeader, &pWritePackedMessage, end, config);
+			break;
 
 		case NFAPI_NR_PHY_MSG_TYPE_RX_DATA_INDICATION:
 			result = pack_nr_rx_data_indication(pMessageHeader, &pWritePackedMessage, end, config);
