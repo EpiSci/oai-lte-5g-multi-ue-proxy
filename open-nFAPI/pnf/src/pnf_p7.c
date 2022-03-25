@@ -1591,8 +1591,9 @@ void pnf_handle_dl_tti_request(void* pRecvMsg, int recvMsgLen, pnf_p7_t* pnf_p7)
 	else
 	{
 		NFAPI_TRACE(NFAPI_TRACE_ERROR, "Failed to unpack dl_tti_req");
-		deallocate_nfapi_dl_tti_request(req, pnf_p7);
 	}
+
+	deallocate_nfapi_dl_tti_request(req, pnf_p7);
 }
 
 void pnf_handle_dl_config_request(void* pRecvMsg, int recvMsgLen, pnf_p7_t* pnf_p7)
@@ -1998,8 +1999,10 @@ void pnf_handle_tx_data_request(void* pRecvMsg, int recvMsgLen, pnf_p7_t* pnf_p7
 	}
 	else
 	{
-		deallocate_nfapi_tx_data_request(req, pnf_p7);
+		NFAPI_TRACE(NFAPI_TRACE_ERROR, "Failed to unpack tx_data_req");
 	}
+
+	deallocate_nfapi_tx_data_request(req, pnf_p7);
 }
 
 void pnf_handle_tx_request(void* pRecvMsg, int recvMsgLen, pnf_p7_t* pnf_p7)
