@@ -218,8 +218,6 @@ class Scenario:
     def launch_enb(self) -> Popen:
         procs = {}
         for num, hostname in self.enb_hostname.items():
-            #if len(self.enb_hostname) == 1:
-            #    num, hostname = None, 'eNB'
             log_name = '{}/{}.log'.format(OPTS.log_dir, hostname)
             LOGGER.info('Launch eNB%d: %s', num, log_name)
             cmd = 'NODE_NUMBER={NODE_ID} {RUN_OAI} enb' \
