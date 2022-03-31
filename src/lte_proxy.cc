@@ -5,23 +5,44 @@
 
 namespace
 {
-    Multi_UE_Proxy *instances[MAX_ENB];
+    Multi_UE_Proxy *instance;
 }
 
-Multi_UE_Proxy::Multi_UE_Proxy(int pnf_id, int num_of_ues, std::string enb_ip, std::string proxy_ip, std::string ue_ip)
+Multi_UE_Proxy::Multi_UE_Proxy(int num_of_ues, std::vector<std::string> enb_ips, std::string proxy_ip, std::string ue_ip)
 {
-    assert(instances[pnf_id] == NULL);
-    instances[pnf_id] = this;
+    assert(instance == NULL);
+    instance = this;
+    taget_eNB_id = 0;
 
+    num_ues = num_of_ues ;
+    int num_of_enbs = enb_ips.size();
+
+    for (int i = 0; i < num_of_enbs; i++)
+    {
+        lte_pnfs.push_back(Multi_UE_PNF(i, num_of_ues, enb_ips[i], proxy_ip));
+    }
+    configure(ue_ip);
+}
+
+Multi_UE_PNF::Multi_UE_PNF(int pnf_id, int num_of_ues, std::string enb_ip, std::string proxy_ip)
+{
     num_ues = num_of_ues ;
     id = pnf_id;
 
-    configure(enb_ip, proxy_ip, ue_ip);
+    configure(enb_ip, proxy_ip);
 
     oai_subframe_init(pnf_id);
 }
 
-void Multi_UE_Proxy::start(softmodem_mode_t softmodem_mode)
+void Multi_UE_PNF::configure(std::string enb_ip, std::string proxy_ip)
+{
+    vnf_ipaddr = enb_ip;
+    pnf_ipaddr = proxy_ip;
+    std::cout<<"VNF is on IP Address "<<vnf_ipaddr<<std::endl;
+    std::cout<<"PNF is on IP Address "<<pnf_ipaddr<<std::endl;
+}
+
+void Multi_UE_PNF::start(softmodem_mode_t softmodem_mode)
 {
     pthread_t thread;
     vnf_p5port = 50001 + id * enb_port_delta;
@@ -35,6 +56,17 @@ void Multi_UE_Proxy::start(softmodem_mode_t softmodem_mode)
     if (pthread_create(&thread, NULL, &oai_subframe_task, (void *)&args) != 0)
     {
         NFAPI_TRACE(NFAPI_TRACE_ERROR, "pthread_create failed for calling oai_subframe_task");
+    }
+}
+
+void Multi_UE_Proxy::start(softmodem_mode_t softmodem_mode)
+{
+    int num_lte_pnfs = lte_pnfs.size();
+
+    for (int i = 0; i < num_lte_pnfs; i++)
+    {
+        lte_pnfs[i].start(softmodem_mode);
+        sleep(1);
     }
 
     for (int i = 0; i < num_ues; i++)
@@ -50,19 +82,15 @@ void Multi_UE_Proxy::start(softmodem_mode_t softmodem_mode)
     }
 }
 
-void Multi_UE_Proxy::configure(std::string enb_ip, std::string proxy_ip, std::string ue_ip)
+void Multi_UE_Proxy::configure(std::string ue_ip)
 {
     oai_ue_ipaddr = ue_ip;
-    vnf_ipaddr = enb_ip;
-    pnf_ipaddr = proxy_ip;
-    std::cout<<"VNF is on IP Address "<<vnf_ipaddr<<std::endl;
-    std::cout<<"PNF is on IP Address "<<pnf_ipaddr<<std::endl;
     std::cout<<"OAI-UE is on IP Address "<<oai_ue_ipaddr<<std::endl;
 
     for (int ue_idx = 0; ue_idx < num_ues; ue_idx++)
     {
-        int oai_rx_ue_port = 3211 + id * enb_port_delta + ue_idx * port_delta;
-        int oai_tx_ue_port = 3212 + id * enb_port_delta + ue_idx * port_delta;
+        int oai_rx_ue_port = 3211 + ue_idx * port_delta;
+        int oai_tx_ue_port = 3212 + ue_idx * port_delta;
         init_oai_socket(oai_ue_ipaddr.c_str(), oai_tx_ue_port, oai_rx_ue_port, ue_idx);
     }
 }
@@ -136,7 +164,6 @@ void Multi_UE_Proxy::receive_message_from_ue(int ue_idx)
         {
             //NFAPI_TRACE(NFAPI_TRACE_INFO , "Dummy frame");
             continue;
-
         }
         else
         {
@@ -150,7 +177,7 @@ void Multi_UE_Proxy::receive_message_from_ue(int ue_idx)
             NFAPI_TRACE(NFAPI_TRACE_INFO , "(Proxy) Proxy has received %d uplink message from OAI UE at socket. Frame: %d, Subframe: %d",
                     header.message_id, NFAPI_SFNSF2SFN(sfn_sf), NFAPI_SFNSF2SF(sfn_sf));
         }
-        oai_subframe_handle_msg_from_ue(id, buffer, buflen, ue_idx + 2);
+        oai_subframe_handle_msg_from_ue(taget_eNB_id, buffer, buflen, ue_idx + 2);
     }
 }
 
@@ -183,7 +210,7 @@ void Multi_UE_Proxy::oai_enb_downlink_nfapi_task(int id, void *msg_org)
 
     for(int ue_idx = 0; ue_idx < num_ues; ue_idx++)
     {
-        address_tx_.sin_port = htons(3212 + id * enb_port_delta + ue_idx * port_delta);
+        address_tx_.sin_port = htons(3212 + ue_idx * port_delta);
         uint16_t id_=1;
         switch (msg.header.message_id)
         {
@@ -203,7 +230,7 @@ void Multi_UE_Proxy::oai_enb_downlink_nfapi_task(int id, void *msg_org)
             }
             else
             {
-                NFAPI_TRACE(NFAPI_TRACE_INFO , "DL_CONFIG_REQ forwarded to UE from UE NEM: %u", id_);
+                NFAPI_TRACE(NFAPI_TRACE_INFO , "DL_CONFIG_REQ forwarded to UE from UE NEM: %u of cell id %d", id_, id);
             }
             break;
         }
@@ -215,7 +242,7 @@ void Multi_UE_Proxy::oai_enb_downlink_nfapi_task(int id, void *msg_org)
             }
             else
             {
-                NFAPI_TRACE(NFAPI_TRACE_INFO , "TX_REQ forwarded to UE from UE NEM: %u", id_);
+                NFAPI_TRACE(NFAPI_TRACE_INFO , "TX_REQ forwarded to UE from UE NEM: %u of cell id %d", id_, id);
             }
             break;
 
@@ -227,7 +254,7 @@ void Multi_UE_Proxy::oai_enb_downlink_nfapi_task(int id, void *msg_org)
             }
             else
             {
-                NFAPI_TRACE(NFAPI_TRACE_INFO , "UL_CONFIG_REQ forwarded to UE from UE NEM: %u", id_);
+                NFAPI_TRACE(NFAPI_TRACE_INFO , "UL_CONFIG_REQ forwarded to UE from UE NEM: %u of cell id %d", id_, id);
             }
             break;
 
@@ -239,7 +266,7 @@ void Multi_UE_Proxy::oai_enb_downlink_nfapi_task(int id, void *msg_org)
             }
             else
             {
-                NFAPI_TRACE(NFAPI_TRACE_INFO , "NFAPI_HI_DCI0_REQ forwarded to UE from UE NEM: %u", id_);
+                NFAPI_TRACE(NFAPI_TRACE_INFO , "NFAPI_HI_DCI0_REQ forwarded to UE from UE NEM: %u of cell id %d", id_, id);
             }
             break;
 
@@ -254,24 +281,28 @@ void Multi_UE_Proxy::pack_and_send_downlink_sfn_sf_msg(int id, uint16_t sfn_sf)
 {
     lock_guard_t lock(mutex);
 
+    sfn_sf_info_t sfn_sf_info;
+    sfn_sf_info.sfn_sf = sfn_sf;
+    sfn_sf_info.cell_id = id;
+
     for(int ue_idx = 0; ue_idx < num_ues; ue_idx++)
     {
-        address_tx_.sin_port = htons(3212 + id * enb_port_delta + ue_idx * port_delta);
+        address_tx_.sin_port = htons(3212 + ue_idx * port_delta);
         assert(ue_tx_socket[ue_idx] > 2);
-        if (sendto(ue_tx_socket[ue_idx], &sfn_sf, sizeof(sfn_sf), 0, (const struct sockaddr *) &address_tx_, sizeof(address_tx_)) < 0)
+        if (sendto(ue_tx_socket[ue_idx], &sfn_sf_info, sizeof(sfn_sf_info), 0, (const struct sockaddr *) &address_tx_, sizeof(address_tx_)) < 0)
         {
             int sfn = NFAPI_SFNSF2SFN(sfn_sf);
             int sf = NFAPI_SFNSF2SF(sfn_sf);
-            NFAPI_TRACE(NFAPI_TRACE_DEBUG, "Send sfn_sf_tx to OAI UE FAIL Frame: %d,Subframe: %d", sfn, sf);
+            NFAPI_TRACE(NFAPI_TRACE_DEBUG, "Send sfn_sf_tx to OAI UE FAIL Frame: %d,Subframe: %d from cell id %d\n", sfn, sf, id);
         }
     }
 }
 
 void transfer_downstream_nfapi_msg_to_proxy(int id, void *msg)
 {
-    instances[id]->oai_enb_downlink_nfapi_task(id, msg);
+    instance->oai_enb_downlink_nfapi_task(id, msg);
 }
 void transfer_downstream_sfn_sf_to_proxy(int id, uint16_t sfn_sf)
 {
-    instances[id]->pack_and_send_downlink_sfn_sf_msg(id, sfn_sf);
+    instance->pack_and_send_downlink_sfn_sf_msg(id, sfn_sf);
 }

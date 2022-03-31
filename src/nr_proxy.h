@@ -46,7 +46,6 @@ private:
     int vnf_p7port = -1;
     int pnf_p7port = -1;
 
-    std::uint16_t u16SequenceNumber_ = 0;
     struct sockaddr_in address_tx_;
     struct sockaddr_in address_rx_;
     int ue_tx_socket_ = -1;

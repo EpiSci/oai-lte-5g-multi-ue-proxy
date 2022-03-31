@@ -164,21 +164,14 @@ int main(int argc, char *argv[])
     case SOFTMODEM_LTE:
         {
             // Should pass multiple ip addresses by using vector or array.
-            Multi_UE_Proxy lte_proxy(0, ues, enb_ipaddrs[0], proxy_ipaddr, ue_ipaddr);
+            Multi_UE_Proxy lte_proxy(ues, enb_ipaddrs, proxy_ipaddr, ue_ipaddr);
             lte_proxy.start(softmodem_mode);
         }
         break;
     case SOFTMODEM_LTE_HANDOVER:
         {
-            Multi_UE_Proxy lte_source_proxy(0, ues, enb_ipaddrs[0], proxy_ipaddr, ue_ipaddr);
-            Multi_UE_Proxy lte_target_proxy(1, ues, enb_ipaddrs[1], proxy_ipaddr, ue_ipaddr);
-
-            std::thread lte_source_th( &Multi_UE_Proxy::start, &lte_source_proxy, softmodem_mode);
-            sleep(1);
-            std::thread lte_target_th( &Multi_UE_Proxy::start, &lte_target_proxy, softmodem_mode);
-
-            lte_source_th.join();
-            lte_target_th.join();
+            Multi_UE_Proxy lte_proxy(ues, enb_ipaddrs, proxy_ipaddr, ue_ipaddr);
+            lte_proxy.start(softmodem_mode);
         }
         break;
     case SOFTMODEM_NR:
@@ -189,7 +182,7 @@ int main(int argc, char *argv[])
         break;
     case SOFTMODEM_NSA:
         {
-            Multi_UE_Proxy lte_proxy(0, ues, enb_ipaddrs[0], proxy_ipaddr, ue_ipaddr);
+            Multi_UE_Proxy lte_proxy(ues, enb_ipaddrs, proxy_ipaddr, ue_ipaddr);
             Multi_UE_NR_Proxy nr_proxy(ues, gnb_ipaddr, proxy_ipaddr, ue_ipaddr);
 
             std::thread lte_th( &Multi_UE_Proxy::start, &lte_proxy, softmodem_mode);
