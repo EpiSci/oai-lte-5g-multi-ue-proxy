@@ -243,12 +243,12 @@ void *oai_slot_task(void *context);
 void oai_subframe_init(int enb_id);
 void oai_slot_init();
 void oai_subframe_flush_msgs_from_ue();
-void oai_subframe_handle_msg_from_ue(int enb_id, const void *msg, size_t len, uint16_t nem_id);
+void oai_subframe_handle_msg_from_ue(uint16_t enb_id, const void *msg, size_t len, uint16_t nem_id);
 void oai_slot_handle_msg_from_ue(const void *msg, size_t len, uint16_t nem_id);
 
-void transfer_downstream_nfapi_msg_to_proxy(int id, void *msg);
+void transfer_downstream_nfapi_msg_to_proxy(uint16_t id, void *msg);
 void transfer_downstream_nfapi_msg_to_nr_proxy(void *msg);
-void transfer_downstream_sfn_sf_to_proxy(int id, uint16_t sfn_sf);
+void transfer_downstream_sfn_sf_to_proxy(uint16_t id, uint16_t sfn_sf);
 void transfer_downstream_sfn_slot_to_proxy(uint16_t sfn_slot);
 
 uint16_t sfn_sf_add(uint16_t a, uint16_t add_val);

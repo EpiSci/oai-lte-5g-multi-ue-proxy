@@ -174,8 +174,9 @@ void Multi_UE_Proxy::receive_message_from_ue(int ue_idx)
                 return ;
             }
             uint16_t sfn_sf = nfapi_get_sfnsf(buffer, buflen);
-            NFAPI_TRACE(NFAPI_TRACE_INFO , "(Proxy) Proxy has received %d uplink message from OAI UE at socket. Frame: %d, Subframe: %d",
-                    header.message_id, NFAPI_SFNSF2SFN(sfn_sf), NFAPI_SFNSF2SF(sfn_sf));
+            taget_eNB_id = header.phy_id;
+            NFAPI_TRACE(NFAPI_TRACE_INFO , "(Proxy) Proxy has received %d uplink message from OAI UE for eNB%u at socket. Frame: %d, Subframe: %d",
+                    header.message_id, taget_eNB_id, NFAPI_SFNSF2SFN(sfn_sf), NFAPI_SFNSF2SF(sfn_sf));
         }
         oai_subframe_handle_msg_from_ue(taget_eNB_id, buffer, buflen, ue_idx + 2);
     }
@@ -277,13 +278,13 @@ void Multi_UE_Proxy::oai_enb_downlink_nfapi_task(int id, void *msg_org)
     }
 }
 
-void Multi_UE_Proxy::pack_and_send_downlink_sfn_sf_msg(int id, uint16_t sfn_sf)
+void Multi_UE_Proxy::pack_and_send_downlink_sfn_sf_msg(uint16_t id, uint16_t sfn_sf)
 {
     lock_guard_t lock(mutex);
 
     sfn_sf_info_t sfn_sf_info;
+    sfn_sf_info.phy_id = id;
     sfn_sf_info.sfn_sf = sfn_sf;
-    sfn_sf_info.cell_id = id;
 
     for(int ue_idx = 0; ue_idx < num_ues; ue_idx++)
     {
@@ -298,11 +299,11 @@ void Multi_UE_Proxy::pack_and_send_downlink_sfn_sf_msg(int id, uint16_t sfn_sf)
     }
 }
 
-void transfer_downstream_nfapi_msg_to_proxy(int id, void *msg)
+void transfer_downstream_nfapi_msg_to_proxy(uint16_t id, void *msg)
 {
     instance->oai_enb_downlink_nfapi_task(id, msg);
 }
-void transfer_downstream_sfn_sf_to_proxy(int id, uint16_t sfn_sf)
+void transfer_downstream_sfn_sf_to_proxy(uint16_t id, uint16_t sfn_sf)
 {
     instance->pack_and_send_downlink_sfn_sf_msg(id, sfn_sf);
 }

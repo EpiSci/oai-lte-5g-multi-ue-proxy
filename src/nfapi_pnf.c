@@ -4399,7 +4399,7 @@ void *oai_slot_task(void *context)
     }
 }
 
-void oai_subframe_handle_msg_from_ue(int enb_id, const void *msg, size_t len, uint16_t nem_id)
+void oai_subframe_handle_msg_from_ue(uint16_t enb_id, const void *msg, size_t len, uint16_t nem_id)
 {
     if (len == 4) // Dummy packet ignore
     {

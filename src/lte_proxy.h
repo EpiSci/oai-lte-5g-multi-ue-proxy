@@ -50,7 +50,7 @@ public:
     int init_oai_socket(const char *addr, int tx_port, int rx_port, int ue_idx);
     void oai_enb_downlink_nfapi_task(int id, void *msg);
     void testcode_tx_packet_to_UE( int ue_tx_socket_);
-    void pack_and_send_downlink_sfn_sf_msg(int id, uint16_t sfn_sf);
+    void pack_and_send_downlink_sfn_sf_msg(uint16_t id, uint16_t sfn_sf);
     void receive_message_from_ue(int ue_id);
     void send_ue_to_enb_msg(void *buffer, size_t buflen);
     void send_received_msg_to_proxy_queue(void *buffer, size_t buflen);
@@ -58,7 +58,7 @@ public:
     void start(softmodem_mode_t softmodem_mode);
     std::vector<Multi_UE_PNF> lte_pnfs;
 private:
-    int taget_eNB_id; // To identify the destination in uplink
+    uint16_t taget_eNB_id; // To identify the destination in uplink
     std::string oai_ue_ipaddr;
     std::string vnf_ipaddr;
     std::string pnf_ipaddr;
@@ -75,8 +75,8 @@ private:
 
     typedef struct sfn_sf_info_s
     {
+        uint16_t phy_id;
         uint16_t sfn_sf;
-        uint16_t cell_id;
     } sfn_sf_info_t;
 
     std::recursive_mutex mutex;
