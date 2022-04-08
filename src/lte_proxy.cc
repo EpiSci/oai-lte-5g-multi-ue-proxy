@@ -186,6 +186,14 @@ void Multi_UE_Proxy::oai_enb_downlink_nfapi_task(int id, void *msg_org)
 {
     lock_guard_t lock(mutex);
 
+    nfapi_p7_message_header_t *pHeader = (nfapi_p7_message_header_t *)msg_org;
+
+    if (msg_org == NULL) {
+        NFAPI_TRACE(NFAPI_TRACE_ERROR, "P7 Pack supplied pointers are null\n");
+        return;
+    }
+    pHeader->phy_id = id;
+
     char buffer[NFAPI_MAX_PACKED_MESSAGE_SIZE];
     int encoded_size = nfapi_p7_message_pack(msg_org, buffer, sizeof(buffer), nullptr);
     if (encoded_size <= 0)
