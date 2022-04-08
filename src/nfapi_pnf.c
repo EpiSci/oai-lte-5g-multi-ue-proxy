@@ -4488,8 +4488,8 @@ int oai_nfapi_rach_ind(int id, nfapi_rach_indication_t *rach_ind)
 
     rach_ind->header.phy_id = 1; // DJP HACK TODO FIXME - need to pass this around!!!!
 
-    NFAPI_TRACE(NFAPI_TRACE_INFO, "Sent the rach to eNB sf: %u sfn : %u num of preambles: %u",
-               rach_ind->sfn_sf & 0xF, rach_ind->sfn_sf >> 4, rach_ind->rach_indication_body.number_of_preambles);
+    NFAPI_TRACE(NFAPI_TRACE_INFO, "Sent the rach to eNB%d sf: %u sfn : %u num of preambles: %u",
+               id, rach_ind->sfn_sf & 0xF, rach_ind->sfn_sf >> 4, rach_ind->rach_indication_body.number_of_preambles);
 
     return nfapi_pnf_p7_rach_ind(p7_config_g[id], rach_ind);
 }

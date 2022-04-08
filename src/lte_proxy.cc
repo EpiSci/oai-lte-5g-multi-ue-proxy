@@ -12,7 +12,7 @@ Multi_UE_Proxy::Multi_UE_Proxy(int num_of_ues, std::vector<std::string> enb_ips,
 {
     assert(instance == NULL);
     instance = this;
-    taget_eNB_id = 0;
+    eNB_id = 0;
 
     num_ues = num_of_ues ;
     int num_of_enbs = enb_ips.size();
@@ -174,11 +174,11 @@ void Multi_UE_Proxy::receive_message_from_ue(int ue_idx)
                 return ;
             }
             uint16_t sfn_sf = nfapi_get_sfnsf(buffer, buflen);
-            taget_eNB_id = header.phy_id;
+            eNB_id = header.phy_id;
             NFAPI_TRACE(NFAPI_TRACE_INFO , "(Proxy) Proxy has received %d uplink message from OAI UE for eNB%u at socket. Frame: %d, Subframe: %d",
-                    header.message_id, taget_eNB_id, NFAPI_SFNSF2SFN(sfn_sf), NFAPI_SFNSF2SF(sfn_sf));
+                    header.message_id, eNB_id, NFAPI_SFNSF2SFN(sfn_sf), NFAPI_SFNSF2SF(sfn_sf));
         }
-        oai_subframe_handle_msg_from_ue(taget_eNB_id, buffer, buflen, ue_idx + 2);
+        oai_subframe_handle_msg_from_ue(eNB_id, buffer, buflen, ue_idx + 2);
     }
 }
 
@@ -190,6 +190,9 @@ void Multi_UE_Proxy::oai_enb_downlink_nfapi_task(int id, void *msg_org)
 
     if (msg_org == NULL) {
         NFAPI_TRACE(NFAPI_TRACE_ERROR, "P7 Pack supplied pointers are null\n");
+        return;
+    }
+    if (id != eNB_id) {
         return;
     }
     pHeader->phy_id = id;
