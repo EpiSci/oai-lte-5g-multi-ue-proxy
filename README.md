@@ -159,8 +159,6 @@ sudo -E ./ran_build/build/lte-softmodem -O ../ci-scripts/conf_files/episci/proxy
 
 #### 2.a Launch gNB without EPC/5GCN support ####
 
-### 2. Open a terminal and launch gNB ###
-#### 2.a Launch gNB without EPC/5GCN support ####
 ```shell
 cd .../openairinterface5g
 source oaienv
@@ -170,6 +168,7 @@ sudo -E ./ran_build/build/nr-softmodem -O ../ci-scripts/conf_files/episci/proxy_
 ```
 
 #### 2.b Launch gNB with EPC/5GCN support ####
+
 ```shell
 cd .../openairinterface5g
 source oaienv
@@ -181,6 +180,7 @@ sudo -E ./ran_build/build/nr-softmodem -O ../ci-scripts/conf_files/episci/proxy_
 ### 3. Open a terminal and launch proxy ###
 
 ### 3. Open a terminal and launch proxy ###
+
 NUMBER_OF_UES is the total number of UEs.
 
 ```shell
@@ -212,9 +212,6 @@ sudo -E ./ran_build/build/nr-uesoftmodem -O ../ci-scripts/conf_files/episci/prox
 --noS1 --nfapi 5 --node-number $node_id --emulate-l1 --nsa \
 --log_config.global_log_options level,nocolor,time,thread_id | tee nrue_$node_id.log 2>&1
 ```
-#### 4.b Launch nrUE with EPC/5GCN support ####
-- nrUE NODE_ID starts from 2 from the first nrUE. If you run one more nrUE, the
-- next NODE_ID = 3 in additional terminal.
 
 #### 4.b Launch nrUE with EPC/5GCN support ####
 
@@ -250,6 +247,7 @@ sudo -E ./ran_build/build/lte-uesoftmodem -O ../ci-scripts/conf_files/episci/pro
 ```
 
 #### 5.b Launch UE with EPC support ####
+
 - The UE node_id starts at 2.
 
 ```shell
