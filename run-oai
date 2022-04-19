@@ -150,4 +150,4 @@ export GMON_OUT_PREFIX=gmon-$NODE_NUMBER.out
 ulimit -c unlimited
 
 set -x
-sudo -E LD_LIBRARY_PATH=$PWD/ran_build/build:$LD_LIBRARY_PATH "${cmd[@]}" "$@"
+sudo -E "LD_LIBRARY_PATH=$PWD/ran_build/build:$LD_LIBRARY_PATH" "${cmd[@]}" "$@"
