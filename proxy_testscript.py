@@ -602,6 +602,11 @@ def analyze_enb_logs(scenario: Scenario) -> bool:
                 found.add('rrc reconf complete to gnb')
                 continue
 
+            # 1612992.160273 00006d7a [RRC] I [eNB 0] Frame  0 : Logical Channel UL-DCCH, Received LTE_RRCConnectionReconfigurationComplete from UE rnti bfd1, reconfiguring DRB 1/LCID 3
+            if '[RRC] A Received HO LTE_RRCConnectionReconfigurationComplete' in line:
+                found.add('ho_msg3')
+                continue
+
         LOGGER.debug('found: %r', found)
 
         num_ues = len(scenario.ue_hostname)
