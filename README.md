@@ -105,11 +105,6 @@ make
 ```shell
 ./proxy_testscript.py --num-ues 1 --mode=nr
 ```
-## Run ANY mode with EPC/5GCN support via the proxy_testscript.py (Recommended) ##
-
-```shell
-./proxy_testscript.py --num-ues 1 --mode=[INSERT MODE FLAG HERE] --EPC
-```
 
 See `./proxy_testscript.py --help` for more information.
 
