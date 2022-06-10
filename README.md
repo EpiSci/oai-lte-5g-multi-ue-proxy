@@ -61,6 +61,7 @@ sudo insmod /lib/modules/$(uname -r)/kernel/net/sctp/sctp.ko
 ```
 
 7. If you plan to use the EPC or 5GCN, be sure to follow the instructions listed in Eurecom's respective repository.
+
 - The EPC is used for both LTE and NSA mode. The 5GCN is used for SA mode.
 - The EPC installation and deployment instructions are found here:
 https://github.com/OPENAIRINTERFACE/openair-epc-fed/blob/master/docs/DEPLOY_HOME_MAGMA_MME.md
@@ -176,8 +177,6 @@ cd cmake_targets
 sudo -E ./ran_build/build/nr-softmodem -O ../ci-scripts/conf_files/episci/proxy_rcc.band78.tm1.106PRB.nfapi.conf \
 --nfapi 2 --nsa --emulate-l1 --log_config.global_log_options level,nocolor,time,thread_id | tee gNB.log 2>&1
 ```
-
-### 3. Open a terminal and launch proxy ###
 
 ### 3. Open a terminal and launch proxy ###
 
