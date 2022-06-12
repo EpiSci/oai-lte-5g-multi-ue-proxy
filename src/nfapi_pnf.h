@@ -238,7 +238,9 @@ void handle_nr_nfapi_ssb_pdu(PHY_VARS_gNB *gNB,int frame,int slot,
                              nfapi_nr_dl_tti_request_pdu_t *dl_tti_pdu);
 
 void *oai_subframe_task(void *context);
+void *oai_subframe_task_vt(void *context);
 void *oai_slot_task(void *context);
+void *oai_slot_task_vt(void *context);
 void oai_subframe_init();
 void oai_slot_init();
 void oai_subframe_flush_msgs_from_ue();

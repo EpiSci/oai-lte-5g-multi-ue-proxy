@@ -900,6 +900,12 @@ int nfapi_pnf_ue_release_resp(nfapi_pnf_p7_config_t* config, nfapi_ue_release_re
 
 int nfapi_pnf_p7_ue_subframe_ind(nfapi_pnf_p7_config_t* config, uint16_t phy_id, uint16_t sfn_sf, uint16_t sfn_sf_sync);
 
+/*! Send a cell search indication message
+ * \param config A pointer to a PNF P7 config
+ * \param ind A pointer to the cell search indication message structure
+ * \return 0 means success, -1 means failure
+ */
+int nfapi_pnf_p7_cell_search_ind(nfapi_pnf_p7_config_t* config, vendor_nfapi_cell_search_indication_t* ind);
 #if defined(__cplusplus)
 }
 #endif

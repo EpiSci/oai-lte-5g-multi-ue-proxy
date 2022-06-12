@@ -262,6 +262,18 @@ void Multi_UE_NR_Proxy::oai_gnb_downlink_nfapi_task(void *msg_org)
                 NFAPI_TRACE(NFAPI_TRACE_INFO , "NFAPI_NR_PHY_MSG_TYPE_UL_DCI_REQUEST forwarded from Proxy to UE");
             }
             break;
+        case P7_CELL_SEARCH_IND:
+            assert(ue_tx_socket[ue_idx] > 2);
+            if (sendto(ue_tx_socket[ue_idx], buffer, encoded_size, 0, (const struct sockaddr *) &address_tx_, sizeof(address_tx_)) < 0)
+            {
+                NFAPI_TRACE(NFAPI_TRACE_ERROR, "Send P7_CELL_SRCH_IND to OAI UE failed");
+            }
+            else
+            {
+                NFAPI_TRACE(NFAPI_TRACE_INFO , "P7_CELL_SRCH_IND forwarded from Proxy to UE ");
+            }
+            break;
+
 
         default:
             NFAPI_TRACE(NFAPI_TRACE_INFO , "Unhandled message at Proxy message_id: %u", msg.header.message_id);

@@ -243,6 +243,16 @@ nfapi_hi_dci0_request_t* allocate_nfapi_hi_dci0_request(pnf_p7_t* pnf_p7)
 	return pnf_p7_malloc(pnf_p7, sizeof(nfapi_hi_dci0_request_t));
 }
 
+vendor_nfapi_cell_search_indication_t* allocate_nfapi_cell_search_ind (pnf_p7_t* pnf_p7)
+{
+	return pnf_p7_malloc(pnf_p7, sizeof(vendor_nfapi_cell_search_indication_t));
+}
+
+void deallocate_nfapi_cell_search_ind (vendor_nfapi_cell_search_indication_t* ind, pnf_p7_t* pnf_p7)
+{
+         pnf_p7_free(pnf_p7, ind);
+}
+
 void deallocate_nfapi_ul_dci_request(nfapi_nr_ul_dci_request_t* req, pnf_p7_t* pnf_p7) 
 { 
   //printf("%s() SFN/SF:%d %s req:%p pdu_list:%p\n", __FUNCTION__, NFAPI_SFNSF2DEC(req->sfn_sf), pnf_p7->_public.codec_config.deallocate ? "DEALLOCATE" : "FREE", req, req->hi_dci0_request_body.hi_dci0_pdu_list);
@@ -646,9 +656,18 @@ int pnf_p7_pack_and_send_p7_message(pnf_p7_t* pnf_p7, nfapi_p7_message_header_t*
 		{
 			nfapi_p7_update_checksum(pnf_p7->tx_message_buffer, len);
 		}
-
-		// simple case that the message fits in a single segment
-		pnf_p7_send_message(pnf_p7, pnf_p7->tx_message_buffer, len);
+		if (NULL == ss_cfg_g) {
+			// simple case that the message fits in a single segment
+			pnf_p7_send_message(pnf_p7, pnf_p7->tx_message_buffer, len);
+		}
+		else {
+			if (header->message_id == P7_CELL_SEARCH_IND) {
+				/** To re-direct it to UE */
+				pnf_handle_p7_message(pnf_p7->tx_message_buffer, len, pnf_p7, 0);
+			} else {
+				pnf_p7_send_message(pnf_p7, pnf_p7->tx_message_buffer, len);
+			}
+		}
 	}
 
 	pnf_p7->sequence_number++;
@@ -2018,6 +2037,56 @@ void pnf_handle_hi_dci0_request(void* pRecvMsg, int recvMsgLen, pnf_p7_t* pnf_p7
 	}
 }
 
+
+void pnf_handle_cell_search_ind(void* pRecvMsg, int recvMsgLen, pnf_p7_t* pnf_p7)
+{
+        vendor_nfapi_cell_search_indication_t* ind = allocate_nfapi_cell_search_ind(pnf_p7);
+
+	if(ind == NULL)
+	{
+		NFAPI_TRACE(NFAPI_TRACE_ERROR, "failed to allocate vendor_nfapi_cell_search_indication_t structure\n");
+		return;
+	}
+
+	int unpack_result = nfapi_p7_message_unpack(pRecvMsg, recvMsgLen, ind, 
+                            sizeof(vendor_nfapi_cell_search_indication_t), &pnf_p7->_public.codec_config);
+
+	if(unpack_result == 0)
+	{
+		if(pthread_mutex_lock(&(pnf_p7->mutex)) != 0)
+		{
+			NFAPI_TRACE(NFAPI_TRACE_ERROR, "failed to lock mutex\n");
+			printf("failed to lock mutex: %d\n", errno);
+			return;
+		}
+
+			switch (ss_cfg_g->softmodem_mode)
+			{
+				case SOFTMODEM_LTE:
+					transfer_downstream_nfapi_msg_to_proxy((void *)ind);
+					break;
+				case SOFTMODEM_NR:
+					transfer_downstream_nfapi_msg_to_nr_proxy((void *)ind);
+					break;
+				default:
+					printf("Invalid Modem Type %d\n", ss_cfg_g->softmodem_mode);
+					exit(0);
+			}
+
+		if(pthread_mutex_unlock(&(pnf_p7->mutex)) != 0)
+		{
+			NFAPI_TRACE(NFAPI_TRACE_ERROR, "failed to unlock mutex\n");
+			return;
+		}
+	}
+	else
+	{
+		NFAPI_TRACE(NFAPI_TRACE_ERROR, "Failed to unpack nfapi_cell_search_indication_t\n");
+		deallocate_nfapi_cell_search_ind(ind, pnf_p7);
+	}
+}
+
+
 void pnf_handle_tx_data_request(void* pRecvMsg, int recvMsgLen, pnf_p7_t* pnf_p7)
 {
 	//NFAPI_TRACE(NFAPI_TRACE_INFO, "TX.req Received\n");
@@ -2514,9 +2583,17 @@ void pnf_dispatch_p7_message(void *pRecvMsg, int recvMsgLen, pnf_p7_t* pnf_p7,  
 		default:
 			{
 				if(header.message_id >= NFAPI_VENDOR_EXT_MSG_MIN &&
-				   header.message_id <= NFAPI_VENDOR_EXT_MSG_MAX)
+						header.message_id <= NFAPI_VENDOR_EXT_MSG_MAX)
 				{
-					pnf_handle_p7_vendor_extension(pRecvMsg, recvMsgLen, pnf_p7, header.message_id);
+					if ( header.message_id == P7_CELL_SEARCH_IND )
+					{
+						pnf_handle_cell_search_ind(pRecvMsg, recvMsgLen, pnf_p7);
+						break;
+					}
+					else
+					{
+						pnf_handle_p7_vendor_extension(pRecvMsg, recvMsgLen, pnf_p7, header.message_id);
+					}
 				}
 				else
 				{

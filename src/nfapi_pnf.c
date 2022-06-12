@@ -131,6 +131,35 @@ void pnf_set_thread_priority(int priority) {
 }
 */
 
+void send_cell_info_ind (nfapi_pnf_p7_config_t *config, /** Unused */ uint8_t attn)
+{
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    vendor_nfapi_cell_search_indication_t ind;
+    memset(&ind, 0, sizeof(ind));
+    ind.header.message_id = P7_CELL_SEARCH_IND;
+    ind.header.phy_id = config->phy_id;
+    ind.error_code = NFAPI_MSG_OK;
+    ind.lte_cell_search_indication.tl.tag = NFAPI_LTE_CELL_SEARCH_INDICATION_TAG;
+    ind.lte_cell_search_indication.number_of_lte_cells_found = 1;
+    
+    /** TODO: PCI will be modified once cell config is ported */
+    ind.lte_cell_search_indication.lte_found_cells[0].pci = 0;
+
+    if (NULL == ss_cfg_g) {
+        NFAPI_TRACE(NFAPI_TRACE_ERROR, "SS Proxy config is NULL.\n");
+        return; /** NOTE: This would never happen */
+    }
+    ind.lte_cell_search_indication.lte_found_cells[0].rsrp = ss_cfg_g->cfg.cli_rsrp_g; 
+    ind.lte_cell_search_indication.lte_found_cells[0].rsrq = ss_cfg_g->cfg.cli_rsrq_g; 
+    ind.lte_cell_search_indication.lte_found_cells[0].frequency_offset = 300 /*ss_cfg_g->dl_earfcn*/;
+    NFAPI_TRACE(NFAPI_TRACE_DEBUG, "Sending cell SEARCH for cell %d: earfcn: %d rsrp: %d rsrq: %d noc: %d Noc-activation:%d\n", 
+        0, 300, ss_cfg_g->cfg.cli_rsrp_g, ss_cfg_g->cfg.cli_rsrq_g, ss_cfg_g->NocLevel, ss_cfg_g->Noc_activated);
+    
+    if (0 > nfapi_pnf_p7_cell_search_ind(config, &ind))
+        NFAPI_TRACE(NFAPI_TRACE_ERROR, "Failed to send cell_info\n");
+}
+
 void *pnf_p7_thread_start(void *ptr)
 {
     NFAPI_TRACE(NFAPI_TRACE_INFO, "[PNF] P7 THREAD %s\n", __FUNCTION__);
@@ -4620,6 +4649,22 @@ void *oai_subframe_task_vt(void *context)
                 errExit("failed to unlock mutex");
         }
 
+       /* Sending the cell info every 20th SFN,
+        * TODO: This shall be agreed and made configurable */       
+	if (NULL != p7_config_g) {
+	    if ((next_sfn_sf_dec == current_sfn_sf_dec) || ss_cfg_g->Noc_updated )
+		{
+		    if (ss_cfg_g->cfg_bitmap & PROXY_CELL_CONFIG || 1 /** Till cell config is ported */) {
+			send_cell_info_ind(p7_config_g, ss_cfg_g->currentAttnVal);
+			NFAPI_TRACE(NFAPI_TRACE_DEBUG, "Sending cell info to UE: sfn: %d sf: %d\n", 
+							sfn_sf_tx >> 4, sfn_sf_tx & 0xF);
+		    }
+
+		    next_sfn_sf_dec = (current_sfn_sf_dec + ss_cfg_g->cfg.cli_periodicity_g) % NFAPI_MAX_SFNSFDEC;
+		    if (ss_cfg_g->Noc_updated) ss_cfg_g->Noc_updated = 0; 
+		}
+
+	}
 
         uint64_t aggregation_done = clock_usec();
 
@@ -4784,6 +4829,19 @@ void *oai_slot_task_vt(void *context)
 
             slot_tick = 0;
         }
+	/* Sending Cell Search Indication to OAI UE */
+	if (NULL != p7_nr_config_g) {
+	    if (!(current_sfn_sl_dec % ss_cfg_g->cfg.cli_periodicity_g) || ss_cfg_g->Noc_updated )
+		{
+		    if (ss_cfg_g->cfg_bitmap & PROXY_CELL_CONFIG || 1 /** Till cell config is ported */) {
+			send_cell_info_ind(p7_nr_config_g, ss_cfg_g->currentAttnVal);
+
+			NFAPI_TRACE(NFAPI_TRACE_DEBUG, "Sending cell info to UE: sfn: %d sf: %d\n", 
+							sfn_slot_tx >> 6, sfn_slot_tx & 0x3F);
+		    }
+		    if (ss_cfg_g->Noc_updated) ss_cfg_g->Noc_updated = 0; 
+		}
+	}
 
         uint64_t aggregation_done = clock_usec();
 
