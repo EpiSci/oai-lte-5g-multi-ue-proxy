@@ -34,6 +34,8 @@ extern "C" {
 #  warning assert is disabled
 #endif
 
+#include "nfapi_pnf_interface.h"
+#include "proxy_ss_interface.h"
 /*
 #include "common/ran_context.h"
 #include "openair2/PHY_INTERFACE/phy_stub_UE.h"
@@ -74,6 +76,11 @@ static pnf_info pnf;
 static pnf_info pnf_nr;
 static pthread_t pnf_start_pthread;
 static pthread_t pnf_nr_start_pthread;
+
+extern proxy_ss_cfg_p ss_cfg_g;
+
+static uint16_t sfn_slot_counter(uint16_t *sfn, uint16_t *slot);
+static uint16_t sfn_sf_counter(uint16_t *sfn, uint16_t *sf);
 
 void *pnf_allocate(size_t size)
 {
@@ -2494,6 +2501,7 @@ static bool get_sfnsf(message_buffer_t *msg, uint16_t *sfnsf)
     case NFAPI_RX_CQI_INDICATION:
     case NFAPI_HARQ_INDICATION:
     case NFAPI_RX_SR_INDICATION:
+    case NFAPI_SUBFRAME_INDICATION:
         break;
     default:
         NFAPI_TRACE(NFAPI_TRACE_ERROR, "Message_id is unknown %u", message_id);
@@ -2531,6 +2539,7 @@ static bool get_sfnslot(message_buffer_t *msg, uint16_t *sfnslot)
     case NFAPI_NR_PHY_MSG_TYPE_RX_DATA_INDICATION:
     case NFAPI_NR_PHY_MSG_TYPE_UCI_INDICATION:
     case NFAPI_NR_PHY_MSG_TYPE_SRS_INDICATION:
+    case NFAPI_NR_PHY_MSG_TYPE_SLOT_INDICATION:
         break;
     default:
         NFAPI_TRACE(NFAPI_TRACE_ERROR, "Message_id is unknown %u", message_id);
@@ -3616,6 +3625,47 @@ static void oai_subframe_aggregate_harq_ind(subframe_msgs_t *msgs)
     nfapi_vendor_extension_tlv_t vendor_extension (typedef nfapi_tl_t*)
 */
 
+int oai_nfapi_ue_subframe_indication(nfapi_subframe_indication_t *ind, uint16_t sfn_sf_sync)
+{
+    ind->header.phy_id = 1; // DJP HACK TODO FIXME - need to pass this around!!!!
+    NFAPI_TRACE(NFAPI_TRACE_DEBUG, "VT (Proxy eNB) inside oai_nfapi_ue_subframe_indication \n");
+    int retval = nfapi_pnf_p7_ue_subframe_ind(p7_config_g, ind->header.phy_id, ind->sfn_sf, sfn_sf_sync);
+    NFAPI_TRACE(NFAPI_TRACE_DEBUG, "VT (Proxy eNB) exit  oai_nfapi_ue_subframe_indication return %d\n", retval);
+    return retval;
+}
+
+static int oai_ue_subframe_ind(subframe_msgs_t *msgs, uint16_t sfn_sf_sync)
+{
+    assert(msgs->num_msgs > 0);
+    nfapi_subframe_indication_t subframe_ind;
+    memset(&subframe_ind, 0, sizeof(subframe_ind));
+
+    for (size_t n = 0; n < msgs->num_msgs; ++n)
+    {
+	    nfapi_subframe_indication_t ind;
+	    message_buffer_t *msg = msgs->msgs[n];
+	    if (nfapi_p7_message_unpack(msg->data, msg->length, &ind, sizeof(ind), NULL) < 0)
+	    {
+		    printf("subframe indication unpack failed, msg[%zu]", n);
+		    return -1;
+	    }
+	    if (n != 0)
+	    {
+		    warn_if_different(__func__, &subframe_ind.header, &ind.header, subframe_ind.sfn_sf, ind.sfn_sf);
+	    }
+        subframe_ind.header = ind.header;
+        subframe_ind.sfn_sf = ind.sfn_sf;
+        NFAPI_TRACE(NFAPI_TRACE_DEBUG, "UE Subframe indication triggered for VNF SFN_SF: %u \n", ind.sfn_sf);
+   }
+    NFAPI_TRACE(NFAPI_TRACE_DEBUG, "VT (Proxy eNB) inside oai_nfapi_ue_subframe_indication from oai_ue_subframe_ind \n");
+   int retVal = oai_nfapi_ue_subframe_indication(&subframe_ind, sfn_sf_sync);
+   if (retVal == -1)
+   {
+       NFAPI_TRACE(NFAPI_TRACE_ERROR, "VT (Proxy eNB) exit  oai_nfapi_ue_subframe_indication return %d\n", retVal);
+   }
+   return retVal;
+}
+
 static void oai_subframe_aggregate_sr_ind(subframe_msgs_t *msgs)
 {
     assert(msgs->num_msgs > 0);
@@ -3692,6 +3742,30 @@ typedef struct
 
 } nfapi_nr_srs_indication_t;
 */
+static void oai_slot_aggregate_slot_ind(slot_msgs_t *msgs, uint16_t *sfn_slot_proxy, uint8_t *ack_status)
+{
+    assert(msgs->num_msgs > 0);
+    assert(sfn_slot_proxy != NULL);
+    int n = 0;
+    uint16_t sfn  = NFAPI_SFNSLOT2SFN(*sfn_slot_proxy);
+    uint16_t slot = NFAPI_SFNSLOT2SLOT(*sfn_slot_proxy);
+
+    nfapi_nr_slot_indication_scf_t ind;
+    message_buffer_t *msg = msgs->msgs[n];
+    assert(msg->length <= sizeof(msg->data));
+    if (nfapi_nr_p7_message_unpack(msg->data, msg->length, &ind, sizeof(ind), NULL) < 0)
+    {
+        NFAPI_TRACE(NFAPI_TRACE_ERROR, "slot indication unpack failed, msg[%d]", n);
+        return;
+    }
+
+    assert (NFAPI_NR_PHY_MSG_TYPE_SLOT_INDICATION == ind.header.message_id);
+    oai_slot_ind(ind.sfn, ind.slot);
+    *sfn_slot_proxy = sfn_slot_counter(&sfn, &slot);
+    transfer_downstream_sfn_slot_to_proxy(*sfn_slot_proxy);
+    *ack_status = 0; 
+}
+
 
 static void oai_slot_aggregate_srs_ind(slot_msgs_t *msgs)
 {
@@ -3745,11 +3819,15 @@ static void oai_slot_aggregate_srs_ind(slot_msgs_t *msgs)
     free(agg.pdu_list); // Should actually be nfapi_vnf_p7_release_msg
 }
 
-static void oai_subframe_aggregate_message_id(uint16_t msg_id, subframe_msgs_t *msgs)
+static void oai_subframe_aggregate_message_id(uint16_t msg_id, subframe_msgs_t *msgs,uint16_t *sfn_sf_ack, uint8_t *ack_status)
 {
     assert(msgs->num_msgs > 0);
     assert(msgs->msgs[0] != NULL);
     assert(msgs->msgs[0]->length <= sizeof(msgs->msgs[0]->data));
+    uint16_t sfn = 0; 
+    uint16_t sf = 0;
+    static uint16_t sfn_sf_sync = 0;
+    
     uint16_t sfn_sf = nfapi_get_sfnsf(msgs->msgs[0]->data, msgs->msgs[0]->length);
     NFAPI_TRACE(NFAPI_TRACE_INFO, "(Proxy eNB) Aggregating collection of %s uplink messages prior to sending to eNB. Frame: %d, Subframe: %d",
                 nfapi_get_message_id(msgs->msgs[0]->data, msgs->msgs[0]->length), NFAPI_SFNSF2SFN(sfn_sf), NFAPI_SFNSF2SF(sfn_sf));
@@ -3773,6 +3851,20 @@ static void oai_subframe_aggregate_message_id(uint16_t msg_id, subframe_msgs_t *
         break;
     case NFAPI_RX_SR_INDICATION:
         oai_subframe_aggregate_sr_ind(msgs);
+        break;
+    case NFAPI_SUBFRAME_INDICATION:
+        /** TODO: Check for Virtual time or not */
+	if ( *ack_status == 1) sfn_sf_sync = sfn_sf;
+        //Sending to VNF
+        sfn = NFAPI_SFNSF2SFN(sfn_sf_sync);
+        sf = NFAPI_SFNSF2SF(sfn_sf_sync);
+        sfn_sf_sync = sfn_sf_counter(&sfn, &sf);
+        int retVal = oai_ue_subframe_ind(msgs, sfn_sf_sync);
+        if(retVal)
+            *ack_status = 1;
+        else
+            *ack_status = 0;
+	*sfn_sf_ack = sfn_sf_sync;
         break;
     default:
         return;
@@ -3824,7 +3916,7 @@ static void oai_subframe_aggregate_messages(subframe_msgs_t *subframe_msgs)
         {
             break;
         }
-        oai_subframe_aggregate_message_id(found_msg_id, &msgs_by_id);
+        oai_subframe_aggregate_message_id(found_msg_id, &msgs_by_id, NULL, NULL);
 
         for (int k = 0; k < msgs_by_id.num_msgs; k++)
         {
@@ -3835,6 +3927,66 @@ static void oai_subframe_aggregate_messages(subframe_msgs_t *subframe_msgs)
         }
     }
 }
+
+
+/*
+ *   Aggregate messages for virtual time.
+ *   subframe_msgs is a pointer to an array of num_ues
+ */
+static void oai_subframe_aggregate_messages_vt(subframe_msgs_t *subframe_msgs,uint16_t *sfn_sf_ack,uint8_t *ack_status)
+{
+    for (;;)
+    {
+        subframe_msgs_t msgs_by_id;
+        memset(&msgs_by_id, 0, sizeof(msgs_by_id));
+        uint16_t found_msg_id = 0;
+        for (int i = 0; i < num_ues; i++)
+        {
+            for (int j = 0; j < subframe_msgs[i].num_msgs; j++)
+            {
+                message_buffer_t *msg = subframe_msgs[i].msgs[j];
+                if (!msg)
+                {
+                    // already processed this message
+                    continue;
+                }
+                assert(msg->magic == MESSAGE_BUFFER_MAGIC);
+
+                uint16_t id = get_message_id(msg);
+                if (found_msg_id == 0)
+                {
+                    found_msg_id = id;
+                }
+                if (found_msg_id == id)
+                {
+                    subframe_msgs[i].msgs[j] = NULL;
+                    if (msgs_by_id.num_msgs == MAX_SUBFRAME_MSGS)
+                    {
+                        NFAPI_TRACE(NFAPI_TRACE_ERROR, "Too many msgs");
+                        msg->magic = 0;
+                        free(msg);
+                        continue;
+                    }
+                    msgs_by_id.msgs[msgs_by_id.num_msgs++] = msg;
+                }
+            }
+        }
+        if (found_msg_id == 0)
+        {
+            break;
+        }
+        oai_subframe_aggregate_message_id(found_msg_id, &msgs_by_id, sfn_sf_ack, ack_status);
+
+        for (int k = 0; k < msgs_by_id.num_msgs; k++)
+        {
+            message_buffer_t *msg = msgs_by_id.msgs[k];
+            assert(msg->magic == MESSAGE_BUFFER_MAGIC);
+            msg->magic = 0;
+            free(msg);
+        }
+    }
+}
+
 
 int get_sf_delta(uint16_t a, uint16_t b)
 {
@@ -3906,6 +4058,42 @@ static void oai_slot_aggregate_message_id(uint16_t msg_id, slot_msgs_t *msgs)
     }
 }
 
+static void oai_slot_aggregate_message_id_vt(uint16_t msg_id, slot_msgs_t *msgs, uint16_t *sfn_sf_tx, uint8_t *ack_status)
+{
+    assert(msgs->num_msgs > 0);
+    assert(msgs->msgs[0] != NULL);
+    assert(msgs->msgs[0]->length <= sizeof(msgs->msgs[0]->data));
+    uint16_t sfn_slot = nfapi_get_sfnslot(msgs->msgs[0]->data, msgs->msgs[0]->length);
+
+    NFAPI_TRACE(NFAPI_TRACE_INFO, "(Proxy gNB) Aggregating collection of %s uplink messages prior to sending to gNB. Frame: %d, Slot: %d",
+                nfapi_nr_get_message_id(msgs->msgs[0]->data, msgs->msgs[0]->length), NFAPI_SFNSLOT2SFN(sfn_slot), NFAPI_SFNSLOT2SLOT(sfn_slot));
+    // Aggregate these messages and send the resulting message to the gNB
+    switch (msg_id)
+    {
+    case NFAPI_NR_PHY_MSG_TYPE_RACH_INDICATION:
+        oai_slot_aggregate_rach_ind(msgs);//It is using subframe. Need to check further.
+        break;
+    case NFAPI_NR_PHY_MSG_TYPE_CRC_INDICATION:
+        oai_slot_aggregate_crc_ind(msgs);
+        break;
+    case NFAPI_NR_PHY_MSG_TYPE_RX_DATA_INDICATION:
+        oai_slot_aggregate_rx_data_ind(msgs);
+        break;
+    case NFAPI_NR_PHY_MSG_TYPE_UCI_INDICATION:
+        oai_slot_aggregate_uci_ind(msgs);
+        break;
+    case NFAPI_NR_PHY_MSG_TYPE_SRS_INDICATION:
+        oai_slot_aggregate_srs_ind(msgs);
+        break;
+    case NFAPI_NR_PHY_MSG_TYPE_SLOT_INDICATION:
+        oai_slot_aggregate_slot_ind(msgs, sfn_sf_tx, ack_status);
+        break;
+    default:
+        return;
+    }
+}
+
+
 /*
     slot_msgs is a pointer to an array of num_ues
 */
@@ -3964,6 +4152,66 @@ static void oai_slot_aggregate_messages(slot_msgs_t *slot_msgs)
         }
     }
 }
+
+
+/*
+    slot_msgs is a pointer to an array of num_ues
+*/
+static void oai_slot_aggregate_messages_vt(slot_msgs_t *slot_msgs, uint16_t *sfn_slot_tx, uint8_t *ack_status)
+{
+    for (;;)
+    {
+        slot_msgs_t msgs_by_id;
+        memset(&msgs_by_id, 0, sizeof(msgs_by_id));
+        uint16_t found_msg_id = 0;
+        for (int i = 0; i < num_ues; i++)
+        {
+            for (int j = 0; j < slot_msgs[i].num_msgs; j++)
+            {
+                message_buffer_t *msg = slot_msgs[i].msgs[j];
+                if (!msg)
+                {
+                    // already processed this message
+                    continue;
+                }
+                assert(msg->magic == MESSAGE_BUFFER_MAGIC);
+
+                uint16_t id = get_message_id(msg);
+                if (found_msg_id == 0)
+                {
+                    found_msg_id = id;
+                }
+                if (found_msg_id == id)
+                {
+                    slot_msgs[i].msgs[j] = NULL;
+                    if (msgs_by_id.num_msgs == MAX_SLOT_MSGS)
+                    {
+                        NFAPI_TRACE(NFAPI_TRACE_ERROR, "Too many msgs");
+                        msg->magic = 0;
+                        free(msg);
+                        continue;
+                    }
+                    msgs_by_id.msgs[msgs_by_id.num_msgs++] = msg;
+                }
+            }
+        }
+        if (found_msg_id == 0)
+        {
+            break;
+        }
+
+        oai_slot_aggregate_message_id_vt(found_msg_id, &msgs_by_id, sfn_slot_tx, ack_status);
+
+        for (int k = 0; k < msgs_by_id.num_msgs; k++)
+        {
+            message_buffer_t *msg = msgs_by_id.msgs[k];
+            assert(msg->magic == MESSAGE_BUFFER_MAGIC);
+            msg->magic = 0;
+            free(msg);
+        }
+    }
+}
+
 
 // TODO: Expand this function to include checking what the different sfn_sf
 // mismatchs are
@@ -4301,6 +4549,87 @@ void *oai_subframe_task(void *context)
     }
 }
 
+
+void *oai_subframe_task_vt(void *context)
+{
+    pnf_set_thread_priority(79);
+    uint16_t sfn = 0;
+    uint16_t sf = 0;
+    uint16_t sfn_sf_tx = 0;
+    uint8_t ack_status = 1;
+    int first_ack = 0;
+   
+    if (NULL == ss_cfg_g)
+        NFAPI_TRACE(NFAPI_TRACE_ERROR, "SS Configuration is NULL");
+
+    uint32_t next_sfn_sf_dec = ss_cfg_g->cfg.cli_periodicity_g;
+    uint32_t current_sfn_sf_dec;
+
+    NFAPI_TRACE(NFAPI_TRACE_INFO, "Cell update periodicity: %d", next_sfn_sf_dec);
+    bool are_queues_empty = true;
+    softmodem_mode_t softmodem_mode = (softmodem_mode_t) context;
+    NFAPI_TRACE(NFAPI_TRACE_INFO, "Subframe Task thread");
+    while (true)
+    {
+        uint64_t iteration_start = clock_usec();
+        if(ack_status)
+        {
+            sfn_sf_tx = sfn_sf_counter(&sfn, &sf);
+            transfer_downstream_sfn_sf_to_proxy(sfn_sf_tx); // send to oai UE
+	    usleep(900);
+        }
+
+        oai_subframe_ind(sfn_sf_tx >>4, sfn_sf_tx & 0xF);
+
+        /*
+            Dequeue, collect and aggregate the messages with the same message ID.
+        */
+        subframe_msgs_t subframe_msgs[MAX_UES];
+        memset(subframe_msgs, 0, sizeof(subframe_msgs));
+        are_queues_empty = dequeue_ue_msgs(subframe_msgs, sfn_sf_tx);
+        oai_subframe_aggregate_messages_vt(subframe_msgs, &sfn_sf_tx, &ack_status);
+        current_sfn_sf_dec =  NFAPI_SFNSF2DEC(sfn_sf_tx);
+        if ((!ack_status && !first_ack))
+        {
+            next_sfn_sf_dec = current_sfn_sf_dec;
+            first_ack = 1;
+        }
+
+        if (softmodem_mode == SOFTMODEM_NSA)
+        {
+            if (pthread_mutex_lock(&lock) != 0)
+                errExit("failed to lock mutex");
+
+            sf_slot_tick |= LTE_PROXY_DONE;
+            if (sf_slot_tick == BOTH_LTE_NR_DONE)
+            {
+                if (pthread_cond_broadcast(&cond_sf_slot) != 0)
+                    errExit("failed to broadcast on the condition");
+            }
+            else
+            {
+                while ( sf_slot_tick != BOTH_LTE_NR_DONE)
+                {
+                    if (pthread_cond_wait(&cond_sf_slot, &lock) != 0)
+                        errExit("failed to wait on the condition");
+                }
+                sf_slot_tick = 0;
+            }
+
+            if (pthread_mutex_unlock(&lock) != 0)
+                errExit("failed to unlock mutex");
+        }
+
+
+        uint64_t aggregation_done = clock_usec();
+
+        if (are_queues_empty)
+        {
+            add_sleep_time(iteration_start, 0, 0, aggregation_done);
+        }
+    }
+}
+
 void *oai_slot_task(void *context)
 {
     pnf_set_thread_priority(79);
@@ -4378,6 +4707,93 @@ void *oai_slot_task(void *context)
         }
     }
 }
+
+
+void *oai_slot_task_vt(void *context)
+{
+    pnf_set_thread_priority(79);
+    uint16_t sfn = 0;
+    uint16_t slot = 0;
+    bool are_queues_empty = true;
+    softmodem_mode_t softmodem_mode = (softmodem_mode_t) context;
+    NFAPI_TRACE(NFAPI_TRACE_INFO, "Slot Task thread");
+    uint16_t slot_tick = 0;
+    uint16_t sfn_slot_tx = 0;
+    uint8_t ack_status = 1;
+    uint32_t current_sfn_sl_dec = 0;
+
+    while (true)
+    {
+
+        uint64_t iteration_start = clock_usec();
+        /* Previously we would sleep to ensure that the 500us contraint (per slot)
+           was met, although the sleep time was 312us, which is pretty arbitrary.
+           As we push higher throughputs, we see that the PNF (proxy) is
+           ahead of the VNF (OAI gNB). By arbitrarily changing the sleep to be executed
+           before every slot is sent to the OAI UE, and increasing the sleep time to 1000us,
+           the slot indications are not arriving at the OAI NRUE too quickly as they were
+           before. Furthermore, this ensures that even when TX_DATA_REQs take too long to
+           arrive to the OAI UE, that the slot will arrive AFTER the TX_DATA_REQ. The relationship
+           between slot indications and TX_DATA_REQs are critical to the ACK/nACK procedure.
+           This is a temporary fix until will can concretely sync the PNF and VNF. */
+        if(ack_status)
+        {
+            sfn_slot_tx = sfn_slot_counter(&sfn, &slot);
+            transfer_downstream_sfn_slot_to_proxy(sfn_slot_tx); // send to oai UE
+            //usleep(900);
+            sleep(1);
+        }
+        /*
+            Dequeue, collect and aggregate the messages with the same message ID.
+        */
+        slot_msgs_t slot_msgs[MAX_UES];
+        memset(slot_msgs, 0, sizeof(slot_msgs));
+        are_queues_empty = dequeue_ue_slot_msgs(slot_msgs, sfn_slot_tx);
+        oai_slot_aggregate_messages_vt(slot_msgs, &sfn_slot_tx, &ack_status);
+		/* Calculating total number of slots */
+        current_sfn_sl_dec = NFAPI_SFNSLOT2DEC(NFAPI_SFNSLOT2SFN(sfn_slot_tx), NFAPI_SFNSLOT2SLOT(sfn_slot_tx));
+//        if ((!ack_status && !first_ack))
+//        {
+//            next_sfn_slot_dec = current_sfn_sl_dec;
+//            first_ack = 1;
+//        }
+
+
+        if (++slot_tick == NR_PROXY_DONE && softmodem_mode == SOFTMODEM_NSA)
+        {
+            if (pthread_mutex_lock(&lock) != 0)
+                errExit("failed to lock mutex");
+
+            sf_slot_tick |= NR_PROXY_DONE;
+            if (sf_slot_tick == BOTH_LTE_NR_DONE)
+            {
+                if (pthread_cond_broadcast(&cond_sf_slot) != 0)
+                    errExit("failed to broadcast on the condition");
+            }
+            else{
+                while ( sf_slot_tick != BOTH_LTE_NR_DONE)
+                {
+                    if (pthread_cond_wait(&cond_sf_slot, &lock) != 0)
+                        errExit("failed to wait on the condition");
+                }
+                sf_slot_tick = 0;
+            }
+
+            if (pthread_mutex_unlock(&lock)!= 0)
+                errExit("failed to unlock mutex");
+
+            slot_tick = 0;
+        }
+
+        uint64_t aggregation_done = clock_usec();
+
+        if (are_queues_empty)
+        {
+            add_nr_sleep_time(iteration_start, 0, 0, aggregation_done);
+        }
+    }
+}
+
 
 void oai_subframe_handle_msg_from_ue(const void *msg, size_t len, uint16_t nem_id)
 {

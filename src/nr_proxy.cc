@@ -192,6 +192,7 @@ void Multi_UE_NR_Proxy::oai_gnb_downlink_nfapi_task(void *msg_org)
         nfapi_nr_tx_data_request_t tx_data_req;
         nfapi_nr_ul_dci_request_t ul_dci_req;
         nfapi_nr_ul_tti_request_t ul_tti_request;
+        vendor_nfapi_cell_search_indication_t cell_info;
     } msg;
 
     if (nfapi_nr_p7_message_unpack((void *)buffer, encoded_size, &msg, sizeof(msg), NULL) != 0)

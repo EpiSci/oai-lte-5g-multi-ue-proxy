@@ -28,11 +28,14 @@
 #include <stdio.h>
 #include "nfapi_pnf.h"
 #include "pnf_p7.h"
-
+#include "proxy_ss_interface.h"
+#include "proxy.h"
 #define FAPI2_IP_DSCP	0
 
 uint16_t slot_ahead;
 uint16_t sf_ahead=4;
+
+extern proxy_ss_cfg_p ss_cfg_g;
 
 void add_slot(uint16_t *frameP, uint16_t *slotP, int offset)
 {
@@ -741,6 +744,43 @@ int pnf_nr_p7_pack_and_send_p7_message(pnf_p7_t* pnf_p7, nfapi_p7_message_header
 	pnf_p7->sequence_number++;
 	
 	if(pthread_mutex_unlock(&(pnf_p7->pack_mutex)) != 0)
+	{
+		NFAPI_TRACE(NFAPI_TRACE_ERROR, "failed to unlock mutex\n");
+		return -1;
+	}
+
+	return 0;
+}
+
+int pnf_pack_and_send_subframe_ind(pnf_p7_t* pnf_p7, uint16_t sfn_sf)
+{
+        nfapi_subframe_indication_t subframe_ind;
+        memset(&subframe_ind, 0, sizeof(subframe_ind));
+        subframe_ind.header.message_id = NFAPI_SUBFRAME_INDICATION;
+        subframe_ind.header.phy_id = pnf_p7->_public.phy_id;
+
+        subframe_ind.sfn_sf = sfn_sf;
+
+        return pnf_p7_pack_and_send_p7_message(pnf_p7, &(subframe_ind.header), sizeof(subframe_ind));
+}
+
+int pnf_p7_ue_subframe_ind(pnf_p7_t* pnf_p7,uint16_t phy_id,uint16_t sfn_sf, uint16_t sfn_sf_sync)
+{
+	int status;
+	status = pnf_pack_and_send_subframe_ind(pnf_p7, sfn_sf);
+	if (status < 0) {
+		NFAPI_TRACE(NFAPI_TRACE_ERROR, "Failed to send UE Subframe indication\n");
+		return -1;
+	}
+	if(pthread_mutex_lock(&(pnf_p7->mutex)) != 0)
+	{
+		NFAPI_TRACE(NFAPI_TRACE_ERROR, "failed to unlock mutex\n");
+		return -1;
+	}
+
+	transfer_downstream_sfn_sf_to_proxy(sfn_sf_sync);
+
+	if(pthread_mutex_unlock(&(pnf_p7->mutex)) != 0)
 	{
 		NFAPI_TRACE(NFAPI_TRACE_ERROR, "failed to unlock mutex\n");
 		return -1;
