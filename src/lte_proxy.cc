@@ -46,7 +46,7 @@ void Multi_UE_Proxy::start(softmodem_mode_t softmodem_mode)
 
     configure_nfapi_pnf(vnf_ipaddr.c_str(), vnf_p5port, pnf_ipaddr.c_str(), pnf_p7port, vnf_p7port);
 
-    if (ss_cfg_g->cfg.vt_enabled) {
+    if (NULL != ss_cfg_g && ss_cfg_g->cfg.vt_enabled) {
         if (pthread_create(&thread, NULL, &oai_subframe_task_vt, (void *)softmodem_mode) != 0)
         {
             NFAPI_TRACE(NFAPI_TRACE_ERROR, "pthread_create failed for calling oai_subframe_task_vt");
