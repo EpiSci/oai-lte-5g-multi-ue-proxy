@@ -188,6 +188,30 @@ int nfapi_pnf_p7_sr_ind(nfapi_pnf_p7_config_t* config, nfapi_sr_indication_t* in
 	pnf_p7_t* _this = (pnf_p7_t*)(config);
 	return pnf_p7_pack_and_send_p7_message(_this, (nfapi_p7_message_header_t*)ind, sizeof(nfapi_sr_indication_t));
 }
+
+int nfapi_pnf_p7_cell_search_ind(nfapi_pnf_p7_config_t* config, vendor_nfapi_cell_search_indication_t* ind)
+{
+        if (config == NULL || ind == NULL)
+        {
+                NFAPI_TRACE(NFAPI_TRACE_ERROR, "%s: NULL parameters\n", __FUNCTION__);
+                return -1;
+        }
+
+        pnf_p7_t* _this = (pnf_p7_t*)(config);
+
+        return pnf_p7_pack_and_send_p7_message(_this, &(ind->header), sizeof(vendor_nfapi_cell_search_indication_t));
+}
+
+int nfapi_pnf_p7_ue_subframe_ind(nfapi_pnf_p7_config_t* config, uint16_t phy_id, uint16_t sfn_sf, uint16_t sfn_sf_sync)
+{
+        // Verify that config is not null
+        if(config == 0)
+                return -1;
+
+        pnf_p7_t* _this = (pnf_p7_t*)(config);
+
+        return pnf_p7_ue_subframe_ind(_this, phy_id, sfn_sf, sfn_sf_sync);
+}
 int nfapi_pnf_p7_cqi_ind(nfapi_pnf_p7_config_t* config, nfapi_cqi_indication_t* ind)
 {
 	if(config == NULL || ind == NULL)

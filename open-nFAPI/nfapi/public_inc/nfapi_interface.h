@@ -209,6 +209,7 @@ typedef enum {
 	NFAPI_NMM_STOP_RESPONSE,
 
 	NFAPI_VENDOR_EXT_MSG_MIN = 0x0300,
+	P7_CELL_SEARCH_IND = 0x0304,
 	NFAPI_VENDOR_EXT_MSG_MAX = 0x03FF,
 
 
@@ -3562,6 +3563,17 @@ typedef struct {
 	uint32_t error_code;
 	nfapi_vendor_extension_tlv_t vendor_extension;
 } nfapi_ue_release_response_t;
+
+/**
+ * TODO: Handling only LTE cell indication, should add NR also.
+ */
+typedef struct {
+        nfapi_p7_message_header_t header;
+        uint32_t error_code;
+        nfapi_lte_cell_search_indication_t lte_cell_search_indication;
+        nfapi_vendor_extension_tlv_t vendor_extension;
+} vendor_nfapi_cell_search_indication_t;
+
 
 // 
 // P4 Messages

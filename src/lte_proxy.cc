@@ -22,6 +22,7 @@
 #include <sstream>
 #include "lte_proxy.h"
 #include "nfapi_pnf.h"
+#include "proxy_ss_interface.h"
 
 namespace
 {
@@ -45,9 +46,16 @@ void Multi_UE_Proxy::start(softmodem_mode_t softmodem_mode)
 
     configure_nfapi_pnf(vnf_ipaddr.c_str(), vnf_p5port, pnf_ipaddr.c_str(), pnf_p7port, vnf_p7port);
 
-    if (pthread_create(&thread, NULL, &oai_subframe_task, (void *)softmodem_mode) != 0)
-    {
-        NFAPI_TRACE(NFAPI_TRACE_ERROR, "pthread_create failed for calling oai_subframe_task");
+    if (NULL != ss_cfg_g && ss_cfg_g->cfg.vt_enabled) {
+        if (pthread_create(&thread, NULL, &oai_subframe_task_vt, (void *)softmodem_mode) != 0)
+        {
+            NFAPI_TRACE(NFAPI_TRACE_ERROR, "pthread_create failed for calling oai_subframe_task_vt");
+        }
+    } else {
+        if (pthread_create(&thread, NULL, &oai_subframe_task, (void *)softmodem_mode) != 0)
+        {
+            NFAPI_TRACE(NFAPI_TRACE_ERROR, "pthread_create failed for calling oai_subframe_task");
+        }
     }
 
     for (int i = 0; i < num_ues; i++)
@@ -190,6 +198,7 @@ void Multi_UE_Proxy::oai_enb_downlink_nfapi_task(void *msg_org)
         nfapi_tx_request_t tx_req;
         nfapi_hi_dci0_request_t hi_dci0_req;
         nfapi_ul_config_request_t ul_config_req;
+        vendor_nfapi_cell_search_indication_t cell_info;
     } msg;
 
     if (nfapi_p7_message_unpack((void *)buffer, encoded_size, &msg, sizeof(msg), NULL) != 0)
@@ -259,6 +268,18 @@ void Multi_UE_Proxy::oai_enb_downlink_nfapi_task(void *msg_org)
                 NFAPI_TRACE(NFAPI_TRACE_INFO , "NFAPI_HI_DCI0_REQ forwarded to UE from UE NEM: %u", id_);
             }
             break;
+        case P7_CELL_SEARCH_IND:
+            assert(ue_tx_socket[ue_idx] > 2);
+            if (sendto(ue_tx_socket[ue_idx], buffer, encoded_size, 0, (const struct sockaddr *) &address_tx_, sizeof(address_tx_)) < 0)
+            {
+                NFAPI_TRACE(NFAPI_TRACE_ERROR, "Send P7_CELL_SRCH_IND to OAI UE failed");
+            }
+            else
+            {
+                NFAPI_TRACE(NFAPI_TRACE_INFO , "P7_CELL_SRCH_IND forwarded to UE from UE NEM: %u", id_);
+            }
+            break;
+
 
         default:
             NFAPI_TRACE(NFAPI_TRACE_INFO , "Unhandled message at UE NEM: %d message_id: %u", id_, msg.header.message_id);
