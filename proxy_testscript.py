@@ -52,7 +52,14 @@ The kind of simulation scenario to run
 (default: %(default)s)
 """)
 
+parser.add_argument('--channel', '-c', default='siso', choices='siso mimo'.split(),
+                    help="""
+physical channel type to run
+(default: %(default)s)
+""")
+
 parser.add_argument('--nfapi-trace-level', '-N',
+                    default='none',
                     choices='none error warn note info debug'.split(),
                     help="""
 Set the NFAPI trace level
@@ -70,6 +77,11 @@ logging.basicConfig(level=logging.DEBUG if OPTS.debug else logging.INFO,
 LOGGER = logging.getLogger(os.path.basename(sys.argv[0]))
 
 RUN_OAI = os.path.join(WORKSPACE_DIR, 'run-oai')
+
+if OPTS.mode == 'nsa':
+    RUN_OAI += ' --nsa'
+if OPTS.channel == 'mimo':
+    RUN_OAI += ' --mimo'
 
 if OPTS.nfapi_trace_level:
     os.environ['NFAPI_TRACE_LEVEL'] = OPTS.nfapi_trace_level
@@ -152,8 +164,6 @@ class Scenario:
     """
 
     def __init__(self) -> None:
-        #self.enb_hostname: Optional[str] = None
-        #self.enb_node_id: Optional[int] = None
         self.enb_hostname: Dict[int, str] = {}
         self.enb_node_id: Dict[int, int] = {}
         self.ue_hostname: Dict[int, str] = {}
@@ -252,6 +262,9 @@ class Scenario:
         return proc
 
     def launch_ue(self) -> Dict[int, Popen]:
+        global RUN_OAI
+        if OPTS.mode == 'lte_handover':
+            RUN_OAI += f' --num-enbs {len(self.enb_hostname)}'
         procs = {}
         for num, hostname in self.ue_hostname.items():
             log_name = '{}/{}.log'.format(OPTS.log_dir, hostname)
@@ -541,6 +554,7 @@ def analyze_enb_logs(scenario: Scenario) -> bool:
         return True
 
     num_failed = 0
+    ho_msg3_cnt = 0
     for enb_number, enb_hostname in scenario.enb_hostname.items():
         found = set()
         for line in get_analysis_messages('{}/{}.log.bz2'.format(OPTS.log_dir, enb_hostname)):
@@ -602,9 +616,11 @@ def analyze_enb_logs(scenario: Scenario) -> bool:
                 found.add('rrc reconf complete to gnb')
                 continue
 
-            # 1612992.160273 00006d7a [RRC] I [eNB 0] Frame  0 : Logical Channel UL-DCCH, Received LTE_RRCConnectionReconfigurationComplete from UE rnti bfd1, reconfiguring DRB 1/LCID 3
+            # 4826185.706918 000000dd [RRC] A Received HO LTE_RRCConnectionReconfigurationComplete UE rnti
+            # 0x9733 ue_context.StatusRrc 4 (4: RRC_RECONFIGURED) handover_info->state 8 (8: HO_CONFIGURED)
             if '[RRC] A Received HO LTE_RRCConnectionReconfigurationComplete' in line:
-                found.add('ho_msg3')
+                ho_msg3_cnt += 1
+                found.add(f'ho_msg3_{ho_msg3_cnt}')
                 continue
 
         LOGGER.debug('found: %r', found)
@@ -615,8 +631,14 @@ def analyze_enb_logs(scenario: Scenario) -> bool:
         if OPTS.mode == 'lte' and len(found) == 3 + num_ues:
             LOGGER.info('eNB%d passed', enb_number)
 
-        elif OPTS.mode == 'lte_handover' and len(found) == 3 + num_ues:
-            LOGGER.info('eNB%d passed', enb_number)
+        elif OPTS.mode == 'lte_handover':
+            if len(found) == 3 + num_ues and enb_number == 1:
+                LOGGER.info('eNB%d passed', enb_number)
+            elif len(found) == 2 + num_ues and enb_number == 2:
+                LOGGER.info('eNB%d passed', enb_number)
+            else:
+                num_failed += 1
+                LOGGER.error('eNB%d failed -- found %d %r', enb_number, len(found), found)
 
         elif OPTS.mode == 'nsa' and len(found) == 6 + 2 * num_ues:
             LOGGER.info('eNB%d passed', enb_number)
@@ -755,11 +777,8 @@ def analyze_gnb_sa_logs(scenario: Scenario) -> bool:
             found.add('gen-ra-4')
             continue
 
-        # 3202155.086422 00011c68 [NR_MAC] A (ue 0, rnti 0x78bf) Received Ack
-        # of RA-Msg4. CBRA procedure succeeded!
-        #863243.079367 0000f754 [NR_MAC] A (ue 0, rnti 0xc882) Received Ack
-        # of RA-Msg4. CBRA procedure succeeded!
-        match = re.search(r'\[NR_MAC\] A \(ue \d+, (rnti \w+)\) Received Ack of RA-Msg4. CBRA procedure succeeded!$', line)
+        # 5000116.983383 000000eb [NR_MAC] A (UE RNTI 0x6ccb) Received Ack of RA-Msg4. CBRA procedure succeeded!
+        match = re.search(r'\[NR_MAC\] A \(UE (RNTI \w+)\) Received Ack of RA-Msg4. CBRA procedure succeeded!$', line)
         if match:
             found.add(f'cbra {match.group(1)}')
             continue
@@ -806,8 +825,8 @@ def analyze_gnb_logs(scenario: Scenario) -> bool:
             found.add('nr capabilites')
             continue
 
-        # 364915.873598 000062e2 [NR_MAC] A (ue 0, rnti 0xb094) CFRA procedure succeeded!
-        match = re.search(r'\[NR_MAC\] A \(ue \d+, (rnti \w+)\) CFRA procedure succeeded!$', line)
+        # 5005668.575471 000000e2 [NR_MAC] A (rnti 0x9052) CFRA procedure succeeded!
+        match = re.search(r'\[NR_MAC\] A \((rnti \w+)\) CFRA procedure succeeded!$', line)
         if match:
             found.add(f'cfra {match.group(1)}')
             continue
@@ -1026,7 +1045,6 @@ def main() -> int:
 
     # Summarize any interesting entries in the logs
     summarize_logs('{}/nfapi-proxy.log.bz2'.format(OPTS.log_dir))
-    #summarize_logs('{}/eNB.log.bz2'.format(OPTS.log_dir))
     for _enb_number, enb_hostname in scenario.enb_hostname.items():
         summarize_logs('{}/{}.log.bz2'.format(OPTS.log_dir, enb_hostname))
     for _ue_number, ue_hostname in scenario.ue_hostname.items():

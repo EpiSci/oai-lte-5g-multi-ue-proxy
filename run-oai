@@ -2,9 +2,25 @@
 
 use_strace=false
 use_valgrind=false
+mimo_mode=false
+nsa_mode=false
+num_enbs=1
 
 while (( $# > 0 )); do
     case "$1" in
+      (--mimo)
+          mimo_mode=true
+          shift
+          ;;
+      (--nsa)
+          nsa_mode=true
+          shift
+          ;;
+      (--num-enbs)
+          shift
+          num_enbs=$1
+          shift
+          ;;
       (--strace)
           use_strace=true
           shift
@@ -38,9 +54,9 @@ case "$node_type" in
     (enb)
         echo "Node $NODE_NUMBER: eNB"
         if [ $NODE_NUMBER = "1" ]; then
-            conf=proxy_rcc.band7.tm1.nfapi.conf # Target eNB
+            conf=proxy_rcc.band7.tm1.nfapi.conf # Source eNB
         else
-            conf=proxy_rcc.band7.tm1.nfapi_$NODE_NUMBER.conf # Source eNB
+            conf=proxy_rcc.band7.tm1.nfapi_$NODE_NUMBER.conf # Target eNB
         fi
         cmd=(
             # Keep the eNB on processor 1 (the second processor) by default
@@ -57,7 +73,11 @@ case "$node_type" in
     (gnb)
         echo "Node $NODE_NUMBER: gNB"
         if [[ " $* " = *" --sa "* ]]; then
-            conf=proxy_gnb.band78.sa.fr1.106PRB.usrpn310.conf
+            if $mimo_mode; then
+                conf=proxy_gnb.band78.sa.fr1.106PRB.usrpn310_mimo.conf
+            else
+                conf=proxy_gnb.band78.sa.fr1.106PRB.usrpn310.conf
+            fi
         else
             conf=proxy_rcc.band78.tm1.106PRB.nfapi.conf
         fi
@@ -148,6 +168,7 @@ fi
 # In case we're running with gprof profiling enabled.
 # https://stackoverflow.com/questions/464116/any-way-to-specify-the-location-of-profile-data
 export GMON_OUT_PREFIX=gmon-$NODE_NUMBER.out
+export LD_LIBRARY_PATH=$PWD/ran_build/build:$LD_LIBRARY_PATH
 
 # Enable core dumps.  You may want to set core_pattern:
 #  sudo sh -c 'echo /tmp/coredump-%P > /proc/sys/kernel/core_pattern'
