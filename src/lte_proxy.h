@@ -58,7 +58,7 @@ public:
     void start(softmodem_mode_t softmodem_mode);
     std::vector<Multi_UE_PNF> lte_pnfs;
 private:
-    uint16_t eNB_id; // To identify the destination in uplink
+    uint16_t eNB_id[100]; // To identify the destination in uplink
     std::string oai_ue_ipaddr;
     std::string vnf_ipaddr;
     std::string pnf_ipaddr;
