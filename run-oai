@@ -56,7 +56,7 @@ case "$node_type" in
         if [ $NODE_NUMBER = "1" ]; then
             conf=proxy_rcc.band7.tm1.nfapi.conf # Source eNB
         else
-            conf=proxy_rcc.band7.tm1.nfapi_$NODE_NUMBER.conf # Target eNB
+            conf=proxy_rcc.band7.tm1.nfapi_target.conf # Target eNB
         fi
         cmd=(
             # Keep the eNB on processor 1 (the second processor) by default
