@@ -4346,7 +4346,17 @@ void *oai_slot_task(void *context)
         uint16_t sfn_slot_tx = sfn_slot_counter(&sfn, &slot);//Need to update it.
 
         uint64_t iteration_start = clock_usec();
-
+        /* Previously we would sleep to ensure that the 500us contraint (per slot)
+           was met, although the sleep time was 312us, which is pretty arbitrary.
+           As we push higher throughputs, we see that the PNF (proxy) is
+           ahead of the VNF (OAI gNB). By arbitrarily changing the sleep to be executed
+           before every slot is sent to the OAI UE, and increasing the sleep time to 1000us,
+           the slot indications are not arriving at the OAI NRUE too quickly as they were
+           before. Furthermore, this ensures that even when TX_DATA_REQs take too long to
+           arrive to the OAI UE, that the slot will arrive AFTER the TX_DATA_REQ. The relationship
+           between slot indications and TX_DATA_REQs are critical to the ACK/nACK procedure.
+           This is a temporary fix until will can concretely sync the PNF and VNF. */
+        usleep(1000);
         transfer_downstream_sfn_slot_to_proxy(sfn_slot_tx); // send to oai UE
         NFAPI_TRACE(NFAPI_TRACE_DEBUG, "Frame %u Slot %u sent to OAI ue", NFAPI_SFNSLOT2SFN(sfn_slot_tx),
                    NFAPI_SFNSLOT2SLOT(sfn_slot_tx));

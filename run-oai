@@ -72,6 +72,8 @@ case "$node_type" in
 
     (gnb)
         echo "Node $NODE_NUMBER: gNB"
+        sudo ifconfig lo: 127.0.0.2 down >&/dev/null
+        sudo ifconfig lo: 127.0.0.2 up || exit
         if [[ " $* " = *" --sa "* ]]; then
             if $mimo_mode; then
                 conf=proxy_gnb.band78.sa.fr1.106PRB.usrpn310_mimo.conf
@@ -175,4 +177,4 @@ export LD_LIBRARY_PATH=$PWD/ran_build/build:$LD_LIBRARY_PATH
 ulimit -c unlimited
 
 set -x
-sudo -E "${cmd[@]}" "$@"
+sudo -E "LD_LIBRARY_PATH=$PWD/ran_build/build:$LD_LIBRARY_PATH" "${cmd[@]}" "$@"
