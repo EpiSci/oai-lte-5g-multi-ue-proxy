@@ -111,22 +111,24 @@ See `./proxy_testscript.py --help` for more information.
 
 ## Run without the proxy_testscript.py (Advanced) ##
 
-The launch order is important, as follows.  Note, there are three different
-proxy modes: LTE, NSA and SA.  Please refer to the table below to determine
+The launch order is important, as follows.  Note, there are four different
+proxy modes: LTE, NSA, SA, and LTE HO.  Please refer to the table below to determine
 which executables to launch and the necessary flags for each command.  Steps
 1-5 below show how to launch NSA mode.  For example, in SA mode, replace the
-`--nsa` flag with `--sa` and only launch NRUE(s), a gNB and the proxy.
+`--nsa` flag with `--nr` and only launch NRUE(s), a gNB and the proxy.
 
-| Mode | Executables     | Flags  |
-|------|-----------------|--------|
-| LTE  | lte-softmodem   | (none) |
-|      | lte-uesoftmodem | (none) |
-| NSA  | lte-softmodem   | --nsa  |
-|      | lte-uesoftmodem | --nsa  |
-|      | nr-softmodem    | --nsa  |
-|      | nr-uesoftmodem  | --nsa  |
-| SA   | nr-softmodem    | --sa   |
-|      | nr-uesoftmodem  | --sa   |
+| Mode | Executables     |     Flags    |
+|------|-----------------|--------------|
+| LTE  | lte-softmodem   |     (none)   |
+|      | lte-uesoftmodem |     (none)   |
+| NSA  | lte-softmodem   |     --nsa    |
+|      | lte-uesoftmodem |     --nsa    |
+|      | nr-softmodem    |     --nsa    |
+|      | nr-uesoftmodem  |     --nsa    |
+| SA   | nr-softmodem    |     --nr     |
+|      | nr-uesoftmodem  |     --nr     |
+|LTE HO| lte-softmodem   |--lte_handover|
+|      | lte-uesoftmodem |--lte_handover|
 
 ### 1. Open a terminal and launch eNB ###
 
