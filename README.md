@@ -115,7 +115,7 @@ The launch order is important, as follows.  Note, there are four different
 proxy modes: LTE, NSA, SA, and LTE HO.  Please refer to the table below to determine
 which executables to launch and the necessary flags for each command.  Steps
 1-5 below show how to launch NSA mode.  For example, in SA mode, replace the
-`--nsa` flag with `--nr` and only launch NRUE(s), a gNB and the proxy.
+`--nsa` flag with `--sa` and only launch NRUE(s), a gNB and the proxy.
 
 | Mode | Executables     |     Flags    |
 |------|-----------------|--------------|
@@ -125,8 +125,8 @@ which executables to launch and the necessary flags for each command.  Steps
 |      | lte-uesoftmodem |     --nsa    |
 |      | nr-softmodem    |     --nsa    |
 |      | nr-uesoftmodem  |     --nsa    |
-| SA   | nr-softmodem    |     --nr     |
-|      | nr-uesoftmodem  |     --nr     |
+| SA   | nr-softmodem    |     --sa     |
+|      | nr-uesoftmodem  |     --sa     |
 |LTE HO| lte-softmodem   |--lte_handover|
 |      | lte-uesoftmodem |--lte_handover|
 
