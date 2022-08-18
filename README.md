@@ -107,6 +107,12 @@ make
 ./proxy_testscript.py --num-ues 1 --mode=nr
 ```
 
+## Run LTE HO mode with the proxy_testscript.py (Recommended) ##
+
+```shell
+./proxy_testscript.py --num-ues 1 --mode=lte_handover
+```
+
 See `./proxy_testscript.py --help` for more information.
 
 ## Run without the proxy_testscript.py (Advanced) ##
