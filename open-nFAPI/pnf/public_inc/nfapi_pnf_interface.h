@@ -604,6 +604,7 @@ typedef struct nfapi_pnf_p7_config
 
 	/*! The PHY id*/
 	uint16_t phy_id;
+	int pnf_id;
 
 	// remote
 	/*! The VNF P7 UDP port */

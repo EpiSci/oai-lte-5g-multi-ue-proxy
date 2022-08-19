@@ -81,6 +81,11 @@ int main(int argc, char *argv[])
             softmodem_mode = SOFTMODEM_LTE;
             continue;
         }
+        if (arg == "--lte_handover")
+        {
+            softmodem_mode = SOFTMODEM_LTE_HANDOVER;
+            continue;
+        }
         if (arg == "--nr")
         {
             softmodem_mode = SOFTMODEM_NR;
@@ -109,33 +114,50 @@ int main(int argc, char *argv[])
     }
 
     std::string ue_ipaddr = "127.0.0.1";
-    std::string enb_ipaddr = "127.0.0.1";
-    std::string gnb_ipaddr = "127.0.0.2";
     std::string proxy_ipaddr = "127.0.0.1";
+    std::string gnb_ipaddr = "127.0.0.2";
+    std::vector<std::string> enb_ipaddrs;
     switch (ipaddrs.size())
     {
     case 0:
         // Use all the default addresses
+        if (softmodem_mode == SOFTMODEM_LTE_HANDOVER)
+        {
+            enb_ipaddrs.push_back("127.0.0.1");
+            enb_ipaddrs.push_back("127.0.0.2");
+        }
+        else
+            enb_ipaddrs.push_back("127.0.0.1");
         break;
     case 3:
         if (softmodem_mode != SOFTMODEM_LTE && softmodem_mode != SOFTMODEM_NR)
         {
             try_help("Wrong number of IP addresses");
         }
-        enb_ipaddr = ipaddrs[0];
+        enb_ipaddrs.push_back(ipaddrs[0]);
         gnb_ipaddr = ipaddrs[0];
         proxy_ipaddr = ipaddrs[1];
         ue_ipaddr = ipaddrs[2];
         break;
     case 4:
-        if (softmodem_mode != SOFTMODEM_NSA)
+        if (softmodem_mode == SOFTMODEM_NSA)
+        {
+            enb_ipaddrs.push_back(ipaddrs[0]);
+            gnb_ipaddr = ipaddrs[1];
+            proxy_ipaddr = ipaddrs[2];
+            ue_ipaddr = ipaddrs[3];
+        }
+        else if (softmodem_mode == SOFTMODEM_LTE_HANDOVER)
+        {
+            enb_ipaddrs.push_back(ipaddrs[0]);
+            enb_ipaddrs.push_back(ipaddrs[1]);
+            proxy_ipaddr = ipaddrs[2];
+            ue_ipaddr = ipaddrs[3];
+        }
+        else
         {
             try_help("Wrong number of IP addresses");
         }
-        enb_ipaddr = ipaddrs[0];
-        gnb_ipaddr = ipaddrs[1];
-        proxy_ipaddr = ipaddrs[2];
-        ue_ipaddr = ipaddrs[3];
         break;
     default:
         try_help("Invalid number of IP addresses");
@@ -161,7 +183,14 @@ int main(int argc, char *argv[])
     {
     case SOFTMODEM_LTE:
         {
-            Multi_UE_Proxy lte_proxy(ues, enb_ipaddr, proxy_ipaddr, ue_ipaddr);
+            // Should pass multiple ip addresses by using vector or array.
+            Multi_UE_Proxy lte_proxy(ues, enb_ipaddrs, proxy_ipaddr, ue_ipaddr);
+            lte_proxy.start(softmodem_mode);
+        }
+        break;
+    case SOFTMODEM_LTE_HANDOVER:
+        {
+            Multi_UE_Proxy lte_proxy(ues, enb_ipaddrs, proxy_ipaddr, ue_ipaddr);
             lte_proxy.start(softmodem_mode);
         }
         break;
@@ -173,7 +202,7 @@ int main(int argc, char *argv[])
         break;
     case SOFTMODEM_NSA:
         {
-            Multi_UE_Proxy lte_proxy(ues, enb_ipaddr, proxy_ipaddr, ue_ipaddr);
+            Multi_UE_Proxy lte_proxy(ues, enb_ipaddrs, proxy_ipaddr, ue_ipaddr);
             Multi_UE_NR_Proxy nr_proxy(ues, gnb_ipaddr, proxy_ipaddr, ue_ipaddr);
 
             std::thread lte_th( &Multi_UE_Proxy::start, &lte_proxy, softmodem_mode);
@@ -196,11 +225,12 @@ void show_usage()
               << "  Number of IP address:\n"
               << "    0 - use the loopback interface (default)\n"
               << "    3 - ENB/GNB proxy UE (for LTE and NR modes)\n"
-              << "    4 - ENB GNB proxy UE (for NSA mode)\n"
+              << "    4 - ENB GNB/ENB proxy UE (for NSA mode or LTE HANDOVER mode)\n"
               << "  Options:\n"
               << "    --lte              Softmodem mode is LTE (default)\n"
               << "    --nr               Softmodem mode is NR\n"
               << "    --nsa              Softmodem mode is NSA\n"
+              << "    --lte_handover     Softmodem mode is LTE HANDOVER\n"
               << "    --max-seconds SEC  Maximum run time (default: " << DEFAULT_MAX_SECONDS << ")\n";
 }
 
