@@ -24,10 +24,12 @@
 #include "proxy.h"
 #include "lte_proxy.h"
 #include "nr_proxy.h"
-
+#include "nfapi_pnf.h"
+#include "proxy_ss_interface.h"
 extern "C"
 {
     int num_ues = 1;
+    proxy_ss_cfg_p ss_cfg_g = NULL;
 }
 
 static void show_usage();
@@ -58,6 +60,10 @@ int main(int argc, char *argv[])
     int max_seconds = DEFAULT_MAX_SECONDS;
     softmodem_mode_t softmodem_mode = SOFTMODEM_LTE;
     std::vector<std::string> ipaddrs;
+
+    uint8_t cli_rsrp = DEFAULT_CELL_RSRP;
+    uint8_t cli_rsrq = DEFAULT_CELL_RSRQ;
+    uint8_t cli_period = DEFAULT_CELL_SRCH_PERIOD;
 
     while (--argc > 0)
     {
@@ -105,6 +111,52 @@ int main(int argc, char *argv[])
             ipaddrs.push_back(arg);
             continue;
         }
+        if (arg == "-p")
+        {
+            if (--argc == 0 || !is_numeric(*++argv))
+	    {
+		    try_help("Expected an integer after -p");
+	    }
+            cli_rsrp =  (uint8_t )std::stoi(*argv);
+            printf("Emulated RSRP: %d dBm\n", ss_cfg_g->cfg.cli_rsrp_g);
+            continue;
+        }
+        if (arg == "-q")
+        {
+            if (--argc == 0 || !is_numeric(*++argv))
+	    {
+		    try_help("Expected an integer after -q");
+	    }
+            cli_rsrq = (uint8_t)std::stoi(*argv);
+            printf("Emulated RSRQ: %d dB\n", ss_cfg_g->cfg.cli_rsrq_g);
+            continue;
+        }
+        if (arg == "-s")
+        {
+            if (--argc == 0 || !is_numeric(*++argv))
+	    {
+		    try_help("Expected an integer after -s");
+	    }
+            cli_period = (uint8_t)std::stoi(*argv);
+            printf("Emulated Cell Info period: %d subframes\n", ss_cfg_g->cfg.cli_periodicity_g);
+            continue;
+        }
+        if (arg == "-v")
+        {
+            /** SS only works in VT at the moment */
+            if ( 0 > init_ss_config()) {
+                printf("System Simulator init failed\n.");
+                exit(-1);
+            }
+            ss_cfg_g->cfg.vt_enabled = true;
+            ss_cfg_g->cfg.cli_periodicity_g = cli_period;
+            ss_cfg_g->cfg.cli_rsrq_g = cli_rsrq;
+            ss_cfg_g->cfg.cli_rsrp_g =  cli_rsrp;
+            printf("Virtual Time enabled\n");
+            continue;
+        }
+
+
         try_help("unexpected argument: " + arg);
     }
 
@@ -162,12 +214,14 @@ int main(int argc, char *argv[])
     case SOFTMODEM_LTE:
         {
             Multi_UE_Proxy lte_proxy(ues, enb_ipaddr, proxy_ipaddr, ue_ipaddr);
+            if (NULL != ss_cfg_g) ss_cfg_g->softmodem_mode= SOFTMODEM_LTE;
             lte_proxy.start(softmodem_mode);
         }
         break;
     case SOFTMODEM_NR:
         {
             Multi_UE_NR_Proxy nr_proxy(ues, gnb_ipaddr, proxy_ipaddr, ue_ipaddr);
+            if (NULL != ss_cfg_g) ss_cfg_g->softmodem_mode= SOFTMODEM_NR;
             nr_proxy.start(softmodem_mode);
         }
         break;
@@ -201,7 +255,11 @@ void show_usage()
               << "    --lte              Softmodem mode is LTE (default)\n"
               << "    --nr               Softmodem mode is NR\n"
               << "    --nsa              Softmodem mode is NSA\n"
-              << "    --max-seconds SEC  Maximum run time (default: " << DEFAULT_MAX_SECONDS << ")\n";
+              << "    --max-seconds SEC  Maximum run time (default: " << DEFAULT_MAX_SECONDS << ")\n"
+              << "    -v Enable virtual time support\n"
+              << "    -p <value> RSRP value of Serving Cell \n"
+              << "    -q <value> RSRQ value of Serving Cell \n"
+              << "    -s <value> Cell info broadcast periodicity (subframes in VT)\n";
 }
 
 bool is_numeric(const std::string &s)
