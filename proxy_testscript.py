@@ -730,11 +730,8 @@ def analyze_gnb_sa_logs(scenario: Scenario) -> bool:
             found.add('gen-ra-4')
             continue
 
-        # 3202155.086422 00011c68 [NR_MAC] A (ue 0, rnti 0x78bf) Received Ack
-        # of RA-Msg4. CBRA procedure succeeded!
-        #863243.079367 0000f754 [NR_MAC] A (ue 0, rnti 0xc882) Received Ack
-        # of RA-Msg4. CBRA procedure succeeded!
-        match = re.search(r'\[NR_MAC\] A \(ue \d+, (rnti \w+)\) Received Ack of RA-Msg4. CBRA procedure succeeded!$', line)
+        # 5000116.983383 000000eb [NR_MAC] A (UE RNTI 0x6ccb) Received Ack of RA-Msg4. CBRA procedure succeeded!
+        match = re.search(r'\[NR_MAC\] A \(UE (RNTI \w+)\) Received Ack of RA-Msg4. CBRA procedure succeeded!$', line)
         if match:
             found.add(f'cbra {match.group(1)}')
             continue
