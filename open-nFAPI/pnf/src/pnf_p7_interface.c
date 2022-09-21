@@ -202,7 +202,7 @@ int nfapi_pnf_p7_cell_search_ind(nfapi_pnf_p7_config_t* config, vendor_nfapi_cel
         return pnf_p7_pack_and_send_p7_message(_this, &(ind->header), sizeof(vendor_nfapi_cell_search_indication_t));
 }
 
-int nfapi_pnf_p7_ue_subframe_ind(nfapi_pnf_p7_config_t* config, uint16_t phy_id, uint16_t sfn_sf, uint16_t sfn_sf_sync)
+int nfapi_pnf_p7_ue_subframe_ind(int id, nfapi_pnf_p7_config_t* config, uint16_t phy_id, uint16_t sfn_sf, uint16_t sfn_sf_sync)
 {
         // Verify that config is not null
         if(config == 0)
@@ -210,7 +210,7 @@ int nfapi_pnf_p7_ue_subframe_ind(nfapi_pnf_p7_config_t* config, uint16_t phy_id,
 
         pnf_p7_t* _this = (pnf_p7_t*)(config);
 
-        return pnf_p7_ue_subframe_ind(_this, phy_id, sfn_sf, sfn_sf_sync);
+        return pnf_p7_ue_subframe_ind(id, _this, phy_id, sfn_sf, sfn_sf_sync);
 }
 int nfapi_pnf_p7_cqi_ind(nfapi_pnf_p7_config_t* config, nfapi_cqi_indication_t* ind)
 {

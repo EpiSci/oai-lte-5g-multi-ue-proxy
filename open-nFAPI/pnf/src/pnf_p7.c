@@ -783,7 +783,7 @@ int pnf_pack_and_send_subframe_ind(pnf_p7_t* pnf_p7, uint16_t sfn_sf)
         return pnf_p7_pack_and_send_p7_message(pnf_p7, &(subframe_ind.header), sizeof(subframe_ind));
 }
 
-int pnf_p7_ue_subframe_ind(pnf_p7_t* pnf_p7,uint16_t phy_id,uint16_t sfn_sf, uint16_t sfn_sf_sync)
+int pnf_p7_ue_subframe_ind(int id, pnf_p7_t* pnf_p7,uint16_t phy_id,uint16_t sfn_sf, uint16_t sfn_sf_sync)
 {
 	int status;
 	status = pnf_pack_and_send_subframe_ind(pnf_p7, sfn_sf);
@@ -797,7 +797,7 @@ int pnf_p7_ue_subframe_ind(pnf_p7_t* pnf_p7,uint16_t phy_id,uint16_t sfn_sf, uin
 		return -1;
 	}
 
-	transfer_downstream_sfn_sf_to_proxy(sfn_sf_sync);
+	transfer_downstream_sfn_sf_to_proxy(id, sfn_sf_sync);
 
 	if(pthread_mutex_unlock(&(pnf_p7->mutex)) != 0)
 	{
@@ -1716,7 +1716,7 @@ void pnf_handle_dl_config_request(void* pRecvMsg, int recvMsgLen, pnf_p7_t* pnf_
 			}
 
 			// saving dl_config_request in subframe buffer
-			transfer_downstream_nfapi_msg_to_proxy((void *)req);
+			transfer_downstream_nfapi_msg_to_proxy(pnf_p7->_public.pnf_id, (void *)req);
 			pnf_p7->subframe_buffer[buffer_index].sfn_sf = req->sfn_sf;
 			pnf_p7->subframe_buffer[buffer_index].dl_config_req = req;
 
@@ -1867,7 +1867,7 @@ void pnf_handle_ul_config_request(void* pRecvMsg, int recvMsgLen, pnf_p7_t* pnf_
 
 				deallocate_nfapi_ul_config_request(pnf_p7->subframe_buffer[buffer_index].ul_config_req, pnf_p7);
 			}
-			transfer_downstream_nfapi_msg_to_proxy((void *)req);
+			transfer_downstream_nfapi_msg_to_proxy(pnf_p7->_public.pnf_id, (void *)req);
 			pnf_p7->subframe_buffer[buffer_index].sfn_sf = req->sfn_sf;
 			pnf_p7->subframe_buffer[buffer_index].ul_config_req = req;
 			
@@ -2004,7 +2004,7 @@ void pnf_handle_hi_dci0_request(void* pRecvMsg, int recvMsgLen, pnf_p7_t* pnf_p7
 				deallocate_nfapi_hi_dci0_request(pnf_p7->subframe_buffer[buffer_index].hi_dci0_req, pnf_p7);
 			}
 
-			transfer_downstream_nfapi_msg_to_proxy((void *)req);
+			transfer_downstream_nfapi_msg_to_proxy(pnf_p7->_public.pnf_id, (void *)req);
 			pnf_p7->subframe_buffer[buffer_index].sfn_sf = req->sfn_sf;
 			pnf_p7->subframe_buffer[buffer_index].hi_dci0_req = req;
 
@@ -2063,7 +2063,7 @@ void pnf_handle_cell_search_ind(void* pRecvMsg, int recvMsgLen, pnf_p7_t* pnf_p7
 			switch (ss_cfg_g->softmodem_mode)
 			{
 				case SOFTMODEM_LTE:
-					transfer_downstream_nfapi_msg_to_proxy((void *)ind);
+					transfer_downstream_nfapi_msg_to_proxy(0, (void *)ind);
 					break;
 				case SOFTMODEM_NR:
 					transfer_downstream_nfapi_msg_to_nr_proxy((void *)ind);
@@ -2159,7 +2159,7 @@ void pnf_handle_tx_request(void* pRecvMsg, int recvMsgLen, pnf_p7_t* pnf_p7)
 				deallocate_nfapi_tx_request(pnf_p7->subframe_buffer[buffer_index].tx_req, pnf_p7);
 			}
 
-			transfer_downstream_nfapi_msg_to_proxy((void *)req);
+			transfer_downstream_nfapi_msg_to_proxy(pnf_p7->_public.pnf_id, (void *)req);
 			pnf_p7->subframe_buffer[buffer_index].sfn_sf = req->sfn_sf;
 			pnf_p7->subframe_buffer[buffer_index].tx_req = req;
 
@@ -2583,7 +2583,7 @@ void pnf_dispatch_p7_message(void *pRecvMsg, int recvMsgLen, pnf_p7_t* pnf_p7,  
 		default:
 			{
 				if(header.message_id >= NFAPI_VENDOR_EXT_MSG_MIN &&
-						header.message_id <= NFAPI_VENDOR_EXT_MSG_MAX)
+					header.message_id <= NFAPI_VENDOR_EXT_MSG_MAX)
 				{
 					if ( header.message_id == P7_CELL_SEARCH_IND )
 					{

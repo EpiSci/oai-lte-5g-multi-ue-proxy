@@ -51,21 +51,21 @@ typedef enum CarrierBandwidthEUTRA_dl_Bandwidth_e {
         CarrierBandwidthEUTRA_dl_Bandwidth_e_spare1 = 15,
 } Dl_Bandwidth_e;
 
-	
+
 /*
  * Proxy SS Header: To be used for comunication between Proxy and SS-eNB.
- * 
+ *
  * preamble: 0xFEEDC0DE for messages coming from SSeNB to Proxy
  *           0xF00DC0DE for messages coming from Proxy to SSeNB
  * msg_id  : To identify the message that is sent.
- * length  : Length of the message in bytes. 
+ * length  : Length of the message in bytes.
  */
 typedef struct proxy_ss_header_s {
   uint32_t preamble;
   proxy_ss_msgs_e  msg_id;
   uint8_t  cell_id;
   uint16_t length;
-} proxy_ss_header_t, 
+} proxy_ss_header_t,
  *proxy_ss_header_p;
 
 #define PROXY_CELL_CONFIG      ((1<<0))
@@ -102,7 +102,7 @@ typedef struct proxy_ss_cfg_s {
   uint8_t  rsrp_dbm;
   uint8_t  rsrq_dbm;
 } proxy_ss_cfg_t,
-*proxy_ss_cfg_p;	
+*proxy_ss_cfg_p;
 
 /** Global pointer */
 extern proxy_ss_cfg_p ss_cfg_g;

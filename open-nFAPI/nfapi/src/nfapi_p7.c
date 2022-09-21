@@ -3653,6 +3653,7 @@ int nfapi_p7_message_pack(void *pMessageBuf, void *pPackedBuf, uint32_t packedBu
     case NFAPI_TIMING_INFO:
       result = pack_timing_info(pMessageHeader, &pWritePackedMessage, end, config);
       break;
+
     case NFAPI_SUBFRAME_INDICATION:
       result = pack_subframe_indication(pMessageHeader, &pWritePackedMessage, end, config);
       break;
@@ -7979,6 +7980,7 @@ int nfapi_p7_message_unpack(void *pMessageBuf, uint32_t messageBufLen, void *pUn
         return -1;
 
       break;
+
     case NFAPI_SUBFRAME_INDICATION:
       if (check_unpack_length(NFAPI_SUBFRAME_INDICATION, unpackedBufLen)){
         nfapi_subframe_indication_t* msg = (nfapi_subframe_indication_t*) pMessageHeader;

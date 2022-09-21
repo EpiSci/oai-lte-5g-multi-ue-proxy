@@ -65,16 +65,16 @@ nfapi_tx_request_pdu_t *tx_request_pdu[1023][10][10]; // [frame][subframe][max_n
 nfapi_nr_pdu_t *tx_data_request[1023][20][10]; //[frame][slot][max_num_pdus]
 nfapi_ue_release_request_body_t release_rntis;
 nfapi_pnf_param_response_t g_pnf_param_resp;
-nfapi_pnf_p7_config_t *p7_config_g = NULL;
+nfapi_pnf_p7_config_t *p7_config_g[MAX_ENB];
 nfapi_pnf_p7_config_t *p7_nr_config_g = NULL;
 
 uint8_t tx_pdus[32][8][4096];
 uint8_t nr_tx_pdus[32][16][4096];
 uint16_t phy_antenna_capability_values[] = { 1, 2, 4, 8, 16 };
 
-static pnf_info pnf;
+static pnf_info pnf[MAX_ENB];
 static pnf_info pnf_nr;
-static pthread_t pnf_start_pthread;
+static pthread_t pnf_start_pthread[MAX_ENB];
 static pthread_t pnf_nr_start_pthread;
 
 extern proxy_ss_cfg_p ss_cfg_g;
@@ -142,7 +142,7 @@ void send_cell_info_ind (nfapi_pnf_p7_config_t *config, /** Unused */ uint8_t at
     ind.error_code = NFAPI_MSG_OK;
     ind.lte_cell_search_indication.tl.tag = NFAPI_LTE_CELL_SEARCH_INDICATION_TAG;
     ind.lte_cell_search_indication.number_of_lte_cells_found = 1;
-    
+
     /** TODO: PCI will be modified once cell config is ported */
     ind.lte_cell_search_indication.lte_found_cells[0].pci = 0;
 
@@ -150,12 +150,12 @@ void send_cell_info_ind (nfapi_pnf_p7_config_t *config, /** Unused */ uint8_t at
         NFAPI_TRACE(NFAPI_TRACE_ERROR, "SS Proxy config is NULL.\n");
         return; /** NOTE: This would never happen */
     }
-    ind.lte_cell_search_indication.lte_found_cells[0].rsrp = ss_cfg_g->cfg.cli_rsrp_g; 
-    ind.lte_cell_search_indication.lte_found_cells[0].rsrq = ss_cfg_g->cfg.cli_rsrq_g; 
+    ind.lte_cell_search_indication.lte_found_cells[0].rsrp = ss_cfg_g->cfg.cli_rsrp_g;
+    ind.lte_cell_search_indication.lte_found_cells[0].rsrq = ss_cfg_g->cfg.cli_rsrq_g;
     ind.lte_cell_search_indication.lte_found_cells[0].frequency_offset = 300 /*ss_cfg_g->dl_earfcn*/;
-    NFAPI_TRACE(NFAPI_TRACE_DEBUG, "Sending cell SEARCH for cell %d: earfcn: %d rsrp: %d rsrq: %d noc: %d Noc-activation:%d\n", 
+    NFAPI_TRACE(NFAPI_TRACE_DEBUG, "Sending cell SEARCH for cell %d: earfcn: %d rsrp: %d rsrq: %d noc: %d Noc-activation:%d\n",
         0, 300, ss_cfg_g->cfg.cli_rsrp_g, ss_cfg_g->cfg.cli_rsrq_g, ss_cfg_g->NocLevel, ss_cfg_g->Noc_activated);
-    
+
     if (0 > nfapi_pnf_p7_cell_search_ind(config, &ind))
         NFAPI_TRACE(NFAPI_TRACE_ERROR, "Failed to send cell_info\n");
 }
@@ -526,7 +526,7 @@ int param_request(nfapi_pnf_config_t *config, nfapi_pnf_phy_config_t *phy, nfapi
     nfapi_resp.num_tlv++;
     // P7 PNF Port
     nfapi_resp.nfapi_config.p7_pnf_port.tl.tag = NFAPI_NFAPI_P7_PNF_PORT_TAG;
-    nfapi_resp.nfapi_config.p7_pnf_port.value = 32123; // DJP - hard code alert!!!! FIXME TODO
+    nfapi_resp.nfapi_config.p7_pnf_port.value = pnf->phys[0].udp.rx_port;
     nfapi_resp.num_tlv++;
     nfapi_pnf_param_resp(config, &nfapi_resp);
     NFAPI_TRACE(NFAPI_TRACE_DEBUG, "[PNF] Sent NFAPI_PARAM_RESPONSE phy_id:%d number_of_tlvs:%u\n", req->header.phy_id, nfapi_resp.num_tlv);
@@ -1785,10 +1785,10 @@ int start_request(nfapi_pnf_config_t *config, nfapi_pnf_phy_config_t *phy, nfapi
     phy_info *phy_info = pnf->phys;
     nfapi_pnf_p7_config_t *p7_config = nfapi_pnf_p7_config_create();
     p7_config->phy_id = phy->phy_id;
+    p7_config->pnf_id = phy_info->pnf_id;
     p7_config->remote_p7_port = phy_info->remote_port;
     p7_config->remote_p7_addr = phy_info->remote_addr;
-    p7_config->local_p7_port = 32123; // DJP - good grief cannot seem to get the right answer phy_info->local_port;
-    //p7_config->local_p7_port = phy_info->udp.rx_port;
+    p7_config->local_p7_port = phy_info->udp.rx_port;
     //DJP p7_config->local_p7_addr = (char*)phy_info->local_addr.c_str();
     p7_config->local_p7_addr = phy_info->local_addr;
     NFAPI_TRACE(NFAPI_TRACE_DEBUG, "[PNF] P7 remote:%s:%d local:%s:%d\n", p7_config->remote_p7_addr, p7_config->remote_p7_port,
@@ -1848,7 +1848,7 @@ int start_request(nfapi_pnf_config_t *config, nfapi_pnf_phy_config_t *phy, nfapi
 
     NFAPI_TRACE(NFAPI_TRACE_INFO, "[PNF] Calling l1_north_init_eNB() %s\n", __FUNCTION__);
     NFAPI_TRACE(NFAPI_TRACE_INFO, "[PNF] DJP - HACK - Set p7_config global ready for subframe ind%s\n", __FUNCTION__);
-    p7_config_g = p7_config;
+    p7_config_g[p7_config->pnf_id] = p7_config;
 
     NFAPI_TRACE(NFAPI_TRACE_DEBUG, "[PNF] OAI eNB/RU configured\n");
     NFAPI_TRACE(NFAPI_TRACE_DEBUG, "[PNF] About to call init_eNB_afterRU()\n");
@@ -2350,23 +2350,24 @@ void configure_nr_nfapi_pnf(const char *vnf_ip_addr, int vnf_p5_port, const char
 
 }
 
-void configure_nfapi_pnf(const char *vnf_ip_addr, int vnf_p5_port, const char *pnf_ip_addr, int pnf_p7_port,
+void configure_nfapi_pnf(int id, const char *vnf_ip_addr, int vnf_p5_port, const char *pnf_ip_addr, int pnf_p7_port,
                          int vnf_p7_port)
 {
     nfapi_pnf_config_t *config = nfapi_pnf_config_create();
     config->vnf_ip_addr = vnf_ip_addr;
     config->vnf_p5_port = vnf_p5_port;
-    pnf.phys[0].udp.enabled = 1;
-    pnf.phys[0].udp.rx_port = pnf_p7_port;
-    pnf.phys[0].udp.tx_port = vnf_p7_port;
-    strcpy(pnf.phys[0].udp.tx_addr, vnf_ip_addr);
-    strcpy(pnf.phys[0].local_addr, pnf_ip_addr);
+    pnf[id].phys[0].udp.enabled = 1;
+    pnf[id].phys[0].udp.rx_port = pnf_p7_port;
+    pnf[id].phys[0].udp.tx_port = vnf_p7_port;
+    pnf[id].phys[0].pnf_id = id;
+    strcpy(pnf[id].phys[0].udp.tx_addr, vnf_ip_addr);
+    strcpy(pnf[id].phys[0].local_addr, pnf_ip_addr);
     NFAPI_TRACE(NFAPI_TRACE_DEBUG, "%s() VNF:%s:%d PNF_PHY[addr:%s UDP:tx_addr:%s:%d rx:%d]\n",
            __FUNCTION__,
            config->vnf_ip_addr, config->vnf_p5_port,
-           pnf.phys[0].local_addr,
-           pnf.phys[0].udp.tx_addr, pnf.phys[0].udp.tx_port,
-           pnf.phys[0].udp.rx_port);
+           pnf[id].phys[0].local_addr,
+           pnf[id].phys[0].udp.tx_addr, pnf[id].phys[0].udp.tx_port,
+           pnf[id].phys[0].udp.rx_port);
     config->pnf_param_req = &pnf_param_request;
     config->pnf_config_req = &pnf_config_request;
     config->pnf_start_req = &pnf_start_request;
@@ -2381,14 +2382,14 @@ void configure_nfapi_pnf(const char *vnf_ip_addr, int vnf_p5_port, const char *p
     config->system_information_schedule_req = &system_information_schedule_request;
     config->system_information_req = &system_information_request;
     config->nmm_stop_req = &nmm_stop_request;
-    config->user_data = &pnf;
+    config->user_data = &pnf[id];
     // To allow custom vendor extentions to be added to nfapi
     NFAPI_TRACE(NFAPI_TRACE_INFO, "[PNF] Creating PNF NFAPI start thread %s\n", __FUNCTION__);
-    if (pthread_create(&pnf_start_pthread, NULL, &pnf_start_thread, config) != 0)
+    if (pthread_create(&pnf_start_pthread[id], NULL, &pnf_start_thread, config) != 0)
     {
         NFAPI_TRACE(NFAPI_TRACE_ERROR, "pthread_create: %s\n", strerror(errno));
     }
-    if (pthread_setname_np(pnf_start_pthread, "NFAPI_PNF") != 0)
+    if (pthread_setname_np(pnf_start_pthread[id], "NFAPI_PNF") != 0)
     {
         NFAPI_TRACE(NFAPI_TRACE_ERROR, "pthread_setname_np: %s\n", strerror(errno));
     }
@@ -2406,10 +2407,10 @@ void configure_nfapi_pnf(const char *vnf_ip_addr, int vnf_p5_port, const char *p
     */
 }
 
-void oai_subframe_ind(uint16_t sfn, uint16_t sf)
+void oai_subframe_ind(int id, uint16_t sfn, uint16_t sf)
 {
     //TODO FIXME - HACK - DJP - using a global to bodge it in
-    if (p7_config_g != NULL)
+    if (p7_config_g[id] != NULL)
     {
         uint16_t sfn_sf_tx = sfn << 4 | sf;
 
@@ -2421,7 +2422,7 @@ void oai_subframe_ind(uint16_t sfn, uint16_t sf)
                         ts.tv_sec, ts.tv_nsec, sfn, sf, NFAPI_SFNSF2DEC(sfn_sf_tx));
         }
 
-        int subframe_ret = nfapi_pnf_p7_subframe_ind(p7_config_g, p7_config_g->phy_id, sfn_sf_tx);
+        int subframe_ret = nfapi_pnf_p7_subframe_ind(p7_config_g[id], p7_config_g[id]->phy_id, sfn_sf_tx);
 
         if (subframe_ret)
         {
@@ -2476,14 +2477,14 @@ void oai_slot_ind(uint16_t sfn, uint16_t slot)
 }
 
 // Queues of message_buffer_t pointers, one queue per UE
-static queue_t msgs_from_ue[MAX_UES];
+static queue_t msgs_from_ue[MAX_ENB][MAX_UES];
 static queue_t msgs_from_nr_ue[MAX_UES];
 
-void oai_subframe_init()
+void oai_subframe_init(int enb_id)
 {
     for (int i = 0; i < num_ues; i++)
     {
-        init_queue(&msgs_from_ue[i]);
+        init_queue(&msgs_from_ue[enb_id][i]);
     }
 }
 
@@ -2660,7 +2661,7 @@ static void warn_if_different_slots(const char *label,
     nfapi_vendor_extension_tlv_t vendor_extension (typedef nfapi_tl_t*)
 */
 
-static void oai_subframe_aggregate_rach_ind(subframe_msgs_t *msgs)
+static void oai_subframe_aggregate_rach_ind(int id, subframe_msgs_t *msgs)
 {
     /* Currently we select the first RACH and ignore others.
        We could have various policies to select one RACH over
@@ -2678,7 +2679,7 @@ static void oai_subframe_aggregate_rach_ind(subframe_msgs_t *msgs)
             continue;
         }
         ind.sfn_sf = sfn_sf_add(ind.sfn_sf, 5);
-        oai_nfapi_rach_ind(&ind);
+        oai_nfapi_rach_ind(id, &ind);
     }
 }
 
@@ -2763,7 +2764,7 @@ static void oai_slot_aggregate_rach_ind(slot_msgs_t *msgs)
         nfapi_vendor_extension_tlv_t vendor_extension (typedef nfapi_tl_t*)
 */
 
-static void oai_subframe_aggregate_crc_ind(subframe_msgs_t *msgs)
+static void oai_subframe_aggregate_crc_ind(int id, subframe_msgs_t *msgs)
 {
     assert(msgs->num_msgs > 0);
     nfapi_crc_indication_t agg;
@@ -2812,7 +2813,7 @@ static void oai_subframe_aggregate_crc_ind(subframe_msgs_t *msgs)
         }
     }
 
-    oai_nfapi_crc_indication(&agg);
+    oai_nfapi_crc_indication(id, &agg);
     free(agg.crc_indication_body.crc_pdu_list); // Should actually be nfapi_vnf_p7_release_msg
 }
 
@@ -2966,7 +2967,7 @@ static void oai_slot_aggregate_crc_ind(slot_msgs_t *msgs)
 // }
 
 
-static void oai_subframe_aggregate_rx_ind(subframe_msgs_t *msgs)
+static void oai_subframe_aggregate_rx_ind(int id, subframe_msgs_t *msgs)
 {
     assert(msgs->num_msgs > 0);
     nfapi_rx_indication_t agg;
@@ -3056,7 +3057,7 @@ static void oai_subframe_aggregate_rx_ind(subframe_msgs_t *msgs)
         }
     }
 
-    oai_nfapi_rx_ind(&agg);
+    oai_nfapi_rx_ind(id, &agg);
     free(agg.rx_indication_body.rx_pdu_list); // Should actually be nfapi_vnf_p7_release_msg
 }
 
@@ -3221,7 +3222,7 @@ static void oai_slot_aggregate_rx_data_ind(slot_msgs_t *msgs)
     nfapi_vendor_extension_tlv_t vendor_extension (typedef nfapi_tl_t*)
 */
 
-static void oai_subframe_aggregate_cqi_ind(subframe_msgs_t *msgs)
+static void oai_subframe_aggregate_cqi_ind(int id, subframe_msgs_t *msgs)
 {
     assert(msgs->num_msgs > 0);
     nfapi_cqi_indication_t agg;
@@ -3298,7 +3299,7 @@ static void oai_subframe_aggregate_cqi_ind(subframe_msgs_t *msgs)
         }
     }
 
-    oai_nfapi_cqi_indication(&agg);
+    oai_nfapi_cqi_indication(id, &agg);
     free(agg.cqi_indication_body.cqi_pdu_list); // Should actually be nfapi_vnf_p7_release_msg
     free(agg.cqi_indication_body.cqi_raw_pdu_list);
 }
@@ -3575,7 +3576,7 @@ static void oai_slot_aggregate_uci_ind(slot_msgs_t *msgs)
     nfapi_vendor_extension_tlv_t vendor_extension (typedef nfapi_tl_t*)
 */
 
-static void oai_subframe_aggregate_harq_ind(subframe_msgs_t *msgs)
+static void oai_subframe_aggregate_harq_ind(int id, subframe_msgs_t *msgs)
 {
     assert(msgs->num_msgs > 0);
     nfapi_harq_indication_t agg;
@@ -3624,7 +3625,7 @@ static void oai_subframe_aggregate_harq_ind(subframe_msgs_t *msgs)
         }
     }
 
-    oai_nfapi_harq_indication(&agg);
+    oai_nfapi_harq_indication(id, &agg);
     free(agg.harq_indication_body.harq_pdu_list); // Should actually be nfapi_vnf_p7_release_msg
 }
 
@@ -3654,16 +3655,16 @@ static void oai_subframe_aggregate_harq_ind(subframe_msgs_t *msgs)
     nfapi_vendor_extension_tlv_t vendor_extension (typedef nfapi_tl_t*)
 */
 
-int oai_nfapi_ue_subframe_indication(nfapi_subframe_indication_t *ind, uint16_t sfn_sf_sync)
+int oai_nfapi_ue_subframe_indication(int id, nfapi_subframe_indication_t *ind, uint16_t sfn_sf_sync)
 {
     ind->header.phy_id = 1; // DJP HACK TODO FIXME - need to pass this around!!!!
     NFAPI_TRACE(NFAPI_TRACE_DEBUG, "VT (Proxy eNB) inside oai_nfapi_ue_subframe_indication \n");
-    int retval = nfapi_pnf_p7_ue_subframe_ind(p7_config_g, ind->header.phy_id, ind->sfn_sf, sfn_sf_sync);
+    int retval = nfapi_pnf_p7_ue_subframe_ind(id, p7_config_g[id], ind->header.phy_id, ind->sfn_sf, sfn_sf_sync);
     NFAPI_TRACE(NFAPI_TRACE_DEBUG, "VT (Proxy eNB) exit  oai_nfapi_ue_subframe_indication return %d\n", retval);
     return retval;
 }
 
-static int oai_ue_subframe_ind(subframe_msgs_t *msgs, uint16_t sfn_sf_sync)
+static int oai_ue_subframe_ind(int id, subframe_msgs_t *msgs, uint16_t sfn_sf_sync)
 {
     assert(msgs->num_msgs > 0);
     nfapi_subframe_indication_t subframe_ind;
@@ -3671,23 +3672,23 @@ static int oai_ue_subframe_ind(subframe_msgs_t *msgs, uint16_t sfn_sf_sync)
 
     for (size_t n = 0; n < msgs->num_msgs; ++n)
     {
-	    nfapi_subframe_indication_t ind;
-	    message_buffer_t *msg = msgs->msgs[n];
-	    if (nfapi_p7_message_unpack(msg->data, msg->length, &ind, sizeof(ind), NULL) < 0)
-	    {
-		    printf("subframe indication unpack failed, msg[%zu]", n);
-		    return -1;
-	    }
-	    if (n != 0)
-	    {
-		    warn_if_different(__func__, &subframe_ind.header, &ind.header, subframe_ind.sfn_sf, ind.sfn_sf);
-	    }
+        nfapi_subframe_indication_t ind;
+        message_buffer_t *msg = msgs->msgs[n];
+        if (nfapi_p7_message_unpack(msg->data, msg->length, &ind, sizeof(ind), NULL) < 0)
+        {
+            printf("subframe indication unpack failed, msg[%zu]", n);
+            return -1;
+        }
+        if (n != 0)
+        {
+            warn_if_different(__func__, &subframe_ind.header, &ind.header, subframe_ind.sfn_sf, ind.sfn_sf);
+        }
         subframe_ind.header = ind.header;
         subframe_ind.sfn_sf = ind.sfn_sf;
         NFAPI_TRACE(NFAPI_TRACE_DEBUG, "UE Subframe indication triggered for VNF SFN_SF: %u \n", ind.sfn_sf);
    }
     NFAPI_TRACE(NFAPI_TRACE_DEBUG, "VT (Proxy eNB) inside oai_nfapi_ue_subframe_indication from oai_ue_subframe_ind \n");
-   int retVal = oai_nfapi_ue_subframe_indication(&subframe_ind, sfn_sf_sync);
+   int retVal = oai_nfapi_ue_subframe_indication(id, &subframe_ind, sfn_sf_sync);
    if (retVal == -1)
    {
        NFAPI_TRACE(NFAPI_TRACE_ERROR, "VT (Proxy eNB) exit  oai_nfapi_ue_subframe_indication return %d\n", retVal);
@@ -3695,7 +3696,7 @@ static int oai_ue_subframe_ind(subframe_msgs_t *msgs, uint16_t sfn_sf_sync)
    return retVal;
 }
 
-static void oai_subframe_aggregate_sr_ind(subframe_msgs_t *msgs)
+static void oai_subframe_aggregate_sr_ind(int id, subframe_msgs_t *msgs)
 {
     assert(msgs->num_msgs > 0);
     nfapi_sr_indication_t agg;
@@ -3744,7 +3745,7 @@ static void oai_subframe_aggregate_sr_ind(subframe_msgs_t *msgs)
         }
     }
 
-    oai_nfapi_sr_indication(&agg);
+    oai_nfapi_sr_indication(id, &agg);
     free(agg.sr_indication_body.sr_pdu_list); // Should actually be nfapi_vnf_p7_release_msg
 }
 
@@ -3792,7 +3793,7 @@ static void oai_slot_aggregate_slot_ind(slot_msgs_t *msgs, uint16_t *sfn_slot_pr
     oai_slot_ind(ind.sfn, ind.slot);
     *sfn_slot_proxy = sfn_slot_counter(&sfn, &slot);
     transfer_downstream_sfn_slot_to_proxy(*sfn_slot_proxy);
-    *ack_status = 0; 
+    *ack_status = 0;
 }
 
 
@@ -3848,15 +3849,15 @@ static void oai_slot_aggregate_srs_ind(slot_msgs_t *msgs)
     free(agg.pdu_list); // Should actually be nfapi_vnf_p7_release_msg
 }
 
-static void oai_subframe_aggregate_message_id(uint16_t msg_id, subframe_msgs_t *msgs,uint16_t *sfn_sf_ack, uint8_t *ack_status)
+static void oai_subframe_aggregate_message_id(int id, uint16_t msg_id, subframe_msgs_t *msgs, uint16_t *sfn_sf_ack, uint8_t *ack_status)
 {
     assert(msgs->num_msgs > 0);
     assert(msgs->msgs[0] != NULL);
     assert(msgs->msgs[0]->length <= sizeof(msgs->msgs[0]->data));
-    uint16_t sfn = 0; 
+    uint16_t sfn = 0;
     uint16_t sf = 0;
     static uint16_t sfn_sf_sync = 0;
-    
+
     uint16_t sfn_sf = nfapi_get_sfnsf(msgs->msgs[0]->data, msgs->msgs[0]->length);
     NFAPI_TRACE(NFAPI_TRACE_INFO, "(Proxy eNB) Aggregating collection of %s uplink messages prior to sending to eNB. Frame: %d, Subframe: %d",
                 nfapi_get_message_id(msgs->msgs[0]->data, msgs->msgs[0]->length), NFAPI_SFNSF2SFN(sfn_sf), NFAPI_SFNSF2SF(sfn_sf));
@@ -3864,36 +3865,37 @@ static void oai_subframe_aggregate_message_id(uint16_t msg_id, subframe_msgs_t *
     switch (msg_id)
     {
     case NFAPI_RACH_INDICATION:
-        oai_subframe_aggregate_rach_ind(msgs);
+        oai_subframe_aggregate_rach_ind(id, msgs);
         break;
     case NFAPI_CRC_INDICATION:
-        oai_subframe_aggregate_crc_ind(msgs);
+        oai_subframe_aggregate_crc_ind(id, msgs);
         break;
     case NFAPI_RX_ULSCH_INDICATION:
-        oai_subframe_aggregate_rx_ind(msgs);
+        oai_subframe_aggregate_rx_ind(id, msgs);
         break;
     case NFAPI_RX_CQI_INDICATION:
-        oai_subframe_aggregate_cqi_ind(msgs);
+        oai_subframe_aggregate_cqi_ind(id, msgs);
         break;
     case NFAPI_HARQ_INDICATION:
-        oai_subframe_aggregate_harq_ind(msgs);
+        oai_subframe_aggregate_harq_ind(id, msgs);
         break;
     case NFAPI_RX_SR_INDICATION:
-        oai_subframe_aggregate_sr_ind(msgs);
+        oai_subframe_aggregate_sr_ind(id, msgs);
         break;
     case NFAPI_SUBFRAME_INDICATION:
+        if (!sfn_sf_ack) return;
         /** TODO: Check for Virtual time or not */
-	if ( *ack_status == 1) sfn_sf_sync = sfn_sf;
+        if ( *ack_status == 1) sfn_sf_sync = sfn_sf;
         //Sending to VNF
         sfn = NFAPI_SFNSF2SFN(sfn_sf_sync);
         sf = NFAPI_SFNSF2SF(sfn_sf_sync);
         sfn_sf_sync = sfn_sf_counter(&sfn, &sf);
-        int retVal = oai_ue_subframe_ind(msgs, sfn_sf_sync);
+        int retVal = oai_ue_subframe_ind(id, msgs, sfn_sf_sync);
         if(retVal)
             *ack_status = 1;
         else
             *ack_status = 0;
-	*sfn_sf_ack = sfn_sf_sync;
+        *sfn_sf_ack = sfn_sf_sync;
         break;
     default:
         return;
@@ -3901,9 +3903,10 @@ static void oai_subframe_aggregate_message_id(uint16_t msg_id, subframe_msgs_t *
 }
 
 /*
-    subframe_msgs is a pointer to an array of num_ues
+*    subframe_msgs is a pointer to an array of num_ues
+*    Aggregate messages for virtual time if ss_cfg_g is not NULL.
 */
-static void oai_subframe_aggregate_messages(subframe_msgs_t *subframe_msgs)
+static void oai_subframe_aggregate_messages(int id, subframe_msgs_t *subframe_msgs, uint16_t *sfn_sf_ack, uint8_t *ack_status)
 {
     for (;;)
     {
@@ -3945,7 +3948,7 @@ static void oai_subframe_aggregate_messages(subframe_msgs_t *subframe_msgs)
         {
             break;
         }
-        oai_subframe_aggregate_message_id(found_msg_id, &msgs_by_id, NULL, NULL);
+        oai_subframe_aggregate_message_id(id, found_msg_id, &msgs_by_id, sfn_sf_ack, ack_status);
 
         for (int k = 0; k < msgs_by_id.num_msgs; k++)
         {
@@ -3956,66 +3959,6 @@ static void oai_subframe_aggregate_messages(subframe_msgs_t *subframe_msgs)
         }
     }
 }
-
-
-/*
- *   Aggregate messages for virtual time.
- *   subframe_msgs is a pointer to an array of num_ues
- */
-static void oai_subframe_aggregate_messages_vt(subframe_msgs_t *subframe_msgs,uint16_t *sfn_sf_ack,uint8_t *ack_status)
-{
-    for (;;)
-    {
-        subframe_msgs_t msgs_by_id;
-        memset(&msgs_by_id, 0, sizeof(msgs_by_id));
-        uint16_t found_msg_id = 0;
-        for (int i = 0; i < num_ues; i++)
-        {
-            for (int j = 0; j < subframe_msgs[i].num_msgs; j++)
-            {
-                message_buffer_t *msg = subframe_msgs[i].msgs[j];
-                if (!msg)
-                {
-                    // already processed this message
-                    continue;
-                }
-                assert(msg->magic == MESSAGE_BUFFER_MAGIC);
-
-                uint16_t id = get_message_id(msg);
-                if (found_msg_id == 0)
-                {
-                    found_msg_id = id;
-                }
-                if (found_msg_id == id)
-                {
-                    subframe_msgs[i].msgs[j] = NULL;
-                    if (msgs_by_id.num_msgs == MAX_SUBFRAME_MSGS)
-                    {
-                        NFAPI_TRACE(NFAPI_TRACE_ERROR, "Too many msgs");
-                        msg->magic = 0;
-                        free(msg);
-                        continue;
-                    }
-                    msgs_by_id.msgs[msgs_by_id.num_msgs++] = msg;
-                }
-            }
-        }
-        if (found_msg_id == 0)
-        {
-            break;
-        }
-        oai_subframe_aggregate_message_id(found_msg_id, &msgs_by_id, sfn_sf_ack, ack_status);
-
-        for (int k = 0; k < msgs_by_id.num_msgs; k++)
-        {
-            message_buffer_t *msg = msgs_by_id.msgs[k];
-            assert(msg->magic == MESSAGE_BUFFER_MAGIC);
-            msg->magic = 0;
-            free(msg);
-        }
-    }
-}
-
 
 int get_sf_delta(uint16_t a, uint16_t b)
 {
@@ -4055,39 +3998,7 @@ void sfn_slot_add(uint16_t *sfn, uint16_t *slot, uint16_t add_val)
     *slot = (*slot + add_val) % 20;
 }
 
-static void oai_slot_aggregate_message_id(uint16_t msg_id, slot_msgs_t *msgs)
-{
-    assert(msgs->num_msgs > 0);
-    assert(msgs->msgs[0] != NULL);
-    assert(msgs->msgs[0]->length <= sizeof(msgs->msgs[0]->data));
-    uint16_t sfn_slot = nfapi_get_sfnslot(msgs->msgs[0]->data, msgs->msgs[0]->length);
-
-    NFAPI_TRACE(NFAPI_TRACE_INFO, "(Proxy gNB) Aggregating collection of %s uplink messages prior to sending to gNB. Frame: %d, Slot: %d",
-                nfapi_nr_get_message_id(msgs->msgs[0]->data, msgs->msgs[0]->length), NFAPI_SFNSLOT2SFN(sfn_slot), NFAPI_SFNSLOT2SLOT(sfn_slot));
-    // Aggregate these messages and send the resulting message to the gNB
-    switch (msg_id)
-    {
-    case NFAPI_NR_PHY_MSG_TYPE_RACH_INDICATION:
-        oai_slot_aggregate_rach_ind(msgs);//It is using subframe. Need to check further.
-        break;
-    case NFAPI_NR_PHY_MSG_TYPE_CRC_INDICATION:
-        oai_slot_aggregate_crc_ind(msgs);
-        break;
-    case NFAPI_NR_PHY_MSG_TYPE_RX_DATA_INDICATION:
-        oai_slot_aggregate_rx_data_ind(msgs);
-        break;
-    case NFAPI_NR_PHY_MSG_TYPE_UCI_INDICATION:
-        oai_slot_aggregate_uci_ind(msgs);
-        break;
-    case NFAPI_NR_PHY_MSG_TYPE_SRS_INDICATION:
-        oai_slot_aggregate_srs_ind(msgs);
-        break;
-    default:
-        return;
-    }
-}
-
-static void oai_slot_aggregate_message_id_vt(uint16_t msg_id, slot_msgs_t *msgs, uint16_t *sfn_sf_tx, uint8_t *ack_status)
+static void oai_slot_aggregate_message_id(uint16_t msg_id, slot_msgs_t *msgs, uint16_t *sfn_sf_tx, uint8_t *ack_status)
 {
     assert(msgs->num_msgs > 0);
     assert(msgs->msgs[0] != NULL);
@@ -4115,6 +4026,7 @@ static void oai_slot_aggregate_message_id_vt(uint16_t msg_id, slot_msgs_t *msgs,
         oai_slot_aggregate_srs_ind(msgs);
         break;
     case NFAPI_NR_PHY_MSG_TYPE_SLOT_INDICATION:
+        if (!sfn_sf_tx) return;
         oai_slot_aggregate_slot_ind(msgs, sfn_sf_tx, ack_status);
         break;
     default:
@@ -4126,7 +4038,7 @@ static void oai_slot_aggregate_message_id_vt(uint16_t msg_id, slot_msgs_t *msgs,
 /*
     slot_msgs is a pointer to an array of num_ues
 */
-static void oai_slot_aggregate_messages(slot_msgs_t *slot_msgs)
+static void oai_slot_aggregate_messages(slot_msgs_t *slot_msgs, uint16_t *sfn_slot_tx, uint8_t *ack_status)
 {
     for (;;)
     {
@@ -4170,7 +4082,7 @@ static void oai_slot_aggregate_messages(slot_msgs_t *slot_msgs)
         }
 
         //To Do Items to implement oai_slot_aggregate_message_id
-        oai_slot_aggregate_message_id(found_msg_id, &msgs_by_id);
+        oai_slot_aggregate_message_id(found_msg_id, &msgs_by_id, sfn_slot_tx, ack_status);
 
         for (int k = 0; k < msgs_by_id.num_msgs; k++)
         {
@@ -4181,66 +4093,6 @@ static void oai_slot_aggregate_messages(slot_msgs_t *slot_msgs)
         }
     }
 }
-
-
-/*
-    slot_msgs is a pointer to an array of num_ues
-*/
-static void oai_slot_aggregate_messages_vt(slot_msgs_t *slot_msgs, uint16_t *sfn_slot_tx, uint8_t *ack_status)
-{
-    for (;;)
-    {
-        slot_msgs_t msgs_by_id;
-        memset(&msgs_by_id, 0, sizeof(msgs_by_id));
-        uint16_t found_msg_id = 0;
-        for (int i = 0; i < num_ues; i++)
-        {
-            for (int j = 0; j < slot_msgs[i].num_msgs; j++)
-            {
-                message_buffer_t *msg = slot_msgs[i].msgs[j];
-                if (!msg)
-                {
-                    // already processed this message
-                    continue;
-                }
-                assert(msg->magic == MESSAGE_BUFFER_MAGIC);
-
-                uint16_t id = get_message_id(msg);
-                if (found_msg_id == 0)
-                {
-                    found_msg_id = id;
-                }
-                if (found_msg_id == id)
-                {
-                    slot_msgs[i].msgs[j] = NULL;
-                    if (msgs_by_id.num_msgs == MAX_SLOT_MSGS)
-                    {
-                        NFAPI_TRACE(NFAPI_TRACE_ERROR, "Too many msgs");
-                        msg->magic = 0;
-                        free(msg);
-                        continue;
-                    }
-                    msgs_by_id.msgs[msgs_by_id.num_msgs++] = msg;
-                }
-            }
-        }
-        if (found_msg_id == 0)
-        {
-            break;
-        }
-
-        oai_slot_aggregate_message_id_vt(found_msg_id, &msgs_by_id, sfn_slot_tx, ack_status);
-
-        for (int k = 0; k < msgs_by_id.num_msgs; k++)
-        {
-            message_buffer_t *msg = msgs_by_id.msgs[k];
-            assert(msg->magic == MESSAGE_BUFFER_MAGIC);
-            msg->magic = 0;
-            free(msg);
-        }
-    }
-}
-
 
 // TODO: Expand this function to include checking what the different sfn_sf
 // mismatchs are
@@ -4291,7 +4143,7 @@ static void oai_slot_aggregate_messages_vt(slot_msgs_t *slot_msgs, uint16_t *sfn
 //     }
 // }
 
-bool dequeue_ue_msgs(subframe_msgs_t *subframe_msgs, uint16_t sfn_sf_tx)
+bool dequeue_ue_msgs(int enb_id, subframe_msgs_t *subframe_msgs, uint16_t sfn_sf_tx)
 {
     // Dequeue for all UE responses, and discard any with the wrong sfn/sf value.
     // There might be multiple messages from a given UE with the same sfn/sf value.
@@ -4301,7 +4153,7 @@ bool dequeue_ue_msgs(subframe_msgs_t *subframe_msgs, uint16_t sfn_sf_tx)
     {
         for (;;)
         {
-            message_buffer_t *msg = get_queue(&msgs_from_ue[i]);
+            message_buffer_t *msg = get_queue(&msgs_from_ue[enb_id][i]);
             if (!msg)
             {
                 break;
@@ -4326,7 +4178,7 @@ bool dequeue_ue_msgs(subframe_msgs_t *subframe_msgs, uint16_t sfn_sf_tx)
             }
             if (master_sfn_sf != msg_sfn_sf)
             {
-                if (!requeue(&msgs_from_ue[i], msg))
+                if (!requeue(&msgs_from_ue[enb_id][i], msg))
                 {
                     msg->magic = 0;
                     free(msg);
@@ -4495,91 +4347,23 @@ static uint16_t sfn_slot_counter(uint16_t *sfn, uint16_t *slot)
     return (*sfn << 6) | *slot;
 }
 
-#define LTE_PROXY_DONE   1
-#define NR_PROXY_DONE    2
-#define BOTH_LTE_NR_DONE 3
+#define LTE_PROXY_DONE      1
+#define NR_PROXY_DONE       2
+#define BOTH_LTE_NR_DONE    3
+#define LTE_PROXY_0_DONE    1
+#define LTE_PROXY_1_DONE    2
+#define BOTH_LTE_PROXY_DONE 3
 #define errExit(msg)     do { NFAPI_TRACE(NFAPI_TRACE_ERROR, "%s", msg); \
                               exit(EXIT_FAILURE); \
                          } while (0)
 
 uint16_t sf_slot_tick;
+uint16_t sf0_sf1_tick;
 pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
 pthread_cond_t cond_sf_slot = PTHREAD_COND_INITIALIZER;
-
+pthread_cond_t cond_sf0_sf1 = PTHREAD_COND_INITIALIZER;
 
 void *oai_subframe_task(void *context)
-{
-    pnf_set_thread_priority(79);
-    uint16_t sfn = 0;
-    uint16_t sf = 0;
-    bool are_queues_empty = true;
-    softmodem_mode_t softmodem_mode = (softmodem_mode_t) context;
-    NFAPI_TRACE(NFAPI_TRACE_INFO, "Subframe Task thread");
-    while (true)
-    {
-
-        uint16_t sfn_sf_tx = sfn_sf_counter(&sfn, &sf);
-
-        uint64_t iteration_start = clock_usec();
-
-        transfer_downstream_sfn_sf_to_proxy(sfn_sf_tx); // send to oai UE
-        NFAPI_TRACE(NFAPI_TRACE_DEBUG, "Frame %u Subframe %u sent to OAI ue", sfn_sf_tx >> 4,
-                    sfn_sf_tx & 0XF);
-
-        if (are_queues_empty)
-        {
-            usleep(825);
-        }
-
-        uint64_t poll_end = clock_usec();
-        oai_subframe_ind(sfn, sf);
-        uint64_t subframe_sent = clock_usec();
-
-        /*
-            Dequeue, collect and aggregate the messages with the same message ID.
-        */
-        subframe_msgs_t subframe_msgs[MAX_UES];
-        memset(subframe_msgs, 0, sizeof(subframe_msgs));
-        are_queues_empty = dequeue_ue_msgs(subframe_msgs, sfn_sf_tx);
-
-        oai_subframe_aggregate_messages(subframe_msgs);
-
-        if (softmodem_mode == SOFTMODEM_NSA)
-        {
-            if (pthread_mutex_lock(&lock) != 0)
-                errExit("failed to lock mutex");
-
-            sf_slot_tick |= LTE_PROXY_DONE;
-            if (sf_slot_tick == BOTH_LTE_NR_DONE)
-            {
-                if (pthread_cond_broadcast(&cond_sf_slot) != 0)
-                    errExit("failed to broadcast on the condition");
-            }
-            else
-            {
-                while ( sf_slot_tick != BOTH_LTE_NR_DONE)
-                {
-                    if (pthread_cond_wait(&cond_sf_slot, &lock) != 0)
-                        errExit("failed to wait on the condition");
-                }
-                sf_slot_tick = 0;
-            }
-
-            if (pthread_mutex_unlock(&lock) != 0)
-                errExit("failed to unlock mutex");
-        }
-
-        uint64_t aggregation_done = clock_usec();
-
-        if (are_queues_empty)
-        {
-            add_sleep_time(iteration_start, poll_end, subframe_sent, aggregation_done);
-        }
-    }
-}
-
-
-void *oai_subframe_task_vt(void *context)
 {
     pnf_set_thread_priority(79);
     uint16_t sfn = 0;
@@ -4587,44 +4371,99 @@ void *oai_subframe_task_vt(void *context)
     uint16_t sfn_sf_tx = 0;
     uint8_t ack_status = 1;
     int first_ack = 0;
-   
-    if (NULL == ss_cfg_g)
-        NFAPI_TRACE(NFAPI_TRACE_ERROR, "SS Configuration is NULL");
+    uint64_t poll_end = 0;
+    uint64_t subframe_sent = 0;
+    bool vt_enabled = (NULL != ss_cfg_g) && (ss_cfg_g->cfg.vt_enabled);
+    uint32_t next_sfn_sf_dec = 0;
+    uint32_t current_sfn_sf_dec = 0;
+    if (vt_enabled)
+    {
+        next_sfn_sf_dec = ss_cfg_g->cfg.cli_periodicity_g;
+        NFAPI_TRACE(NFAPI_TRACE_INFO, "Cell update periodicity: %d", next_sfn_sf_dec);
+    }
 
-    uint32_t next_sfn_sf_dec = ss_cfg_g->cfg.cli_periodicity_g;
-    uint32_t current_sfn_sf_dec;
-
-    NFAPI_TRACE(NFAPI_TRACE_INFO, "Cell update periodicity: %d", next_sfn_sf_dec);
     bool are_queues_empty = true;
-    softmodem_mode_t softmodem_mode = (softmodem_mode_t) context;
+    softmodem_mode_t softmodem_mode = ((struct oai_task_args*)context)->softmodem_mode;
+    int id = ((struct oai_task_args*)context)->node_id;
+    uint16_t sf_tick_1st = (id == 0) ? LTE_PROXY_0_DONE : LTE_PROXY_1_DONE;
     NFAPI_TRACE(NFAPI_TRACE_INFO, "Subframe Task thread");
     while (true)
     {
         uint64_t iteration_start = clock_usec();
-        if(ack_status)
+        if (vt_enabled)
+        {
+            if(ack_status)
+            {
+                sfn_sf_tx = sfn_sf_counter(&sfn, &sf);
+                transfer_downstream_sfn_sf_to_proxy(id, sfn_sf_tx); // send to oai UE
+                usleep(900);
+            }
+            oai_subframe_ind(id, sfn_sf_tx >>4, sfn_sf_tx & 0xF);
+        }
+        else
         {
             sfn_sf_tx = sfn_sf_counter(&sfn, &sf);
-            transfer_downstream_sfn_sf_to_proxy(sfn_sf_tx); // send to oai UE
-	    usleep(900);
-        }
 
-        oai_subframe_ind(sfn_sf_tx >>4, sfn_sf_tx & 0xF);
+            transfer_downstream_sfn_sf_to_proxy(id, sfn_sf_tx); // send to oai UE
+            NFAPI_TRACE(NFAPI_TRACE_DEBUG, "Frame %u Subframe %u sent to OAI ue", sfn_sf_tx >> 4,
+                        sfn_sf_tx & 0XF);
+
+            if (are_queues_empty)
+            {
+                usleep(825);
+            }
+            poll_end = clock_usec();
+            oai_subframe_ind(id, sfn, sf);
+            subframe_sent = clock_usec();
+        }
 
         /*
             Dequeue, collect and aggregate the messages with the same message ID.
         */
         subframe_msgs_t subframe_msgs[MAX_UES];
         memset(subframe_msgs, 0, sizeof(subframe_msgs));
-        are_queues_empty = dequeue_ue_msgs(subframe_msgs, sfn_sf_tx);
-        oai_subframe_aggregate_messages_vt(subframe_msgs, &sfn_sf_tx, &ack_status);
-        current_sfn_sf_dec =  NFAPI_SFNSF2DEC(sfn_sf_tx);
-        if ((!ack_status && !first_ack))
+        are_queues_empty = dequeue_ue_msgs(id, subframe_msgs, sfn_sf_tx);
+
+        if (vt_enabled)
         {
-            next_sfn_sf_dec = current_sfn_sf_dec;
-            first_ack = 1;
+            oai_subframe_aggregate_messages(id, subframe_msgs, &sfn_sf_tx, &ack_status);
+            current_sfn_sf_dec =  NFAPI_SFNSF2DEC(sfn_sf_tx);
+            if ((!ack_status && !first_ack))
+            {
+                next_sfn_sf_dec = current_sfn_sf_dec;
+                first_ack = 1;
+            }
+        }
+        else
+        {
+            oai_subframe_aggregate_messages(id, subframe_msgs, NULL, NULL);
         }
 
-        if (softmodem_mode == SOFTMODEM_NSA)
+        if (softmodem_mode == SOFTMODEM_LTE_HANDOVER)
+        {
+            if (pthread_mutex_lock(&lock) != 0)
+                errExit("failed to lock mutex");
+
+            sf0_sf1_tick |= sf_tick_1st;
+            if (sf0_sf1_tick == BOTH_LTE_PROXY_DONE)
+            {
+                if (pthread_cond_broadcast(&cond_sf0_sf1) != 0)
+                    errExit("failed to broadcast on the condition");
+            }
+            else
+            {
+                while ( sf0_sf1_tick != BOTH_LTE_PROXY_DONE)
+                {
+                    if (pthread_cond_wait(&cond_sf0_sf1, &lock) != 0)
+                        errExit("failed to wait on the condition");
+                }
+                sf0_sf1_tick = 0;
+            }
+
+            if (pthread_mutex_unlock(&lock) != 0)
+                errExit("failed to unlock mutex");
+        }
+        else if (softmodem_mode == SOFTMODEM_NSA)
         {
             if (pthread_mutex_lock(&lock) != 0)
                 errExit("failed to lock mutex");
@@ -4649,28 +4488,32 @@ void *oai_subframe_task_vt(void *context)
                 errExit("failed to unlock mutex");
         }
 
-       /* Sending the cell info every 20th SFN,
-        * TODO: This shall be agreed and made configurable */       
-	if (NULL != p7_config_g) {
-	    if ((next_sfn_sf_dec == current_sfn_sf_dec) || ss_cfg_g->Noc_updated )
-		{
-		    if (ss_cfg_g->cfg_bitmap & PROXY_CELL_CONFIG || 1 /** Till cell config is ported */) {
-			send_cell_info_ind(p7_config_g, ss_cfg_g->currentAttnVal);
-			NFAPI_TRACE(NFAPI_TRACE_DEBUG, "Sending cell info to UE: sfn: %d sf: %d\n", 
-							sfn_sf_tx >> 4, sfn_sf_tx & 0xF);
-		    }
+        /* Sending the cell info every 20th SFN,
+        *  TODO: This shall be agreed and made configurable
+        */
+        if (vt_enabled && NULL != p7_config_g[id]) {
+            if ((next_sfn_sf_dec == current_sfn_sf_dec) || ss_cfg_g->Noc_updated )
+            {
+                if (ss_cfg_g->cfg_bitmap & PROXY_CELL_CONFIG || 1 /** Till cell config is ported */) {
+                send_cell_info_ind(p7_config_g[id], ss_cfg_g->currentAttnVal);
+                NFAPI_TRACE(NFAPI_TRACE_DEBUG, "Sending cell info to UE: sfn: %d sf: %d\n",
+                                sfn_sf_tx >> 4, sfn_sf_tx & 0xF);
+                }
 
-		    next_sfn_sf_dec = (current_sfn_sf_dec + ss_cfg_g->cfg.cli_periodicity_g) % NFAPI_MAX_SFNSFDEC;
-		    if (ss_cfg_g->Noc_updated) ss_cfg_g->Noc_updated = 0; 
-		}
+                next_sfn_sf_dec = (current_sfn_sf_dec + ss_cfg_g->cfg.cli_periodicity_g) % NFAPI_MAX_SFNSFDEC;
+                if (ss_cfg_g->Noc_updated) ss_cfg_g->Noc_updated = 0;
+            }
 
-	}
+        }
 
         uint64_t aggregation_done = clock_usec();
 
         if (are_queues_empty)
         {
-            add_sleep_time(iteration_start, 0, 0, aggregation_done);
+            if (vt_enabled)
+                add_sleep_time(iteration_start, 0, 0, aggregation_done);
+            else
+                add_sleep_time(iteration_start, poll_end, subframe_sent, aggregation_done);
         }
     }
 }
@@ -4685,91 +4528,16 @@ void *oai_slot_task(void *context)
     NFAPI_TRACE(NFAPI_TRACE_INFO, "Slot Task thread");
     uint16_t slot_tick = 0;
 
-    while (true)
-    {
-        uint16_t sfn_slot_tx = sfn_slot_counter(&sfn, &slot);//Need to update it.
-
-        uint64_t iteration_start = clock_usec();
-        /* Previously we would sleep to ensure that the 500us contraint (per slot)
-           was met, although the sleep time was 312us, which is pretty arbitrary.
-           As we push higher throughputs, we see that the PNF (proxy) is
-           ahead of the VNF (OAI gNB). By arbitrarily changing the sleep to be executed
-           before every slot is sent to the OAI UE, and increasing the sleep time to 1000us,
-           the slot indications are not arriving at the OAI NRUE too quickly as they were
-           before. Furthermore, this ensures that even when TX_DATA_REQs take too long to
-           arrive to the OAI UE, that the slot will arrive AFTER the TX_DATA_REQ. The relationship
-           between slot indications and TX_DATA_REQs are critical to the ACK/nACK procedure.
-           This is a temporary fix until will can concretely sync the PNF and VNF. */
-        usleep(1000);
-        transfer_downstream_sfn_slot_to_proxy(sfn_slot_tx); // send to oai UE
-        NFAPI_TRACE(NFAPI_TRACE_DEBUG, "Frame %u Slot %u sent to OAI ue", NFAPI_SFNSLOT2SFN(sfn_slot_tx),
-                   NFAPI_SFNSLOT2SLOT(sfn_slot_tx));
-
-        uint64_t poll_end = clock_usec();
-        oai_slot_ind(sfn, slot);
-        uint64_t slot_sent = clock_usec();
-
-        /*
-            Dequeue, collect and aggregate the messages with the same message ID.
-        */
-        slot_msgs_t slot_msgs[MAX_UES];
-        memset(slot_msgs, 0, sizeof(slot_msgs));
-        are_queues_empty = dequeue_ue_slot_msgs(slot_msgs, sfn_slot_tx);
-
-        oai_slot_aggregate_messages(slot_msgs);
-
-        if (++slot_tick == NR_PROXY_DONE && softmodem_mode == SOFTMODEM_NSA)
-        {
-            if (pthread_mutex_lock(&lock) != 0)
-                errExit("failed to lock mutex");
-
-            sf_slot_tick |= NR_PROXY_DONE;
-            if (sf_slot_tick == BOTH_LTE_NR_DONE)
-            {
-                if (pthread_cond_broadcast(&cond_sf_slot) != 0)
-                    errExit("failed to broadcast on the condition");
-            }
-            else{
-                while ( sf_slot_tick != BOTH_LTE_NR_DONE)
-                {
-                    if (pthread_cond_wait(&cond_sf_slot, &lock) != 0)
-                        errExit("failed to wait on the condition");
-                }
-                sf_slot_tick = 0;
-            }
-
-            if (pthread_mutex_unlock(&lock)!= 0)
-                errExit("failed to unlock mutex");
-
-            slot_tick = 0;
-        }
-
-        uint64_t aggregation_done = clock_usec();
-
-        if (are_queues_empty)
-        {
-            add_nr_sleep_time(iteration_start, poll_end, slot_sent, aggregation_done);
-        }
-    }
-}
-
-
-void *oai_slot_task_vt(void *context)
-{
-    pnf_set_thread_priority(79);
-    uint16_t sfn = 0;
-    uint16_t slot = 0;
-    bool are_queues_empty = true;
-    softmodem_mode_t softmodem_mode = (softmodem_mode_t) context;
-    NFAPI_TRACE(NFAPI_TRACE_INFO, "Slot Task thread");
-    uint16_t slot_tick = 0;
     uint16_t sfn_slot_tx = 0;
     uint8_t ack_status = 1;
     uint32_t current_sfn_sl_dec = 0;
 
+    uint64_t poll_end = 0;
+    uint64_t slot_sent = 0;
+    bool vt_enabled = (NULL != ss_cfg_g) && (ss_cfg_g->cfg.vt_enabled);
+
     while (true)
     {
-
         uint64_t iteration_start = clock_usec();
         /* Previously we would sleep to ensure that the 500us contraint (per slot)
            was met, although the sleep time was 312us, which is pretty arbitrary.
@@ -4781,28 +4549,42 @@ void *oai_slot_task_vt(void *context)
            arrive to the OAI UE, that the slot will arrive AFTER the TX_DATA_REQ. The relationship
            between slot indications and TX_DATA_REQs are critical to the ACK/nACK procedure.
            This is a temporary fix until will can concretely sync the PNF and VNF. */
-        if(ack_status)
+        if(vt_enabled && ack_status)
         {
             sfn_slot_tx = sfn_slot_counter(&sfn, &slot);
             transfer_downstream_sfn_slot_to_proxy(sfn_slot_tx); // send to oai UE
             //usleep(900);
             sleep(1);
         }
+        else
+        {
+            sfn_slot_tx = sfn_slot_counter(&sfn, &slot);//Need to update it.
+            usleep(1000);
+            transfer_downstream_sfn_slot_to_proxy(sfn_slot_tx); // send to oai UE
+            NFAPI_TRACE(NFAPI_TRACE_DEBUG, "Frame %u Slot %u sent to OAI ue", NFAPI_SFNSLOT2SFN(sfn_slot_tx),
+                    NFAPI_SFNSLOT2SLOT(sfn_slot_tx));
+
+            poll_end = clock_usec();
+            oai_slot_ind(sfn, slot);
+            slot_sent = clock_usec();
+        }
         /*
             Dequeue, collect and aggregate the messages with the same message ID.
         */
         slot_msgs_t slot_msgs[MAX_UES];
         memset(slot_msgs, 0, sizeof(slot_msgs));
         are_queues_empty = dequeue_ue_slot_msgs(slot_msgs, sfn_slot_tx);
-        oai_slot_aggregate_messages_vt(slot_msgs, &sfn_slot_tx, &ack_status);
-		/* Calculating total number of slots */
-        current_sfn_sl_dec = NFAPI_SFNSLOT2DEC(NFAPI_SFNSLOT2SFN(sfn_slot_tx), NFAPI_SFNSLOT2SLOT(sfn_slot_tx));
-//        if ((!ack_status && !first_ack))
-//        {
-//            next_sfn_slot_dec = current_sfn_sl_dec;
-//            first_ack = 1;
-//        }
 
+        if (vt_enabled)
+        {
+            oai_slot_aggregate_messages(slot_msgs, &sfn_slot_tx, &ack_status);
+            /* Calculating total number of slots */
+            current_sfn_sl_dec = NFAPI_SFNSLOT2DEC(NFAPI_SFNSLOT2SFN(sfn_slot_tx), NFAPI_SFNSLOT2SLOT(sfn_slot_tx));
+        }
+        else
+        {
+            oai_slot_aggregate_messages(slot_msgs, NULL, NULL);
+        }
 
         if (++slot_tick == NR_PROXY_DONE && softmodem_mode == SOFTMODEM_NSA)
         {
@@ -4829,31 +4611,34 @@ void *oai_slot_task_vt(void *context)
 
             slot_tick = 0;
         }
-	/* Sending Cell Search Indication to OAI UE */
-	if (NULL != p7_nr_config_g) {
-	    if (!(current_sfn_sl_dec % ss_cfg_g->cfg.cli_periodicity_g) || ss_cfg_g->Noc_updated )
-		{
-		    if (ss_cfg_g->cfg_bitmap & PROXY_CELL_CONFIG || 1 /** Till cell config is ported */) {
-			send_cell_info_ind(p7_nr_config_g, ss_cfg_g->currentAttnVal);
 
-			NFAPI_TRACE(NFAPI_TRACE_DEBUG, "Sending cell info to UE: sfn: %d sf: %d\n", 
-							sfn_slot_tx >> 6, sfn_slot_tx & 0x3F);
-		    }
-		    if (ss_cfg_g->Noc_updated) ss_cfg_g->Noc_updated = 0; 
-		}
-	}
+        /* Sending Cell Search Indication to OAI UE */
+        if (vt_enabled && NULL != p7_nr_config_g) {
+            if (!(current_sfn_sl_dec % ss_cfg_g->cfg.cli_periodicity_g) || ss_cfg_g->Noc_updated )
+            {
+                if (ss_cfg_g->cfg_bitmap & PROXY_CELL_CONFIG || 1 /** Till cell config is ported */) {
+                send_cell_info_ind(p7_nr_config_g, ss_cfg_g->currentAttnVal);
+
+                NFAPI_TRACE(NFAPI_TRACE_DEBUG, "Sending cell info to UE: sfn: %d sf: %d\n",
+                                sfn_slot_tx >> 6, sfn_slot_tx & 0x3F);
+                }
+                if (ss_cfg_g->Noc_updated) ss_cfg_g->Noc_updated = 0;
+            }
+        }
 
         uint64_t aggregation_done = clock_usec();
 
         if (are_queues_empty)
         {
-            add_nr_sleep_time(iteration_start, 0, 0, aggregation_done);
+            if (vt_enabled)
+                add_nr_sleep_time(iteration_start, 0, 0, aggregation_done);
+            else
+                add_nr_sleep_time(iteration_start, poll_end, slot_sent, aggregation_done);
         }
     }
 }
 
-
-void oai_subframe_handle_msg_from_ue(const void *msg, size_t len, uint16_t nem_id)
+void oai_subframe_handle_msg_from_ue(uint16_t enb_id, const void *msg, size_t len, uint16_t nem_id)
 {
     if (len == 4) // Dummy packet ignore
     {
@@ -4877,7 +4662,7 @@ void oai_subframe_handle_msg_from_ue(const void *msg, size_t len, uint16_t nem_i
     assert(len < sizeof(p->data));
     memcpy(p->data, msg, len);
 
-    if (!put_queue(&msgs_from_ue[i], p))
+    if (!put_queue(&msgs_from_ue[enb_id][i], p))
     {
         p->magic = 0;
         free(p);
@@ -4928,33 +4713,33 @@ void handle_nr_slot_ind(uint16_t sfn, uint16_t slot) {
 
     ind->sfn = sfn_tx;
     ind->slot = slot_tx;
-    oai_nfapi_nr_slot_indication(ind); 
+    oai_nfapi_nr_slot_indication(ind);
 
     //copy data from appropriate p7 slot buffers into channel structures for PHY processing
-    nfapi_pnf_p7_slot_ind(p7_config_g, p7_config_g->phy_id, sfn, slot); 
+    nfapi_pnf_p7_slot_ind(p7_config_g, p7_config_g->phy_id, sfn, slot);
 
     return;
 }
 */
 
-int oai_nfapi_rach_ind(nfapi_rach_indication_t *rach_ind)
+int oai_nfapi_rach_ind(int id, nfapi_rach_indication_t *rach_ind)
 {
 
     rach_ind->header.phy_id = 1; // DJP HACK TODO FIXME - need to pass this around!!!!
 
-    NFAPI_TRACE(NFAPI_TRACE_INFO, "Sent the rach to eNB sf: %u sfn : %u num of preambles: %u",
-               rach_ind->sfn_sf & 0xF, rach_ind->sfn_sf >> 4, rach_ind->rach_indication_body.number_of_preambles);
+    NFAPI_TRACE(NFAPI_TRACE_INFO, "Sent the rach to eNB%d sf: %u sfn : %u num of preambles: %u",
+               id, rach_ind->sfn_sf & 0xF, rach_ind->sfn_sf >> 4, rach_ind->rach_indication_body.number_of_preambles);
 
-    return nfapi_pnf_p7_rach_ind(p7_config_g, rach_ind);
+    return nfapi_pnf_p7_rach_ind(p7_config_g[id], rach_ind);
 }
 
-int oai_nfapi_harq_indication(nfapi_harq_indication_t *harq_ind)
+int oai_nfapi_harq_indication(int id, nfapi_harq_indication_t *harq_ind)
 {
     harq_ind->header.phy_id = 1; // DJP HACK TODO FIXME - need to pass this around!!!!
     harq_ind->header.message_id = NFAPI_HARQ_INDICATION;
     NFAPI_TRACE(NFAPI_TRACE_INFO, "sfn_sf:%d number_of_harqs:%d\n", NFAPI_SFNSF2DEC(harq_ind->sfn_sf),
                harq_ind->harq_indication_body.number_of_harqs);
-    int retval = nfapi_pnf_p7_harq_ind(p7_config_g, harq_ind);
+    int retval = nfapi_pnf_p7_harq_ind(p7_config_g[id], harq_ind);
 
     if (retval != 0)
     {
@@ -4966,16 +4751,16 @@ int oai_nfapi_harq_indication(nfapi_harq_indication_t *harq_ind)
     return retval;
 }
 
-int oai_nfapi_crc_indication(nfapi_crc_indication_t *crc_ind) // msg 3
+int oai_nfapi_crc_indication(int id, nfapi_crc_indication_t *crc_ind) // msg 3
 {
 
     crc_ind->header.phy_id = 1; // DJP HACK TODO FIXME - need to pass this around!!!!
     crc_ind->header.message_id = NFAPI_CRC_INDICATION;
 
-    return nfapi_pnf_p7_crc_ind(p7_config_g, crc_ind);
+    return nfapi_pnf_p7_crc_ind(p7_config_g[id], crc_ind);
 }
 
-int oai_nfapi_cqi_indication(nfapi_cqi_indication_t *ind) // maybe msg 3
+int oai_nfapi_cqi_indication(int id, nfapi_cqi_indication_t *ind) // maybe msg 3
 {
     ind->header.phy_id = 1; // DJP HACK TODO FIXME - need to pass this around!!!!
     ind->header.message_id = NFAPI_RX_CQI_INDICATION;
@@ -4994,10 +4779,10 @@ int oai_nfapi_cqi_indication(nfapi_cqi_indication_t *ind) // maybe msg 3
         }
     }
 
-    return nfapi_pnf_p7_cqi_ind(p7_config_g, ind);
+    return nfapi_pnf_p7_cqi_ind(p7_config_g[id], ind);
 }
 
-int oai_nfapi_rx_ind(nfapi_rx_indication_t *ind) // msg 3
+int oai_nfapi_rx_ind(int id, nfapi_rx_indication_t *ind) // msg 3
 {
 
     ind->header.phy_id = 1; // DJP HACK TODO FIXME - need to pass this around!!!!
@@ -5023,7 +4808,7 @@ int oai_nfapi_rx_ind(nfapi_rx_indication_t *ind) // msg 3
         return -1;
     }
 
-    if (nfapi_pnf_p7_rx_ind(p7_config_g, ind) != 0)
+    if (nfapi_pnf_p7_rx_ind(p7_config_g[id], ind) != 0)
     {
         NFAPI_TRACE(NFAPI_TRACE_ERROR, "Failed to send the RX_IND for SFN.SF %u.%u",
                     ind->sfn_sf >> 4, ind->sfn_sf & 15);
@@ -5048,11 +4833,11 @@ int oai_nfapi_rx_ind(nfapi_rx_indication_t *ind) // msg 3
     return 0;
 }
 
-int oai_nfapi_sr_indication(nfapi_sr_indication_t *ind)
+int oai_nfapi_sr_indication(int id, nfapi_sr_indication_t *ind)
 {
 
     ind->header.phy_id = 1; // DJP HACK TODO FIXME - need to pass this around!!!!
-    int retval = nfapi_pnf_p7_sr_ind(p7_config_g, ind);
+    int retval = nfapi_pnf_p7_sr_ind(p7_config_g[id], ind);
     return retval;
 }
 

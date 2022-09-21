@@ -604,6 +604,7 @@ typedef struct nfapi_pnf_p7_config
 
 	/*! The PHY id*/
 	uint16_t phy_id;
+	int pnf_id;
 
 	// remote
 	/*! The VNF P7 UDP port */
@@ -898,7 +899,7 @@ int nfapi_pnf_p7_vendor_extension(nfapi_pnf_p7_config_t* config, nfapi_p7_messag
 
 int nfapi_pnf_ue_release_resp(nfapi_pnf_p7_config_t* config, nfapi_ue_release_response_t* resp);
 
-int nfapi_pnf_p7_ue_subframe_ind(nfapi_pnf_p7_config_t* config, uint16_t phy_id, uint16_t sfn_sf, uint16_t sfn_sf_sync);
+int nfapi_pnf_p7_ue_subframe_ind(int id, nfapi_pnf_p7_config_t* config, uint16_t phy_id, uint16_t sfn_sf, uint16_t sfn_sf_sync);
 
 /*! Send a cell search indication message
  * \param config A pointer to a PNF P7 config
