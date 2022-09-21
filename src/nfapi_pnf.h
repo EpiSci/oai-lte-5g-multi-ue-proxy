@@ -84,6 +84,7 @@ typedef struct
 {
     uint16_t index;
     uint16_t id;
+    int pnf_id;
     uint8_t rfs[2];
     uint8_t excluded_rfs[2];
 
@@ -189,12 +190,12 @@ typedef struct slot_msgs_t
     message_buffer_t *msgs[MAX_SLOT_MSGS];
 } slot_msgs_t;
 
-int oai_nfapi_rach_ind(nfapi_rach_indication_t *rach_ind);
-int oai_nfapi_harq_indication(nfapi_harq_indication_t *harq_ind);
-int oai_nfapi_crc_indication(nfapi_crc_indication_t *crc_ind);
-int oai_nfapi_cqi_indication(nfapi_cqi_indication_t *ind);
-int oai_nfapi_rx_ind(nfapi_rx_indication_t *ind);
-int oai_nfapi_sr_indication(nfapi_sr_indication_t *ind);
+int oai_nfapi_rach_ind(int id, nfapi_rach_indication_t *rach_ind);
+int oai_nfapi_harq_indication(int id, nfapi_harq_indication_t *harq_ind);
+int oai_nfapi_crc_indication(int id, nfapi_crc_indication_t *crc_ind);
+int oai_nfapi_cqi_indication(int id, nfapi_cqi_indication_t *ind);
+int oai_nfapi_rx_ind(int id, nfapi_rx_indication_t *ind);
+int oai_nfapi_sr_indication(int id, nfapi_sr_indication_t *ind);
 
 int oai_nfapi_nr_rach_indication(nfapi_nr_rach_indication_t *ind);
 int oai_nfapi_nr_rx_data_indication(nfapi_nr_rx_data_indication_t *ind);
@@ -202,10 +203,10 @@ int oai_nfapi_nr_crc_indication(nfapi_nr_crc_indication_t *ind);
 int oai_nfapi_nr_srs_indication(nfapi_nr_srs_indication_t *ind);
 int oai_nfapi_nr_uci_indication(nfapi_nr_uci_indication_t *ind);
 
-void oai_subframe_ind(uint16_t sfn, uint16_t sf);
+void oai_subframe_ind(int id, uint16_t sfn, uint16_t sf);
 void oai_slot_ind(uint16_t sfn, uint16_t slot);
 
-void configure_nfapi_pnf(const char *vnf_ip_addr, int vnf_p5_port, const char *pnf_ip_addr, int pnf_p7_port,
+void configure_nfapi_pnf(int config_id, const char *vnf_ip_addr, int vnf_p5_port, const char *pnf_ip_addr, int pnf_p7_port,
                          int vnf_p7_port);
 void configure_nr_nfapi_pnf(const char *vnf_ip_addr, int vnf_p5_port, const char *pnf_ip_addr, int pnf_p7_port, int vnf_p7_port);
 
@@ -239,15 +240,15 @@ void handle_nr_nfapi_ssb_pdu(PHY_VARS_gNB *gNB,int frame,int slot,
 
 void *oai_subframe_task(void *context);
 void *oai_slot_task(void *context);
-void oai_subframe_init();
+void oai_subframe_init(int enb_id);
 void oai_slot_init();
 void oai_subframe_flush_msgs_from_ue();
-void oai_subframe_handle_msg_from_ue(const void *msg, size_t len, uint16_t nem_id);
+void oai_subframe_handle_msg_from_ue(uint16_t enb_id, const void *msg, size_t len, uint16_t nem_id);
 void oai_slot_handle_msg_from_ue(const void *msg, size_t len, uint16_t nem_id);
 
-void transfer_downstream_nfapi_msg_to_proxy(void *msg);
+void transfer_downstream_nfapi_msg_to_proxy(uint16_t id, void *msg);
 void transfer_downstream_nfapi_msg_to_nr_proxy(void *msg);
-void transfer_downstream_sfn_sf_to_proxy(uint16_t sfn_sf);
+void transfer_downstream_sfn_sf_to_proxy(uint16_t id, uint16_t sfn_sf);
 void transfer_downstream_sfn_slot_to_proxy(uint16_t sfn_slot);
 
 uint16_t sfn_sf_add(uint16_t a, uint16_t add_val);
@@ -258,11 +259,12 @@ int get_slot_delta(uint16_t a, uint16_t b);
 uint16_t sfn_sf_subtract(uint16_t a, uint16_t sub_val);
 
 
-bool dequeue_ue_msgs(subframe_msgs_t *subframe_msgs, uint16_t sfn_sf_tx);
+bool dequeue_ue_msgs(int enb_id, subframe_msgs_t *subframe_msgs, uint16_t sfn_sf_tx);
 void add_sleep_time(uint64_t start, uint64_t poll, uint64_t send, uint64_t agg);
 
 extern int num_ues;
 
+#define MAX_ENB 2
 #define MAX_UES 64
 
 #ifdef __cplusplus
