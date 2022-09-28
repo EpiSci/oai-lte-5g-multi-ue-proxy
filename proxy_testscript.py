@@ -767,11 +767,6 @@ def analyze_ue_logs(scenario: Scenario) -> bool:
 def analyze_gnb_sa_logs(scenario: Scenario) -> bool:
     found = set()
     for line in get_analysis_messages('{}/gNB.log.bz2'.format(OPTS.log_dir)):
-        # 3203303.646606 00013e0d [PHY] A Configuring MIB for instance 0, :
-        # (Nid_cell 0,DL freq 3619200000, UL freq 3619200000)
-        if 'A Configuring MIB for instance' in line:
-            found.add('config')
-            continue
 
         # 3202155.061316 00011c68 [MAC] A UL_info[Frame 574, Slot 0] Calling
         # initiate_ra_proc RACH:SFN/SLOT:573/19
@@ -809,7 +804,7 @@ def analyze_gnb_sa_logs(scenario: Scenario) -> bool:
     num_nrues = len(scenario.nrue_hostname)
     LOGGER.debug('num NRUEs: %d', num_nrues)
 
-    num_expect = 5 + num_nrues
+    num_expect = 4 + num_nrues
     if len(found) != num_expect:
         LOGGER.error('gNB failed -- found %d/%d %r', len(found), num_expect, found)
         return False
