@@ -38,7 +38,6 @@ SRCS = \
 	$(SRC_DIR)/nfapiutils.c \
 	$(SRC_DIR)/nfapi_pnf.c \
 	$(SRC_DIR)/queue.c \
-	$(SRC_DIR)/ss_proxy.c \
 	$(LIB_SOURCES)
 
 OBJS := $(SRCS:%=$(BUILD_DIR)/%.o)

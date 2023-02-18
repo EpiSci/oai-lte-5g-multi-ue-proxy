@@ -67,20 +67,13 @@ Don't run the scenario, only examine the logs in the --log-dir
 directory from a previous run of the scenario
 """)
 
-parser.add_argument('--mode', default='lte', choices='lte nr nsa lte_handover'.split(),
+parser.add_argument('--mode', default='lte', choices='lte nr nsa'.split(),
                     help="""
 The kind of simulation scenario to run
 (default: %(default)s)
 """)
 
-parser.add_argument('--channel', '-c', default='siso', choices='siso mimo'.split(),
-                    help="""
-physical channel type to run
-(default: %(default)s)
-""")
-
 parser.add_argument('--nfapi-trace-level', '-N',
-                    default='none',
                     choices='none error warn note info debug'.split(),
                     help="""
 Set the NFAPI trace level
@@ -98,11 +91,6 @@ logging.basicConfig(level=logging.DEBUG if OPTS.debug else logging.INFO,
 LOGGER = logging.getLogger(os.path.basename(sys.argv[0]))
 
 RUN_OAI = os.path.join(WORKSPACE_DIR, 'run-oai')
-
-if OPTS.mode == 'nsa':
-    RUN_OAI += ' --nsa'
-if OPTS.channel == 'mimo':
-    RUN_OAI += ' --mimo'
 
 if OPTS.nfapi_trace_level:
     os.environ['NFAPI_TRACE_LEVEL'] = OPTS.nfapi_trace_level
@@ -185,8 +173,8 @@ class Scenario:
     """
 
     def __init__(self) -> None:
-        self.enb_hostname: Dict[int, str] = {}
-        self.enb_node_id: Dict[int, int] = {}
+        self.enb_hostname: Optional[str] = None
+        self.enb_node_id: Optional[int] = None
         self.ue_hostname: Dict[int, str] = {}
         self.ue_node_id: Dict[int, int] = {}
         self.gnb_hostname: Optional[str] = None
@@ -196,76 +184,56 @@ class Scenario:
 
         # Setup our data structures according to the command-line options
 
-        nodeB_ids = NodeIdGenerator()
-        ue_ids = NodeIdGenerator()
+        node_ids = NodeIdGenerator()
 
         if OPTS.mode == 'nsa':
             # Non-standalone mode: eNB, gNB, UEs and NRUEs
-            eNB_id = 1
-            self.enb_hostname[eNB_id] = f'eNB{eNB_id}'
-            self.enb_node_id[eNB_id] = nodeB_ids()
-            self.gnb_hostname = 'gNB'
-            self.gnb_node_id = nodeB_ids()
+            self.enb_hostname = 'eNB'
+            self.enb_node_id = node_ids()
             for i in range(OPTS.num_ues):
                 ue_num = i + 1
-                node_id = ue_ids()
+                node_id = node_ids()
                 self.ue_hostname[ue_num] = f'UE{ue_num}'
                 self.ue_node_id[ue_num] = node_id
                 self.nrue_hostname[ue_num] = f'NRUE{ue_num}'
                 self.nrue_node_id[ue_num] = node_id
-
+            self.gnb_hostname = 'gNB'
+            self.gnb_node_id = node_ids()
 
         if OPTS.mode == 'nr':
             # NR mode: gNB and NRUEs, no eNB, no UEs
             self.gnb_hostname = 'gNB'
-            self.gnb_node_id = nodeB_ids()
+            self.gnb_node_id = node_ids()
             for i in range(OPTS.num_ues):
                 ue_num = i + 1
                 self.nrue_hostname[ue_num] = f'NRUE{ue_num}'
-                self.nrue_node_id[ue_num] = ue_ids()
+                self.nrue_node_id[ue_num] = node_ids()
 
         if OPTS.mode == 'lte':
             # LTE mode: eNB and UEs, no gNB, no NRUEs
-            eNB_id = 1
-            self.enb_hostname[eNB_id] = f'eNB{eNB_id}'
-            self.enb_node_id[eNB_id] = nodeB_ids()
-
+            self.enb_hostname = 'eNB'
+            self.enb_node_id = node_ids()
             for i in range(OPTS.num_ues):
                 ue_num = i + 1
                 self.ue_hostname[ue_num] = f'UE{ue_num}'
-                self.ue_node_id[ue_num] = ue_ids()
-
-        if OPTS.mode == 'lte_handover':
-            # LTE handover mode: 2 eNBs and UEs, no gNB, no NRUEs
-            for i in range(2):
-                eNB_id = i + 1
-                self.enb_hostname[eNB_id] = f'eNB{eNB_id}'
-                self.enb_node_id[eNB_id] = nodeB_ids()
-            for i in range(OPTS.num_ues):
-                ue_num = i + 1
-                self.ue_hostname[ue_num] = f'UE{ue_num}'
-                self.ue_node_id[ue_num] = ue_ids()
+                self.ue_node_id[ue_num] = node_ids()
 
     def launch_enb(self) -> Popen:
-        procs = {}
-        for num, hostname in self.enb_hostname.items():
-            log_name = '{}/{}.log'.format(OPTS.log_dir, hostname)
-            LOGGER.info('Launch eNB%d: %s', num, log_name)
-            cmd = 'NODE_NUMBER={NODE_ID} {RUN_OAI} enb' \
-                  .format(NODE_ID=self.enb_node_id[num],
-                          RUN_OAI=RUN_OAI)
-            if OPTS.mode == 'nsa':
-                cmd += ' --nsa'
-            procs[num] = Popen(redirect_output(cmd, log_name), shell=True)
+        log_name = '{}/eNB.log'.format(OPTS.log_dir)
+        LOGGER.info('Launch eNB: %s', log_name)
+        cmd = 'NODE_NUMBER=1 {RUN_OAI} enb' \
+              .format(RUN_OAI=RUN_OAI)
+        if OPTS.mode == 'nsa':
+            cmd += ' --nsa'
+        proc = Popen(redirect_output(cmd, log_name), shell=True)
 
-            # TODO: Sleep time needed so eNB and UEs don't start at the exact same
-            # time When nodes start at the same time, occasionally eNB will only
-            # recognize one UE I think this bug has been fixed -- the random
-            # number generator initializer issue
-            time.sleep(1)
+        # TODO: Sleep time needed so eNB and UEs don't start at the exact same
+        # time When nodes start at the same time, occasionally eNB will only
+        # recognize one UE I think this bug has been fixed -- the random
+        # number generator initializer issue
+        time.sleep(1)
 
-        return procs
-
+        return proc
 
     def launch_proxy(self) -> Popen:
         log_name = '{}/nfapi.log'.format(OPTS.log_dir)
@@ -283,9 +251,6 @@ class Scenario:
         return proc
 
     def launch_ue(self) -> Dict[int, Popen]:
-        global RUN_OAI
-        if OPTS.mode == 'lte_handover':
-            RUN_OAI += f' --num-enbs {len(self.enb_hostname)}'
         procs = {}
         for num, hostname in self.ue_hostname.items():
             log_name = '{}/{}.log'.format(OPTS.log_dir, hostname)
@@ -295,8 +260,6 @@ class Scenario:
                           RUN_OAI=RUN_OAI)
             if OPTS.mode == 'nsa':
                 cmd += ' --nsa'
-            if OPTS.mode == 'lte_handover':
-                cmd += f' --num-enbs {len(self.enb_node_id)}'
             procs[num] = Popen(redirect_output(cmd, log_name), shell=True)
 
             # TODO: Sleep time needed so eNB and UEs don't start at the exact
@@ -387,13 +350,12 @@ class Scenario:
 
         if enb_proc:
             # See if the eNB crashed
-            for enb_number in self.enb_hostname:
-                status = enb_proc[enb_number].poll()
-                if status is None:
-                    LOGGER.info('eNB%d process is still running, which is good', enb_number)
-                else:
-                    passed = False
-                    LOGGER.critical('eNB%d process ended early: %r', enb_number, status)
+            status = enb_proc.poll()
+            if status is None:
+                LOGGER.info('eNB process is still running, which is good')
+            else:
+                passed = False
+                LOGGER.critical('eNB process ended early: %r', status)
 
         if proxy_proc:
             # See if the proxy crashed
@@ -454,8 +416,7 @@ class Scenario:
         # Wait for the processes to end
         proxy_proc.wait()
         if enb_proc:
-            for proc in enb_proc.values():
-                proc.wait()
+            enb_proc.wait()
         if gnb_proc:
             gnb_proc.wait()
         for proc in ue_proc.values():
@@ -476,8 +437,7 @@ class Scenario:
         # Compress eNB.log, UE*.log, gNB.log and NRUE*.log
         jobs = CompressJobs()
         if enb_proc:
-            for enb_hostname in self.enb_hostname.values():
-                jobs.compress('{}/{}.log'.format(OPTS.log_dir, enb_hostname), remove_original=True)
+            jobs.compress('{}/eNB.log'.format(OPTS.log_dir), remove_original=True)
         if ue_proc:
             for ue_hostname in self.ue_hostname.values():
                 jobs.compress('{}/{}.log'.format(OPTS.log_dir, ue_hostname), remove_original=True)
@@ -574,107 +534,81 @@ def analyze_enb_logs(scenario: Scenario) -> bool:
         LOGGER.info('No eNB in this scenario')
         return True
 
-    num_failed = 0
-    ho_msg3_cnt = 0
-    for enb_number, enb_hostname in scenario.enb_hostname.items():
-        found = set()
-        for line in get_analysis_messages('{}/{}.log.bz2'.format(OPTS.log_dir, enb_hostname)):
-            # 94772.731183 00000057 [MAC] A Configuring MIB for instance 0, CCid 0 : (band
-            # 7,N_RB_DL 50,Nid_cell 0,p 1,DL freq 2685000000,phich_config.resource 0,
-            # phich_config.duration 0)
-            if '[MAC] A Configuring MIB ' in line:
-                found.add('configured')
-                continue
+    found = set()
+    for line in get_analysis_messages('{}/eNB.log.bz2'.format(OPTS.log_dir)):
+        # 94772.731183 00000057 [MAC] A Configuring MIB for instance 0, CCid 0 : (band
+        # 7,N_RB_DL 50,Nid_cell 0,p 1,DL freq 2685000000,phich_config.resource 0,
+        # phich_config.duration 0)
+        if '[MAC] A Configuring MIB ' in line:
+            found.add('configured')
+            continue
 
-            # 94777.679273 00000057 [MAC] A [eNB 0][RAPROC] CC_id 0 Frame 74, subframeP 3:
-            # Generating Msg4 with RRC Piggyback (RNTI a67)
-            if 'Generating Msg4 with RRC Piggyback' in line:
-                found.add('msg4')
-                continue
+        # 94777.679273 00000057 [MAC] A [eNB 0][RAPROC] CC_id 0 Frame 74, subframeP 3:
+        # Generating Msg4 with RRC Piggyback (RNTI a67)
+        if 'Generating Msg4 with RRC Piggyback' in line:
+            found.add('msg4')
+            continue
 
-            # 94777.695277 00000057 [RRC] A [FRAME 00000][eNB][MOD 00][RNTI a67] [RAPROC]
-            # Logical Channel UL-DCCH, processing LTE_RRCConnectionSetupComplete
-            # from UE (SRB1 Active)
-            if 'processing LTE_RRCConnectionSetupComplete from UE ' in line:
-                found.add('setup')
-                continue
+        # 94777.695277 00000057 [RRC] A [FRAME 00000][eNB][MOD 00][RNTI a67] [RAPROC]
+        # Logical Channel UL-DCCH, processing LTE_RRCConnectionSetupComplete
+        # from UE (SRB1 Active)
+        if 'processing LTE_RRCConnectionSetupComplete from UE ' in line:
+            found.add('setup')
+            continue
 
-            # 94776.725081 00000057 [RRC] A got UE capabilities for UE 6860
-            match = re.search(r'\[RRC\] A (got UE capabilities for UE \w+)$', line)
-            if match:
-                found.add(match.group(1))
-                continue
+        # 94776.725081 00000057 [RRC] A got UE capabilities for UE 6860
+        match = re.search(r'\[RRC\] A (got UE capabilities for UE \w+)$', line)
+        if match:
+            found.add(match.group(1))
+            continue
 
-            # 2075586.647598 00006b4a [RRC] A Generating
-            # RRCCConnectionReconfigurationRequest (NRUE Measurement Report
-            # Request).
-            if '[RRC] A Generating RRCCConnectionReconfigurationRequest (NRUE Measurement Report Request)' in line:
-                found.add('gen nrue meas report req')
-                continue
+        # 2075586.647598 00006b4a [RRC] A Generating
+        # RRCCConnectionReconfigurationRequest (NRUE Measurement Report
+        # Request).
+        if '[RRC] A Generating RRCCConnectionReconfigurationRequest (NRUE Measurement Report Request)' in line:
+            found.add('gen nrue meas report req')
+            continue
 
-            # 2075586.671139 00006b4a [RRC] A [FRAME 00000][eNB][MOD 00][RNTI
-            # e9fb] Logical Channel DL-DCCH, Generate NR UECapabilityEnquiry
-            # (bytes 11)
-            if ' Logical Channel DL-DCCH, Generate NR UECapabilityEnquiry' in line:
-                found.add('dl-dcch gen nrue cap enq')
-                continue
+        # 2075586.671139 00006b4a [RRC] A [FRAME 00000][eNB][MOD 00][RNTI
+        # e9fb] Logical Channel DL-DCCH, Generate NR UECapabilityEnquiry
+        # (bytes 11)
+        if ' Logical Channel DL-DCCH, Generate NR UECapabilityEnquiry' in line:
+            found.add('dl-dcch gen nrue cap enq')
+            continue
 
-            # 2075586.677066 00006b4a [RRC] A got nrUE capabilities for UE e9fb
-            match = re.search(r'\[RRC\] (got nrUE capabilities for UE \w+)$', line)
-            if match:
-                found.add(match.group(1))
-                continue
+        # 2075586.677066 00006b4a [RRC] A got nrUE capabilities for UE e9fb
+        match = re.search(r'\[RRC\] (got nrUE capabilities for UE \w+)$', line)
+        if match:
+            found.add(match.group(1))
+            continue
 
-            # 2075586.756959 00006b4a [RRC] A [eNB 0] frame 0 subframe 0: UE rnti
-            # e9fb switching to NSA mode
-            match = re.search(r': (UE rnti \w+ switching to NSA mode)', line)
-            if match:
-                found.add(match.group(1))
-                continue
+        # 2075586.756959 00006b4a [RRC] A [eNB 0] frame 0 subframe 0: UE rnti
+        # e9fb switching to NSA mode
+        match = re.search(r': (UE rnti \w+ switching to NSA mode)', line)
+        if match:
+            found.add(match.group(1))
+            continue
 
-            # 2075586.911204 00006b4a [RRC] A Sent rrcReconfigurationComplete to gNB
-            if '[RRC] A Sent rrcReconfigurationComplete to gNB' in line:
-                found.add('rrc reconf complete to gnb')
-                continue
+        # 2075586.911204 00006b4a [RRC] A Sent rrcReconfigurationComplete to gNB
+        if '[RRC] A Sent rrcReconfigurationComplete to gNB' in line:
+            found.add('rrc reconf complete to gnb')
+            continue
 
-            # 4826185.706918 000000dd [RRC] A Received HO LTE_RRCConnectionReconfigurationComplete UE rnti
-            # 0x9733 ue_context.StatusRrc 4 (4: RRC_RECONFIGURED) handover_info->state 8 (8: HO_CONFIGURED)
-            if '[RRC] A Received HO LTE_RRCConnectionReconfigurationComplete' in line:
-                ho_msg3_cnt += 1
-                found.add(f'ho_msg3_{ho_msg3_cnt}')
-                continue
+    LOGGER.debug('found: %r', found)
 
-        LOGGER.debug('found: %r', found)
+    num_ues = len(scenario.ue_hostname)
+    LOGGER.debug('num UEs: %d', num_ues)
 
-        num_ues = len(scenario.ue_hostname)
-        LOGGER.debug('num UEs: %d', num_ues)
+    if OPTS.mode == 'lte' and len(found) == 3 + num_ues:
+        LOGGER.info('eNB passed')
+        return True
 
-        if OPTS.mode == 'lte' and len(found) == 3 + num_ues:
-            LOGGER.info('eNB%d passed', enb_number)
+    if OPTS.mode == 'nsa' and len(found) == 6 + 2 * num_ues:
+        LOGGER.info('eNB passed')
+        return True
 
-        elif OPTS.mode == 'lte_handover':
-            if len(found) == 3 + num_ues and enb_number == 1:
-                LOGGER.info('eNB%d passed', enb_number)
-            elif len(found) == 2 + num_ues and enb_number == 2:
-                LOGGER.info('eNB%d passed', enb_number)
-            else:
-                num_failed += 1
-                LOGGER.error('eNB%d failed -- found %d %r', enb_number, len(found), found)
-
-        elif OPTS.mode == 'nsa' and len(found) == 6 + 2 * num_ues:
-            LOGGER.info('eNB%d passed', enb_number)
-
-        else:
-            num_failed += 1
-            LOGGER.error('eNB%d failed -- found %d %r', enb_number, len(found), found)
-
-    if num_failed != 0:
-        LOGGER.critical('%d of %d eNBs failed', num_failed, len(scenario.enb_hostname))
-        return False
-
-    LOGGER.info('All eNBs passed')
-    return True
-
+    LOGGER.error('eNB failed -- found %d %r', len(found), found)
+    return False
 
 def analyze_ue_logs(scenario: Scenario) -> bool:
     if not scenario.ue_hostname:
@@ -748,8 +682,6 @@ def analyze_ue_logs(scenario: Scenario) -> bool:
                 continue
 
         if OPTS.mode == 'lte' and len(found) == 4:
-            LOGGER.info('UE%d passed', ue_number)
-        elif OPTS.mode == 'lte_handover' and len(found) == 4:
             LOGGER.info('UE%d passed', ue_number)
         elif OPTS.mode == 'nsa' and len(found) == 10:
             LOGGER.info('UE%d passed', ue_number)
@@ -841,8 +773,8 @@ def analyze_gnb_logs(scenario: Scenario) -> bool:
             found.add('nr capabilites')
             continue
 
-        # 5005668.575471 000000e2 [NR_MAC] A (rnti 0x9052) CFRA procedure succeeded!
-        match = re.search(r'\[NR_MAC\] A \((rnti \w+)\) CFRA procedure succeeded!$', line)
+        # 364915.873598 000062e2 [NR_MAC] A (ue 0, rnti 0xb094) CFRA procedure succeeded!
+        match = re.search(r'\[NR_MAC\] A \(ue \d+, (rnti \w+)\) CFRA procedure succeeded!$', line)
         if match:
             found.add(f'cfra {match.group(1)}')
             continue
@@ -1018,9 +950,7 @@ def main() -> int:
     scenario = Scenario()
 
     if scenario.enb_hostname:
-        LOGGER.info('eNB node number%s %s',
-                    '' if len(scenario.enb_node_id) == 1 else 's',
-                    ' '.join(map(str, scenario.enb_node_id.values())))
+        LOGGER.info('eNB node number %d', scenario.enb_node_id)
 
     if scenario.gnb_hostname:
         LOGGER.info('gNB node number %d', scenario.gnb_node_id)
@@ -1061,8 +991,7 @@ def main() -> int:
 
     # Summarize any interesting entries in the logs
     summarize_logs('{}/nfapi-proxy.log.bz2'.format(OPTS.log_dir))
-    for _enb_number, enb_hostname in scenario.enb_hostname.items():
-        summarize_logs('{}/{}.log.bz2'.format(OPTS.log_dir, enb_hostname))
+    summarize_logs('{}/eNB.log.bz2'.format(OPTS.log_dir))
     for _ue_number, ue_hostname in scenario.ue_hostname.items():
         summarize_logs('{}/{}.log.bz2'.format(OPTS.log_dir, ue_hostname))
     summarize_logs('{}/gNB.log.bz2'.format(OPTS.log_dir))

@@ -2,25 +2,9 @@
 
 use_strace=false
 use_valgrind=false
-mimo_mode=false
-nsa_mode=false
-num_enbs=1
 
 while (( $# > 0 )); do
     case "$1" in
-      (--mimo)
-          mimo_mode=true
-          shift
-          ;;
-      (--nsa)
-          nsa_mode=true
-          shift
-          ;;
-      (--num-enbs)
-          shift
-          num_enbs=$1
-          shift
-          ;;
       (--strace)
           use_strace=true
           shift
@@ -53,18 +37,12 @@ export MALLOC_CHECK_=3
 case "$node_type" in
     (enb)
         echo "Node $NODE_NUMBER: eNB"
-        if [ $NODE_NUMBER = "1" ]; then
-            conf=proxy_rcc.band7.tm1.nfapi.conf # Source eNB
-        else
-            conf=proxy_rcc.band7.tm1.nfapi_target.conf # Target eNB
-        fi
         cmd=(
             # Keep the eNB on processor 1 (the second processor) by default
             taskset --cpu-list 1
             ./ran_build/build/lte-softmodem
-            -O "../ci-scripts/conf_files/episci/$conf"
+            -O ../ci-scripts/conf_files/episci/proxy_rcc.band7.tm1.nfapi.conf
             --noS1
-            --node-number "$NODE_NUMBER"
             --emulate-l1
             --log_config.global_log_options level,nocolor,time,thread_id
         )
@@ -75,11 +53,7 @@ case "$node_type" in
         sudo ifconfig lo: 127.0.0.2 down >&/dev/null
         sudo ifconfig lo: 127.0.0.2 up || exit
         if [[ " $* " = *" --sa "* ]]; then
-            if $mimo_mode; then
-                conf=proxy_gnb.band78.sa.fr1.106PRB.usrpn310_mimo.conf
-            else
-                conf=proxy_gnb.band78.sa.fr1.106PRB.usrpn310.conf
-            fi
+            conf=proxy_gnb.band78.sa.fr1.106PRB.usrpn310.conf
         else
             conf=proxy_rcc.band78.tm1.106PRB.nfapi.conf
         fi
@@ -170,7 +144,6 @@ fi
 # In case we're running with gprof profiling enabled.
 # https://stackoverflow.com/questions/464116/any-way-to-specify-the-location-of-profile-data
 export GMON_OUT_PREFIX=gmon-$NODE_NUMBER.out
-export LD_LIBRARY_PATH=$PWD/ran_build/build:$LD_LIBRARY_PATH
 
 # Enable core dumps.  You may want to set core_pattern:
 #  sudo sh -c 'echo /tmp/coredump-%P > /proc/sys/kernel/core_pattern'

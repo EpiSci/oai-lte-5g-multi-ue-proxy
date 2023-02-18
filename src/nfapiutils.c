@@ -51,7 +51,6 @@ const char *nfapi_get_message_id(const void *msg, size_t length)
     case NFAPI_RX_CQI_INDICATION: return "CQI";
     case NFAPI_HARQ_INDICATION: return "HARQ";
     case NFAPI_RX_SR_INDICATION: return "SR";
-    case NFAPI_SUBFRAME_INDICATION: return "SFNSF";
     case 0: return "Dummy";
     default:
         NFAPI_TRACE(NFAPI_TRACE_ERROR, "Message_id is unknown %u", message_id);
@@ -75,7 +74,6 @@ const char *nfapi_nr_get_message_id(const void *msg, size_t length)
     case NFAPI_NR_PHY_MSG_TYPE_RX_DATA_INDICATION: return "RX_DATA_NR";
     case NFAPI_NR_PHY_MSG_TYPE_UCI_INDICATION: return "UCI_NR";
     case NFAPI_NR_PHY_MSG_TYPE_SRS_INDICATION: return "SRS_NR";
-    case NFAPI_NR_PHY_MSG_TYPE_SLOT_INDICATION: return "SLOT_NR";
     case 0: return "Dummy";
     default:
         NFAPI_TRACE(NFAPI_TRACE_ERROR, "Message_id is unknown %u", message_id);
@@ -104,7 +102,6 @@ uint16_t nfapi_get_sfnsf(const void *msg, size_t length)
     case NFAPI_RX_CQI_INDICATION:
     case NFAPI_HARQ_INDICATION:
     case NFAPI_RX_SR_INDICATION:
-    case NFAPI_SUBFRAME_INDICATION:
     case 0:
         break;
     default:
@@ -142,7 +139,6 @@ uint16_t nfapi_get_sfnslot(const void *msg, size_t length)
     case NFAPI_NR_PHY_MSG_TYPE_RX_DATA_INDICATION:
     case NFAPI_NR_PHY_MSG_TYPE_UCI_INDICATION:
     case NFAPI_NR_PHY_MSG_TYPE_SRS_INDICATION:
-    case NFAPI_NR_PHY_MSG_TYPE_SLOT_INDICATION:
     case 0:
         break;
     default:
