@@ -62,7 +62,7 @@ case "$node_type" in
             taskset --cpu-list 1
             ./ran_build/build/nr-softmodem
             -O "../ci-scripts/conf_files/episci/$conf"
-            --nfapi 2
+            --nfapi VNF
             --noS1
             --emulate-l1
             --log_config.global_log_options level,nocolor,time,thread_id
@@ -109,7 +109,7 @@ case "$node_type" in
             ./ran_build/build/nr-uesoftmodem
             -O ../ci-scripts/conf_files/episci/proxy_nr-ue.nfapi.conf
             --nokrnmod 1
-            --nfapi 5
+            --nfapi STANDALONE_PNF
             --node-number "$NODE_NUMBER"
             --emulate-l1
             --log_config.global_log_options level,nocolor,time,thread_id
