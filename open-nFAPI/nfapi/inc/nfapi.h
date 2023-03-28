@@ -74,7 +74,9 @@ typedef uint8_t (*pack_tlv_fn)(void* tlv, uint8_t **ppWritePackedMsg, uint8_t *e
 uint8_t pack_tlv(uint16_t tag, void *tlv, uint8_t **ppWritePackedMsg, uint8_t *end, pack_tlv_fn fn);
 
 uint32_t pack_vendor_extension_tlv(nfapi_tl_t* ve, uint8_t **ppWritePackedMsg, uint8_t *end, nfapi_p4_p5_codec_config_t* config);
-int unpack_vendor_extension(nfapi_tl_t* tl, uint8_t **ppReadPackedMsg, uint8_t *end, nfapi_p4_p5_codec_config_t* config, nfapi_tl_t** ve_tlv);
+int unpack_vendor_extension_tlv(nfapi_tl_t* tl, uint8_t **ppReadPackedMsg, uint8_t *end, nfapi_p4_p5_codec_config_t* config, nfapi_tl_t** ve_tlv);
+
+uint8_t get_tlv_padding(uint16_t tlv_length);
 
 typedef uint8_t (*unpack_tlv_fn)(void* tlv, uint8_t **ppWritePackedMsg, uint8_t *end);
 typedef struct

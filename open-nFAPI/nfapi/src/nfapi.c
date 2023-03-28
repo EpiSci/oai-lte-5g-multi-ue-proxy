@@ -556,7 +556,7 @@ uint32_t pack_vendor_extension_tlv(nfapi_tl_t *ve, uint8_t **ppWritePackedMsg, u
   return 1;
 }
 
-uint32_t unpack_vendor_extension_tlv(nfapi_tl_t *tl, uint8_t **ppReadPackedMsg, uint8_t *end, nfapi_p4_p5_codec_config_t *config, nfapi_tl_t **ve_tlv) {
+int unpack_vendor_extension_tlv(nfapi_tl_t *tl, uint8_t **ppReadPackedMsg, uint8_t *end, nfapi_p4_p5_codec_config_t *config, nfapi_tl_t **ve_tlv) {
   if(ve_tlv != 0 && config != 0) {
     if(config->unpack_vendor_extension_tlv) {
       return (config->unpack_vendor_extension_tlv)(tl, ppReadPackedMsg, end, (void **)ve_tlv, config);
@@ -639,6 +639,11 @@ int unpack_tlv_list(unpack_tlv_t unpack_fns[], uint16_t size, uint8_t **ppReadPa
           NFAPI_TRACE(NFAPI_TRACE_ERROR, "Warning tlv tag 0x%x length %d not equal to unpack %ld\n", tl->tag, tl->length, (*ppReadPackedMsg - pStartOfValue));
           on_error();
         }
+        // Remove padding that ensures multiple of 4 bytes (SCF 225 Section 2.3.2.1)
+        int padding = get_tlv_padding(tl->length);
+        if (padding != 0) {
+          (*ppReadPackedMsg) += padding;
+        }
       }
     }
 
@@ -662,7 +667,7 @@ int unpack_tlv_list(unpack_tlv_t unpack_fns[], uint16_t size, uint8_t **ppReadPa
 
           if((end - *ppReadPackedMsg) >= generic_tl.length) {
             // Advance past the unknown TLV
-            (*ppReadPackedMsg) += generic_tl.length;
+            (*ppReadPackedMsg) += generic_tl.length + get_tlv_padding(generic_tl.length);
           } else {
             // go to the end
             return 0;
@@ -680,7 +685,7 @@ int unpack_tlv_list(unpack_tlv_t unpack_fns[], uint16_t size, uint8_t **ppReadPa
 
         if((end - *ppReadPackedMsg) >= generic_tl.length) {
           // Advance past the unknown TLV
-          (*ppReadPackedMsg) += generic_tl.length;
+          (*ppReadPackedMsg) += generic_tl.length + get_tlv_padding(generic_tl.length);
         } else {
           // go to the end
           return 0;
@@ -721,6 +726,11 @@ int unpack_p7_tlv_list(unpack_p7_tlv_t unpack_fns[], uint16_t size, uint8_t **pp
           NFAPI_TRACE(NFAPI_TRACE_ERROR, "Warning tlv tag 0x%x length %d not equal to unpack %ld\n", tl->tag, tl->length, (*ppReadPackedMsg - pStartOfValue));
           on_error();
         }
+        // Remove padding that ensures multiple of 4 bytes (SCF 225 Section 2.3.2.1)
+        int padding = get_tlv_padding(tl->length);
+        if (padding != 0) {
+          (*ppReadPackedMsg) += padding;
+        }
       }
     }
 
@@ -744,7 +754,7 @@ int unpack_p7_tlv_list(unpack_p7_tlv_t unpack_fns[], uint16_t size, uint8_t **pp
 
           if((end - *ppReadPackedMsg) >= generic_tl.length) {
             // Advance past the unknown TLV
-            (*ppReadPackedMsg) += generic_tl.length;
+            (*ppReadPackedMsg) += generic_tl.length + get_tlv_padding(generic_tl.length);
           } else {
             // got ot the dn
             return 0;
@@ -762,7 +772,7 @@ int unpack_p7_tlv_list(unpack_p7_tlv_t unpack_fns[], uint16_t size, uint8_t **pp
 
         if((end - *ppReadPackedMsg) >= generic_tl.length) {
           // Advance past the unknown TLV
-          (*ppReadPackedMsg) += generic_tl.length;
+          (*ppReadPackedMsg) += generic_tl.length + get_tlv_padding(generic_tl.length);
         } else {
           // got ot the dn
           return 0;
@@ -798,6 +808,13 @@ uint8_t pack_tlv(uint16_t tag, void *tlv, uint8_t **ppWritePackedMsg, uint8_t *e
     tl->length = (*ppWritePackedMsg) - pStartOfValue;
     // rewrite the header with the correct length
     pack_tl(tl, &pStartOfTlv, end);
+    // Add padding that ensures multiple of 4 bytes (SCF 225 Section 2.3.2.1)
+    int padding = get_tlv_padding(tl->length);
+    NFAPI_TRACE(NFAPI_TRACE_DEBUG, "TLV 0x%x with padding of %d bytes\n", tl->tag, padding);
+    if (padding != 0) {
+      memset(*ppWritePackedMsg,0,padding);
+      (*ppWritePackedMsg) += padding;
+    }
   } else {
     if(tl->tag != 0) {
       NFAPI_TRACE(NFAPI_TRACE_WARN, "Warning pack_tlv tag 0x%x does not match expected 0x%x\n", tl->tag, tag);
@@ -841,4 +858,8 @@ const char *nfapi_error_code_to_str(nfapi_error_code_e value) {
     default:
       return "UNKNOWN";
   }
+}
+
+uint8_t get_tlv_padding(uint16_t tlv_length){
+  return ( 4 - (tlv_length % 4) ) % 4;
 }
