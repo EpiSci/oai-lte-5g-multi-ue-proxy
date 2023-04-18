@@ -165,7 +165,7 @@ cd .../openairinterface5g
 source oaienv
 cd cmake_targets
 sudo -E ./ran_build/build/nr-softmodem -O ../ci-scripts/conf_files/episci/proxy_rcc.band78.tm1.106PRB.nfapi.conf \
---nfapi 2 --noS1 --nsa --emulate-l1 --log_config.global_log_options level,nocolor,time,thread_id | tee gNB.log 2>&1
+--nfapi VNF --noS1 --nsa --emulate-l1 --log_config.global_log_options level,nocolor,time,thread_id | tee gNB.log 2>&1
 ```
 
 #### 2.b Launch gNB with EPC/5GCN support ####
@@ -175,7 +175,7 @@ cd .../openairinterface5g
 source oaienv
 cd cmake_targets
 sudo -E ./ran_build/build/nr-softmodem -O ../ci-scripts/conf_files/episci/proxy_rcc.band78.tm1.106PRB.nfapi.conf \
---nfapi 2 --nsa --emulate-l1 --log_config.global_log_options level,nocolor,time,thread_id | tee gNB.log 2>&1
+--nfapi VNF --nsa --emulate-l1 --log_config.global_log_options level,nocolor,time,thread_id | tee gNB.log 2>&1
 ```
 
 ### 3. Open a terminal and launch proxy ###
@@ -207,8 +207,8 @@ cd .../openairinterface5g
 source oaienv
 cd cmake_targets
 node_id=2
-sudo -E ./ran_build/build/nr-uesoftmodem -O ../ci-scripts/conf_files/episci/proxy_nr-ue.nfapi.conf --nokrnmod 1 \
---noS1 --nfapi 5 --node-number $node_id --emulate-l1 --nsa \
+sudo -E ./ran_build/build/nr-uesoftmodem -O ../ci-scripts/conf_files/episci/proxy_nr-ue.nfapi.conf \
+--noS1 --nfapi STANDALONE_PNF --node-number $node_id --emulate-l1 --nsa \
 --log_config.global_log_options level,nocolor,time,thread_id | tee nrue_$node_id.log 2>&1
 ```
 
@@ -224,9 +224,8 @@ source oaienv
 cd cmake_targets
 node_id=2
 sudo -E ./ran_build/build/nr-uesoftmodem -O ../ci-scripts/conf_files/episci/proxy_nr-ue.nfapi.conf --nokrnmod 1 \
---ue-idx-standalone $node_id --nfapi 5 --node-number $node_id --emulate-l1 --nsa \
---log_config.global_log_options level,nocolor,time,thread_id | tee nrue_$node_id.log 2>&1 \
---uicc0.imsi $imsi
+--ue-idx-standalone $node_id --nfapi STANDALONE_PNF --node-number $node_id --emulate-l1 --nsa --uicc0.imsi $imsi \
+--log_config.global_log_options level,nocolor,time,thread_id | tee nrue_$node_id.log 2>&1 
 ```
 
 ### 5. Open a terminal and launch UE ###
