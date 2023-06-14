@@ -506,7 +506,7 @@ static uint8_t pack_param_response(void *msg, uint8_t **ppWritePackedMsg, uint8_
           pack_tlv(NFAPI_NFAPI_TIMING_INFO_MODE_TAG, &(pNfapiMsg->nfapi_config.timing_info_mode), ppWritePackedMsg, end, &pack_uint8_tlv_value) &&
           pack_tlv(NFAPI_NFAPI_TIMING_INFO_PERIOD_TAG, &(pNfapiMsg->nfapi_config.timing_info_period), ppWritePackedMsg, end, &pack_uint8_tlv_value) &&
           pack_tlv(NFAPI_NFAPI_MAXIMUM_TRANSMIT_POWER_TAG, &(pNfapiMsg->nfapi_config.max_transmit_power), ppWritePackedMsg, end, &pack_uint16_tlv_value) &&
-          pack_tlv(NFAPI_NFAPI_EARFCN_TAG, &(pNfapiMsg->nfapi_config.earfcn), ppWritePackedMsg, end, &pack_uint16_tlv_value) &&
+          pack_tlv(NFAPI_NFAPI_EARFCN_TAG, &(pNfapiMsg->nfapi_config.earfcn), ppWritePackedMsg, end, &pack_uint32_tlv_value) &&
           pack_tlv(NFAPI_NFAPI_NMM_GSM_FREQUENCY_BANDS_TAG, &(pNfapiMsg->nfapi_config.nmm_gsm_frequency_bands), ppWritePackedMsg, end, &pack_nmm_frequency_bands_value) &&
           pack_tlv(NFAPI_NFAPI_NMM_UMTS_FREQUENCY_BANDS_TAG, &(pNfapiMsg->nfapi_config.nmm_umts_frequency_bands), ppWritePackedMsg, end, &pack_nmm_frequency_bands_value) &&
           pack_tlv(NFAPI_NFAPI_NMM_LTE_FREQUENCY_BANDS_TAG, &(pNfapiMsg->nfapi_config.nmm_lte_frequency_bands), ppWritePackedMsg, end, &pack_nmm_frequency_bands_value) &&
@@ -694,7 +694,7 @@ static uint8_t pack_config_request(void *msg, uint8_t **ppWritePackedMsg, uint8_
            pack_tlv(NFAPI_NFAPI_TIMING_INFO_MODE_TAG, &(pNfapiMsg->nfapi_config.timing_info_mode), ppWritePackedMsg, end, &pack_uint8_tlv_value) &&
            pack_tlv(NFAPI_NFAPI_TIMING_INFO_PERIOD_TAG, &(pNfapiMsg->nfapi_config.timing_info_period), ppWritePackedMsg, end, &pack_uint8_tlv_value) &&
            pack_tlv(NFAPI_NFAPI_MAXIMUM_TRANSMIT_POWER_TAG, &(pNfapiMsg->nfapi_config.max_transmit_power), ppWritePackedMsg, end, &pack_uint16_tlv_value) &&
-           pack_tlv(NFAPI_NFAPI_EARFCN_TAG, &(pNfapiMsg->nfapi_config.earfcn), ppWritePackedMsg, end, &pack_uint16_tlv_value) &&
+           pack_tlv(NFAPI_NFAPI_EARFCN_TAG, &(pNfapiMsg->nfapi_config.earfcn), ppWritePackedMsg, end, &pack_uint32_tlv_value) &&
            pack_tlv(NFAPI_NFAPI_NMM_GSM_FREQUENCY_BANDS_TAG, &(pNfapiMsg->nfapi_config.nmm_gsm_frequency_bands), ppWritePackedMsg, end, &pack_nmm_frequency_bands_value) &&
            pack_tlv(NFAPI_NFAPI_NMM_UMTS_FREQUENCY_BANDS_TAG, &(pNfapiMsg->nfapi_config.nmm_umts_frequency_bands), ppWritePackedMsg, end, &pack_nmm_frequency_bands_value) &&
            pack_tlv(NFAPI_NFAPI_NMM_LTE_FREQUENCY_BANDS_TAG, &(pNfapiMsg->nfapi_config.nmm_lte_frequency_bands), ppWritePackedMsg, end, &pack_nmm_frequency_bands_value) &&
@@ -1658,7 +1658,7 @@ static uint8_t unpack_param_response(uint8_t **ppReadPackedMsg, uint8_t *end, vo
     { NFAPI_NFAPI_TIMING_INFO_MODE_TAG, &pNfapiMsg->nfapi_config.timing_info_mode, &unpack_uint8_tlv_value},
     { NFAPI_NFAPI_TIMING_INFO_PERIOD_TAG, &pNfapiMsg->nfapi_config.timing_info_period, &unpack_uint8_tlv_value},
     { NFAPI_NFAPI_MAXIMUM_TRANSMIT_POWER_TAG, &pNfapiMsg->nfapi_config.max_transmit_power, &unpack_uint16_tlv_value},
-    { NFAPI_NFAPI_EARFCN_TAG, &pNfapiMsg->nfapi_config.earfcn, &unpack_uint16_tlv_value},
+    { NFAPI_NFAPI_EARFCN_TAG, &pNfapiMsg->nfapi_config.earfcn, &unpack_uint32_tlv_value},
     { NFAPI_NFAPI_NMM_GSM_FREQUENCY_BANDS_TAG, &pNfapiMsg->nfapi_config.nmm_gsm_frequency_bands, &unpack_nmm_frequency_bands_value},
     { NFAPI_NFAPI_NMM_UMTS_FREQUENCY_BANDS_TAG, &pNfapiMsg->nfapi_config.nmm_umts_frequency_bands, &unpack_nmm_frequency_bands_value},
     { NFAPI_NFAPI_NMM_LTE_FREQUENCY_BANDS_TAG, &pNfapiMsg->nfapi_config.nmm_lte_frequency_bands, &unpack_nmm_frequency_bands_value},
@@ -1871,7 +1871,7 @@ static uint8_t unpack_config_request(uint8_t **ppReadPackedMsg, uint8_t *end, vo
     { NFAPI_NFAPI_TIMING_INFO_MODE_TAG, &pNfapiMsg->nfapi_config.timing_info_mode, &unpack_uint8_tlv_value},
     { NFAPI_NFAPI_TIMING_INFO_PERIOD_TAG, &pNfapiMsg->nfapi_config.timing_info_period, &unpack_uint8_tlv_value},
     { NFAPI_NFAPI_MAXIMUM_TRANSMIT_POWER_TAG, &pNfapiMsg->nfapi_config.max_transmit_power, &unpack_uint16_tlv_value},
-    { NFAPI_NFAPI_EARFCN_TAG, &pNfapiMsg->nfapi_config.earfcn, &unpack_uint16_tlv_value},
+    { NFAPI_NFAPI_EARFCN_TAG, &pNfapiMsg->nfapi_config.earfcn, &unpack_uint32_tlv_value},
     { NFAPI_NFAPI_NMM_GSM_FREQUENCY_BANDS_TAG, &pNfapiMsg->nfapi_config.nmm_gsm_frequency_bands, &unpack_nmm_frequency_bands_value},
     { NFAPI_NFAPI_NMM_UMTS_FREQUENCY_BANDS_TAG, &pNfapiMsg->nfapi_config.nmm_umts_frequency_bands, &unpack_nmm_frequency_bands_value},
     { NFAPI_NFAPI_NMM_LTE_FREQUENCY_BANDS_TAG, &pNfapiMsg->nfapi_config.nmm_lte_frequency_bands, &unpack_nmm_frequency_bands_value},
@@ -2090,9 +2090,7 @@ static uint8_t unpack_nr_config_request(uint8_t **ppReadPackedMsg, uint8_t *end,
             // Advance past the unknown TLV
             (*ppReadPackedMsg) += generic_tl.length ;
             int padding = get_tlv_padding(generic_tl.length);
-            if (padding != 0) {
-              (*ppReadPackedMsg) += padding;
-            }
+            (*ppReadPackedMsg) += padding;
           } else {
             // go to the end
             return 0;
@@ -2109,9 +2107,7 @@ static uint8_t unpack_nr_config_request(uint8_t **ppReadPackedMsg, uint8_t *end,
           // Advance past the unknown TLV
           (*ppReadPackedMsg) += generic_tl.length ;
           int padding = get_tlv_padding(generic_tl.length);
-          if (padding != 0) {
-            (*ppReadPackedMsg) += padding;
-          }
+          (*ppReadPackedMsg) += padding;
         } else {
           // go to the end
           return 0;
