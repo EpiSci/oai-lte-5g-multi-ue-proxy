@@ -283,21 +283,8 @@ static uint8_t pack_dl_tti_pdcch_pdu_rel15_value(void* tlv, uint8_t **ppWritePac
     push8(value->dci_pdu[i].powerControlOffsetSS, ppWritePackedMsg, end);
     // DCI Payload fields
     push16(value->dci_pdu[i].PayloadSizeBits, ppWritePackedMsg, end);
-    // Helper vars for DCI Payload
-    uint8_t dci_bytes_inverted[DCI_PAYLOAD_BYTE_LEN];
-    uint8_t dci_byte_len = (value->dci_pdu[i].PayloadSizeBits + 7) / 8;
-    // Align the dci payload bits to the left on the payload buffer
-    uint64_t *dci_pdu = (uint64_t *)value->dci_pdu[i].Payload;
-    //printf(" %s DCI has %d bits and the payload is %lx\n",__FUNCTION__, value->dci_pdu[i].PayloadSizeBits, *dci_pdu);
-    if (value->dci_pdu[i].PayloadSizeBits % 8 != 0) {
-      uint8_t rotation_bits = 8 - (value->dci_pdu[i].PayloadSizeBits % 8);
-      *dci_pdu = (*dci_pdu << rotation_bits);
-    }
-    // Invert the byte order of the DCI Payload
-    for (int j = 0; j < dci_byte_len; j++) {
-      dci_bytes_inverted[j] = value->dci_pdu[i].Payload[(dci_byte_len - 1) - j];
-    }
-    pusharray8(dci_bytes_inverted, DCI_PAYLOAD_BYTE_LEN, dci_byte_len, ppWritePackedMsg, end);
+    //Pack DCI Payload
+    pack_dci_payload(value->dci_pdu[i].Payload,value->dci_pdu[i].PayloadSizeBits, ppWritePackedMsg,end);
   }
   return 1;
 }
@@ -2007,21 +1994,9 @@ static uint8_t pack_ul_dci_pdu_list_value(void* tlv, uint8_t **ppWritePackedMsg,
     push8(value->pdcch_pdu.pdcch_pdu_rel15.dci_pdu[i].powerControlOffsetSS, ppWritePackedMsg, end);
     // DCI Payload fields
     push16(value->pdcch_pdu.pdcch_pdu_rel15.dci_pdu[i].PayloadSizeBits, ppWritePackedMsg, end);
-    // Helper vars for DCI Payload
-    uint8_t dci_bytes_inverted[DCI_PAYLOAD_BYTE_LEN];
-    uint8_t dci_byte_len = (value->pdcch_pdu.pdcch_pdu_rel15.dci_pdu[i].PayloadSizeBits + 7) / 8;
-    // Align the dci payload bits to the left on the payload buffer
-    uint64_t *dci_pdu = (uint64_t *)value->pdcch_pdu.pdcch_pdu_rel15.dci_pdu[i].Payload;
-    if (value->pdcch_pdu.pdcch_pdu_rel15.dci_pdu[i].PayloadSizeBits % 8 != 0) {
-      uint8_t rotation_bits = 8 - (value->pdcch_pdu.pdcch_pdu_rel15.dci_pdu[i].PayloadSizeBits % 8);
-      *dci_pdu = (*dci_pdu << rotation_bits);
-    }
-    // Invert the byte order of the DCI Payload
-    for (int j = 0; j < dci_byte_len; j++) {
-      dci_bytes_inverted[j] = value->pdcch_pdu.pdcch_pdu_rel15.dci_pdu[i].Payload[(dci_byte_len - 1) - j];
-    }
-    //printf("%s UL DCI has %d bits and the payload is %lx\n",__FUNCTION__, value->pdcch_pdu.pdcch_pdu_rel15.dci_pdu[i].PayloadSizeBits, *dci_pdu);
-    pusharray8(dci_bytes_inverted, DCI_PAYLOAD_BYTE_LEN, dci_byte_len, ppWritePackedMsg, end);
+    //Pack DCI Payload
+    pack_dci_payload(value->pdcch_pdu.pdcch_pdu_rel15.dci_pdu[i].Payload,value->pdcch_pdu.pdcch_pdu_rel15.dci_pdu[i].PayloadSizeBits, ppWritePackedMsg,end);
+
   }
 
   //pack proper size
@@ -4097,28 +4072,8 @@ static uint8_t unpack_dl_tti_pdcch_pdu_rel15_value(void* tlv, uint8_t **ppReadPa
     pull8(ppReadPackedMsg, &value->dci_pdu[i].beta_PDCCH_1_0, end);
     pull8(ppReadPackedMsg, &value->dci_pdu[i].powerControlOffsetSS, end);
     pull16(ppReadPackedMsg, &value->dci_pdu[i].PayloadSizeBits, end);
-    //Pull the inverted DCI and invert it back
-    // Helper vars for DCI Payload
-    uint8_t dci_bytes_inverted[DCI_PAYLOAD_BYTE_LEN];
-    uint8_t dci_byte_len = (value->dci_pdu[i].PayloadSizeBits + 7) / 8;
-    //Get DCI array inverted
-    pullarray8(ppReadPackedMsg, dci_bytes_inverted, DCI_PAYLOAD_BYTE_LEN, dci_byte_len, end);
-    uint64_t *dci_pdu = (uint64_t *)value->dci_pdu[i].Payload;
-    //Set Payload array to all 0 so we don't need to set them later, not sure if needed
-    //memset(&value->dci_pdu[i].Payload,0,DCI_PAYLOAD_BYTE_LEN);
-    // Reversing the byte order of the inverted DCI payload
-    //Invert the obtained values
-    for(uint16_t j = 0;j < dci_byte_len; j++){
-      value->dci_pdu[i].Payload[j] = dci_bytes_inverted[(dci_byte_len - 1) - j];
-      //printf(" %s DCI has %d bits and the payload is %d\n",__FUNCTION__, value->dci_pdu[i].PayloadSizeBits, value->dci_pdu[i].Payload[j]);
-    }
-    //printf(" %s DCI has %d bits and the payload is %lx\n",__FUNCTION__, value->dci_pdu[i].PayloadSizeBits, *dci_pdu);
-    if (value->dci_pdu[i].PayloadSizeBits % 8 != 0) {
-      uint8_t rotation_bits = 8 - (value->dci_pdu[i].PayloadSizeBits % 8);
-      *dci_pdu = (*dci_pdu >> rotation_bits);
-    }
-   //printf(" %s DCI has %d bits and the payload is %lx\n",__FUNCTION__, value->dci_pdu[i].PayloadSizeBits, *dci_pdu);
 
+    unpack_dci_payload(value->dci_pdu[i].Payload, value->dci_pdu[i].PayloadSizeBits, ppReadPackedMsg,end);
   }
   // TODO: resolve the packaging of array (currently sending a single element)
   return 1;
@@ -5014,8 +4969,8 @@ static uint8_t unpack_ul_tti_request_pusch_pdu(void *tlv, uint8_t **ppReadPacked
       return(
               pull8(ppReadPackedMsg, &pusch_pdu->pusch_ptrs.num_ptrs_ports, end) &&
               pull8(ppReadPackedMsg, &pusch_pdu->pusch_ptrs.ptrs_ports_list->ptrs_dmrs_port, end) &&
-              +               pull16(ppReadPackedMsg, &pusch_pdu->pusch_ptrs.ptrs_ports_list->ptrs_port_index, end) &&
-              +               pull8(ppReadPackedMsg, &pusch_pdu->pusch_ptrs.ptrs_ports_list->ptrs_re_offset, end) &&
+              pull16(ppReadPackedMsg, &pusch_pdu->pusch_ptrs.ptrs_ports_list->ptrs_port_index, end) &&
+              pull8(ppReadPackedMsg, &pusch_pdu->pusch_ptrs.ptrs_ports_list->ptrs_re_offset, end) &&
               pull8(ppReadPackedMsg, &pusch_pdu->pusch_ptrs.ptrs_time_density, end) &&
               pull8(ppReadPackedMsg, &pusch_pdu->pusch_ptrs.ptrs_freq_density, end) &&
               pull8(ppReadPackedMsg, &pusch_pdu->pusch_ptrs.ul_ptrs_power, end)
@@ -5993,24 +5948,8 @@ static uint8_t unpack_ul_dci_pdu_list_value(uint8_t **ppReadPackedMsg, uint8_t *
     pull8(ppReadPackedMsg, &value->pdcch_pdu.pdcch_pdu_rel15.dci_pdu[i].beta_PDCCH_1_0, end);
     pull8(ppReadPackedMsg, &value->pdcch_pdu.pdcch_pdu_rel15.dci_pdu[i].powerControlOffsetSS, end);
     pull16(ppReadPackedMsg, &value->pdcch_pdu.pdcch_pdu_rel15.dci_pdu[i].PayloadSizeBits, end);
-    //Pull the inverted DCI and invert it back
-    // Helper vars for DCI Payload
-    uint8_t dci_bytes_inverted[DCI_PAYLOAD_BYTE_LEN];
-    uint8_t dci_byte_len = (value->pdcch_pdu.pdcch_pdu_rel15.dci_pdu[i].PayloadSizeBits + 7) / 8;
-    //Get DCI array inverted
-    pullarray8(ppReadPackedMsg, dci_bytes_inverted, DCI_PAYLOAD_BYTE_LEN, dci_byte_len, end);
-    uint64_t *dci_pdu = (uint64_t *)value->pdcch_pdu.pdcch_pdu_rel15.dci_pdu[i].Payload;
-    //Set Payload array to all 0 so we don't need to set them later, not sure if needed
-    //memset(&value->pdcch_pdu.pdcch_pdu_rel15.dci_pdu[i].Payload,0,DCI_PAYLOAD_BYTE_LEN);
-    // Reversing the byte order of the inverted DCI payload
-    for(uint16_t j = 0;j < dci_byte_len; j++){
-      value->pdcch_pdu.pdcch_pdu_rel15.dci_pdu[i].Payload[j] = dci_bytes_inverted[(dci_byte_len - 1) - j];
-    }
-    if (value->pdcch_pdu.pdcch_pdu_rel15.dci_pdu[i].PayloadSizeBits % 8 != 0) {
-      uint8_t rotation_bits = 8 - (value->pdcch_pdu.pdcch_pdu_rel15.dci_pdu[i].PayloadSizeBits % 8);
-      *dci_pdu = (*dci_pdu >> rotation_bits);
-    }
-    //printf("%s UL DCI has %d bits and the payload is %lx\n",__FUNCTION__, value->pdcch_pdu.pdcch_pdu_rel15.dci_pdu[i].PayloadSizeBits, *dci_pdu);
+
+    unpack_dci_payload(value->pdcch_pdu.pdcch_pdu_rel15.dci_pdu[i].Payload, value->pdcch_pdu.pdcch_pdu_rel15.dci_pdu[i].PayloadSizeBits, ppReadPackedMsg,end);
   }
   return 1;
 }
@@ -6259,7 +6198,6 @@ static uint8_t unpack_nr_rx_data_indication_body(nfapi_nr_rx_data_pdu_t* value,
                                                  uint8_t *end,
                                                  nfapi_p7_codec_config_t* config)
 {
-
   //uint16_t dummy = 0;
   if(!(pull32(ppReadPackedMsg, &value->handle, end) &&
        pull16(ppReadPackedMsg, &value->rnti, end) &&
