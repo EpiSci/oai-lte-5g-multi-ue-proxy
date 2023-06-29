@@ -830,7 +830,7 @@ void pnf_nr_handle_start_request(pnf_t* pnf, void *pRecvMsg, int recvMsgLen)
 						memset(&resp, 0, sizeof(resp));
 						resp.header.message_id = NFAPI_NR_PHY_MSG_TYPE_START_RESPONSE;
 						resp.header.phy_id = req.header.phy_id;
-						resp.error_code = NFAPI_MSG_INVALID_STATE;
+						resp.error_code = NFAPI_NR_START_MSG_INVALID_STATE;
 						nfapi_nr_pnf_start_resp(config, &resp);
 					}
 				}
@@ -840,7 +840,7 @@ void pnf_nr_handle_start_request(pnf_t* pnf, void *pRecvMsg, int recvMsgLen)
 					memset(&resp, 0, sizeof(resp));
 					resp.header.message_id = NFAPI_NR_PHY_MSG_TYPE_START_RESPONSE;
 					resp.header.phy_id = req.header.phy_id;
-					resp.error_code = NFAPI_MSG_INVALID_CONFIG;
+					resp.error_code = NFAPI_NR_START_MSG_INVALID_STATE;
 					nfapi_nr_pnf_start_resp(config, &resp);
 				}
 			}
@@ -850,7 +850,7 @@ void pnf_nr_handle_start_request(pnf_t* pnf, void *pRecvMsg, int recvMsgLen)
 				memset(&resp, 0, sizeof(resp));
 				resp.header.message_id = NFAPI_NR_PHY_MSG_TYPE_START_RESPONSE;
 				resp.header.phy_id = req.header.phy_id;
-				resp.error_code = NFAPI_MSG_INVALID_STATE;
+				resp.error_code = NFAPI_NR_START_MSG_INVALID_STATE;
 				nfapi_nr_pnf_start_resp(config, &resp);
 			}
 		}
@@ -2029,7 +2029,7 @@ int pnf_read_dispatch_message(pnf_t* pnf)
 			NFAPI_TRACE(NFAPI_TRACE_INFO, "PNF Failed to unpack p5 message header\n");
 			return 0;
 		}
-		message_size = header.message_length;
+		message_size = header.message_length+header_buffer_size;
 
 		// now have the size of the mesage
 	}

@@ -1286,7 +1286,7 @@ int vnf_nr_read_dispatch_message(nfapi_vnf_config_t* config, nfapi_vnf_pnf_info_
 				NFAPI_TRACE(NFAPI_TRACE_INFO, "VNF Failed to decode message header %d\n", unpack_result);
 				return 0;
 			}
-			message_size = header.message_length;
+			message_size = header.message_length + header_buffer_size;
 
 			// now have the size of the mesage
 		}
