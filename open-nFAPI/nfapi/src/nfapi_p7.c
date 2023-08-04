@@ -8368,8 +8368,6 @@ int nfapi_p7_message_unpack(void *pMessageBuf, uint32_t messageBufLen, void *pUn
   }
   printf("\n");
   */
-  // clean the supplied buffer for - tag value blanking
-  (void)memset(pUnpackedBuf, 0, unpackedBufLen);
 
   // process the header
   if(!(pull16(&pReadPackedMessage, &pMessageHeader->phy_id, end) &&
@@ -8598,9 +8596,6 @@ int nfapi_nr_p7_message_unpack(void *pMessageBuf, uint32_t messageBufLen, void *
 		printf("P7 unpack supplied message buffer is too small %d, %d\n", messageBufLen, unpackedBufLen);
 		return -1;
 	}
-
-	// clean the supplied buffer for - tag value blanking
-	(void)memset(pUnpackedBuf, 0, unpackedBufLen);
 
 	// process the header
 	if(!(pull16(&pReadPackedMessage, &pMessageHeader->phy_id, end) &&
