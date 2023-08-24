@@ -2027,6 +2027,14 @@ static uint8_t pack_ue_release_request(void *msg, uint8_t **ppWritePackedMsg, ui
   return x && y && z;
 }
 
+static uint8_t pack_nr_ue_release_request(void *msg, uint8_t **ppWritePackedMsg, uint8_t *end, nfapi_p7_codec_config_t *config) {
+  nfapi_ue_release_request_t *pNfapiMsg = (nfapi_ue_release_request_t *)msg;
+  int x = push16(pNfapiMsg->sfn_sf, ppWritePackedMsg, end);
+  int y = pack_nr_tlv(NFAPI_UE_RELEASE_BODY_TAG, &pNfapiMsg->ue_release_request_body, ppWritePackedMsg, end, &pack_release_request_body_value);
+  int z = pack_p7_vendor_extension_tlv(pNfapiMsg->vendor_extension, ppWritePackedMsg, end, config);
+  return x && y && z;
+}
+
 static uint8_t pack_ue_release_response(void *msg, uint8_t **ppWritePackedMsg, uint8_t *end, nfapi_p7_codec_config_t *config) {
   nfapi_ue_release_response_t *pNfapiMsg = (nfapi_ue_release_response_t *)msg;
   int x = push32(pNfapiMsg->error_code, ppWritePackedMsg, end);
@@ -3482,7 +3490,7 @@ int nfapi_nr_p7_message_pack(void *pMessageBuf, void *pPackedBuf, uint32_t packe
 			result = pack_ul_dci_request(pMessageHeader, &pWritePackedMessage, end, config);
 			break;
 		case NFAPI_UE_RELEASE_REQUEST:
-			result =pack_ue_release_request(pMessageHeader, &pWritePackedMessage, end, config);
+			result =pack_nr_ue_release_request(pMessageHeader, &pWritePackedMessage, end, config);
 			break;
 
 		case NFAPI_UE_RELEASE_RESPONSE:
@@ -4626,8 +4634,8 @@ static uint8_t unpack_ul_tti_request_pusch_pdu(void *tlv, uint8_t **ppReadPacked
       return(
               pull8(ppReadPackedMsg, &pusch_pdu->pusch_ptrs.num_ptrs_ports, end) &&
               pull8(ppReadPackedMsg, &pusch_pdu->pusch_ptrs.ptrs_ports_list->ptrs_dmrs_port, end) &&
-              +               pull16(ppReadPackedMsg, &pusch_pdu->pusch_ptrs.ptrs_ports_list->ptrs_port_index, end) &&
-              +               pull8(ppReadPackedMsg, &pusch_pdu->pusch_ptrs.ptrs_ports_list->ptrs_re_offset, end) &&
+              pull16(ppReadPackedMsg, &pusch_pdu->pusch_ptrs.ptrs_ports_list->ptrs_port_index, end) &&
+              pull8(ppReadPackedMsg, &pusch_pdu->pusch_ptrs.ptrs_ports_list->ptrs_re_offset, end) &&
               pull8(ppReadPackedMsg, &pusch_pdu->pusch_ptrs.ptrs_time_density, end) &&
               pull8(ppReadPackedMsg, &pusch_pdu->pusch_ptrs.ptrs_freq_density, end) &&
               pull8(ppReadPackedMsg, &pusch_pdu->pusch_ptrs.ul_ptrs_power, end)
@@ -7516,7 +7524,7 @@ static uint8_t unpack_nr_dl_node_sync(uint8_t **ppReadPackedMsg, uint8_t *end, v
   nfapi_nr_dl_node_sync_t *pNfapiMsg = (nfapi_nr_dl_node_sync_t *)msg;
   return (pull32(ppReadPackedMsg, &pNfapiMsg->t1, end) &&
           pulls32(ppReadPackedMsg, &pNfapiMsg->delta_sfn_slot, end) &&
-          unpack_p7_tlv_list(NULL, 0, ppReadPackedMsg, end, config, &pNfapiMsg->vendor_extension));
+          unpack_nr_p7_tlv_list(NULL, 0, ppReadPackedMsg, end, config, &pNfapiMsg->vendor_extension));
 }
 
 static uint8_t unpack_dl_node_sync(uint8_t **ppReadPackedMsg, uint8_t *end, void *msg, nfapi_p7_codec_config_t *config) {
@@ -7532,7 +7540,7 @@ static uint8_t unpack_nr_ul_node_sync(uint8_t **ppReadPackedMsg, uint8_t *end, v
   return (pull32(ppReadPackedMsg, &pNfapiMsg->t1, end) &&
           pull32(ppReadPackedMsg, &pNfapiMsg->t2, end) &&
           pull32(ppReadPackedMsg, &pNfapiMsg->t3, end) &&
-          unpack_p7_tlv_list(NULL, 0, ppReadPackedMsg, end, config, &pNfapiMsg->vendor_extension));
+          unpack_nr_p7_tlv_list(NULL, 0, ppReadPackedMsg, end, config, &pNfapiMsg->vendor_extension));
 }
 
 
@@ -7581,7 +7589,7 @@ static uint8_t unpack_nr_timing_info(uint8_t **ppReadPackedMsg, uint8_t *end, vo
           pulls32(ppReadPackedMsg, &pNfapiMsg->tx_data_request_earliest_arrival, end) &&
           pulls32(ppReadPackedMsg, &pNfapiMsg->ul_tti_earliest_arrival, end) &&
           pulls32(ppReadPackedMsg, &pNfapiMsg->ul_dci_earliest_arrival, end) &&
-          unpack_p7_tlv_list(NULL, 0, ppReadPackedMsg, end, config, &pNfapiMsg->vendor_extension));
+          unpack_nr_p7_tlv_list(NULL, 0, ppReadPackedMsg, end, config, &pNfapiMsg->vendor_extension));
 }
 
 

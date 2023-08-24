@@ -41,7 +41,7 @@ case "$node_type" in
             # Keep the eNB on processor 1 (the second processor) by default
             taskset --cpu-list 1
             ./ran_build/build/lte-softmodem
-            -O ../ci-scripts/conf_files/episci/proxy_rcc.band7.tm1.nfapi.conf
+            -O ../ci-scripts/conf_files/untested/episci/proxy_rcc.band7.tm1.nfapi.conf
             --noS1
             --emulate-l1
             --log_config.global_log_options level,nocolor,time,thread_id
@@ -61,7 +61,7 @@ case "$node_type" in
             # Keep the gNB on processor 1 (the second processor) by default
             taskset --cpu-list 1
             ./ran_build/build/nr-softmodem
-            -O "../ci-scripts/conf_files/episci/$conf"
+            -O "../ci-scripts/conf_files/untested/$conf"
             --nfapi VNF
             --noS1
             --emulate-l1
@@ -83,7 +83,7 @@ case "$node_type" in
         cmd=(
             taskset --cpu-list "$cpu"
             ./ran_build/build/lte-uesoftmodem
-            -O ../ci-scripts/conf_files/episci/proxy_ue.nfapi.conf
+            -O ../ci-scripts/conf_files/untested/episci/proxy_ue.nfapi.conf
             --L2-emul 5
             --nokrnmod 1
             --noS1
@@ -107,7 +107,7 @@ case "$node_type" in
         cmd=(
             taskset --cpu-list "$cpu"
             ./ran_build/build/nr-uesoftmodem
-            -O ../ci-scripts/conf_files/episci/proxy_nr-ue.nfapi.conf
+            -O ../ci-scripts/conf_files/untested/episci/proxy_nr-ue.nfapi.conf
             --nokrnmod 1
             --nfapi STANDALONE_PNF
             --node-number "$NODE_NUMBER"
