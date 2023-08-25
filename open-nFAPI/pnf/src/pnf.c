@@ -2029,7 +2029,7 @@ int pnf_read_dispatch_message(pnf_t* pnf)
 			NFAPI_TRACE(NFAPI_TRACE_INFO, "PNF Failed to unpack p5 message header\n");
 			return 0;
 		}
-		message_size = header.message_length+header_buffer_size;
+		message_size = header.message_length;
 
 		// now have the size of the mesage
 	}

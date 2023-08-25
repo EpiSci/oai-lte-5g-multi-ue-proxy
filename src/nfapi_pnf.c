@@ -1751,14 +1751,12 @@ int start_request(nfapi_pnf_config_t *config, nfapi_pnf_phy_config_t *phy, nfapi
     p7_config->phy_id = phy->phy_id;
     p7_config->remote_p7_port = phy_info->remote_port;
     p7_config->remote_p7_addr = phy_info->remote_addr;
-    p7_config->local_p7_port = phy_info->udp.rx_port;
+    p7_config->local_p7_port = 32123; // DJP - good grief cannot seem to get the right answer phy_info->local_port;
     //p7_config->local_p7_port = phy_info->udp.rx_port;
     //DJP p7_config->local_p7_addr = (char*)phy_info->local_addr.c_str();
     p7_config->local_p7_addr = phy_info->local_addr;
     NFAPI_TRACE(NFAPI_TRACE_DEBUG, "[PNF] P7 remote:%s:%d local:%s:%d\n", p7_config->remote_p7_addr, p7_config->remote_p7_port,
            p7_config->local_p7_addr, p7_config->local_p7_port);
-  printf( "[PNF] P7 remote:%s:%d local:%s:%d\n", p7_config->remote_p7_addr, p7_config->remote_p7_port,
-              p7_config->local_p7_addr, p7_config->local_p7_port);
     p7_config->user_data = phy_info;
     p7_config->malloc = &pnf_allocate;
     p7_config->free = &pnf_deallocate;
@@ -1841,8 +1839,6 @@ int nr_start_request(nfapi_pnf_config_t *config, nfapi_pnf_phy_config_t *phy,  n
   //DJP p7_config->local_p7_addr = (char*)phy_info->local_addr.c_str();
   p7_config->local_p7_addr = phy_info->local_addr;
   NFAPI_TRACE(NFAPI_TRACE_DEBUG, "[PNF] P7 remote:%s:%d local:%s:%d\n", p7_config->remote_p7_addr, p7_config->remote_p7_port, p7_config->local_p7_addr, p7_config->local_p7_port);
-  printf("[PNF] P7 remote:%s:%d local:%s:%d\n", p7_config->remote_p7_addr, p7_config->remote_p7_port, p7_config->local_p7_addr, p7_config->local_p7_port);
-
   p7_config->user_data = phy_info;
   //p7_config->user_data = phy_info;
   p7_config->malloc = &pnf_allocate;
