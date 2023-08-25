@@ -157,7 +157,7 @@ int nfapi_nr_vnf_p7_start(nfapi_vnf_p7_config_t* config)
 
     struct timespec ref_time;
 	clock_gettime(CLOCK_MONOTONIC, &ref_time);
-	uint8_t setup_time;
+	uint8_t setup_done;
 	while(vnf_p7->terminate == 0)
 	{	
 		fd_set rfds;
@@ -168,12 +168,17 @@ int nfapi_nr_vnf_p7_start(nfapi_vnf_p7_config_t* config)
 		// Add the p7 socket
 		FD_SET(vnf_p7->socket, &rfds);
 		maxSock = vnf_p7->socket;
-		
-		struct timespec curr_time;
-		clock_gettime(CLOCK_MONOTONIC, &curr_time);
-		setup_time = curr_time.tv_sec - ref_time.tv_sec;
 
-		if(setup_time > 10 && prev_slot != gNB->UL_INFO.slot){ //Give the VNF sufficient time to setup before starting scheduling
+    if (setup_done == 0) {
+      struct timespec curr_time;
+      clock_gettime(CLOCK_MONOTONIC, &curr_time);
+      uint8_t setup_time = curr_time.tv_sec - ref_time.tv_sec;
+      if (setup_time > 3) {
+        setup_done = 1;
+      }
+    }
+
+		if(setup_done && prev_slot != gNB->UL_INFO.slot){ //Give the VNF sufficient time to setup before starting scheduling
 
 			//Call the scheduler
 			pthread_mutex_lock(&gNB->UL_INFO_mutex);

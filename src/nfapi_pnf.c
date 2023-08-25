@@ -1835,7 +1835,7 @@ int nr_start_request(nfapi_pnf_config_t *config, nfapi_pnf_phy_config_t *phy,  n
   p7_config->remote_p7_port = phy_info->remote_port;
   p7_config->remote_p7_addr = phy_info->remote_addr;
   // TODO: remove this hardcoded port
-  p7_config->local_p7_port = 50610; // DJP - good grief cannot seem to get the right answer phy_info->local_port;
+  p7_config->local_p7_port = phy_info->udp.rx_port;
   //DJP p7_config->local_p7_addr = (char*)phy_info->local_addr.c_str();
   p7_config->local_p7_addr = phy_info->local_addr;
   NFAPI_TRACE(NFAPI_TRACE_DEBUG, "[PNF] P7 remote:%s:%d local:%s:%d\n", p7_config->remote_p7_addr, p7_config->remote_p7_port, p7_config->local_p7_addr, p7_config->local_p7_port);
