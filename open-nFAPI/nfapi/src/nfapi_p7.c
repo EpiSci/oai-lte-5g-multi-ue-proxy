@@ -1043,7 +1043,6 @@ static uint8_t pack_ul_tti_request_pucch_pdu(nfapi_nr_pucch_pdu_t *pucch_pdu, ui
 
 
 static uint8_t pack_ul_tti_request_pusch_pdu(nfapi_nr_pusch_pdu_t *pusch_pdu, uint8_t **ppWritePackedMsg, uint8_t *end) {
-
   if (!(
     push16(pusch_pdu->pdu_bit_map, ppWritePackedMsg, end) &&
     push16(pusch_pdu->rnti, ppWritePackedMsg, end) &&
@@ -8376,6 +8375,8 @@ int nfapi_p7_message_unpack(void *pMessageBuf, uint32_t messageBufLen, void *pUn
   }
   printf("\n");
   */
+  // clean the supplied buffer for - tag value blanking
+  (void)memset(pUnpackedBuf, 0, unpackedBufLen);
 
   // process the header
   if(!(pull16(&pReadPackedMessage, &pMessageHeader->phy_id, end) &&
@@ -8594,16 +8595,17 @@ int nfapi_nr_p7_message_unpack(void *pMessageBuf, uint32_t messageBufLen, void *
 	if (pMessageBuf == NULL || pUnpackedBuf == NULL)
 	{
 		NFAPI_TRACE(NFAPI_TRACE_ERROR, "P7 unpack supplied pointers are null\n");
-		printf( "P7 unpack supplied pointers are null\n");
 		return -1;
 	}
 
 	if (messageBufLen < NFAPI_P7_HEADER_LENGTH || unpackedBufLen < sizeof(nfapi_p7_message_header_t))
 	{
 		NFAPI_TRACE(NFAPI_TRACE_ERROR, "P7 unpack supplied message buffer is too small %d, %d\n", messageBufLen, unpackedBufLen);
-		printf("P7 unpack supplied message buffer is too small %d, %d\n", messageBufLen, unpackedBufLen);
 		return -1;
 	}
+
+	// clean the supplied buffer for - tag value blanking
+	(void)memset(pUnpackedBuf, 0, unpackedBufLen);
 
 	// process the header
 	if(!(pull16(&pReadPackedMessage, &pMessageHeader->phy_id, end) &&
@@ -8614,14 +8616,12 @@ int nfapi_nr_p7_message_unpack(void *pMessageBuf, uint32_t messageBufLen, void *
 		 pull32(&pReadPackedMessage, &pMessageHeader->transmit_timestamp, end)))
 	{
 		NFAPI_TRACE(NFAPI_TRACE_ERROR, "P7 unpack header failed\n");
-		printf("P7 unpack header failed\n");
 		return -1;
 	}
 
 	if((uint8_t*)(pMessageBuf + pMessageHeader->message_length) > end)
 	{
 		NFAPI_TRACE(NFAPI_TRACE_ERROR, "P7 unpack message length is greater than the message buffer \n");
-		printf("P7 unpack message length is greater than the message buffer \n");
 		return -1;
 	}
 
