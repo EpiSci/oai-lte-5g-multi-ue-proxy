@@ -3,7 +3,7 @@
 This repository contains the Multi-UE Proxy to allow UEs to communicate with a
 single eNB (LTE mode), or both an eNB and gNB (NSA mode), or a single gNB
 (SA/NR mode) using the customized OpenAirInterface (OAI) software. The OAI
-code is located at https://gitlab.eurecom.fr/oai/openairinterface5g. The UEs
+code is located at <https://gitlab.eurecom.fr/oai/openairinterface5g>. The UEs
 communicate to the eNB via the bypass PHY layer. Various multi-UE scenarios
 can be tested without the overhead of a PHY layer.
 
@@ -44,34 +44,38 @@ Build and install the EpiSys version of the OAI repository.
 4. git checkout master
 5. If you run the proxy in loopback mode, add the following loopback interface for the VNF in the gNB.
 
-```shell
-sudo ifconfig lo: 127.0.0.2 netmask 255.0.0.0 up
-```
+    ```shell
+    sudo ifconfig lo: 127.0.0.2 netmask 255.0.0.0 up
+    ```
 
 6. Verify that SCTP support is enabled.
 
-```shell
-checksctp
-```
+   ```shell
+   checksctp
+   ```
 
-If SCTP is not supported, then do the following.
+   If SCTP is not supported, then do the following.
 
-```shell
-sudo insmod /lib/modules/$(uname -r)/kernel/net/sctp/sctp.ko
-```
+   ```shell
+   sudo insmod /lib/modules/$(uname -r)/kernel/net/sctp/sctp.ko
+   ```
 
 7. If you plan to use the EPC or 5GCN, be sure to follow the instructions listed in Eurecom's respective repository.
 
-- The EPC is used for both LTE and NSA mode. The 5GCN is used for SA mode.
-- The EPC installation and deployment instructions are found here:
-https://github.com/OPENAIRINTERFACE/openair-epc-fed/blob/master/docs/DEPLOY_HOME_MAGMA_MME.md
-- The 5GCN installation and deployment instructions are found here:
-https://gitlab.eurecom.fr/oai/cn5g/oai-cn5g-fed/-/blob/master/docs/DEPLOY_HOME.md
-- It is critical to update the configuration files in the eNB/gNB/UE/NRUE if running with the 5GCN/EPC.\
-Instructions to update the configuration files are oulined in the EPC/5GCN documentation
-- Each softmodem command will not have the `--noS1` when running with the EPC or 5GCN.
-- The UE and NRUE launch commands will have a `--ue-idx-standalone $node_id` flag added
-when running with the ECP/5GCN to distinguish USIM information for multiple UEs.
+   - The EPC is used for both LTE and NSA mode. The 5GCN is used for SA mode.
+   - The EPC installation and deployment instructions are found here:
+   <https://github.com/OPENAIRINTERFACE/openair-epc-fed/blob/master/docs/DEPLOY_HOME_MAGMA_MME.md>
+   - The 5GCN installation and deployment instructions are found here:
+   <https://gitlab.eurecom.fr/oai/cn5g/oai-cn5g-fed/-/blob/master/docs/DEPLOY_HOME.md>
+   - It is critical to update the configuration files in the eNB/gNB/UE/NRUE if running with the 5GCN/EPC.\
+   Instructions to update the configuration files are oulined in the EPC/5GCN documentation
+   - Each softmodem command will not have the `--noS1` when running with the EPC or 5GCN.
+   - The UE and NRUE launch commands will have a `--ue-idx-standalone $node_id` flag added
+   when running with the ECP/5GCN to distinguish USIM information for multiple UEs.
+
+8. If you plan on running multiple UEs that are not located on the same host or will not all be
+using the same IP address (i.e., Docker containers as UEs), the provided `proxy_testscript.py`
+cannot be used. See the advanced section for details on configuring IP addresses correctly.
 
 ## Build OAI ##
 
@@ -118,7 +122,7 @@ which executables to launch and the necessary flags for each command.  Steps
 `--nsa` flag with `--sa` and only launch NRUE(s), a gNB and the proxy.
 
 | Mode | Executables     | Flags  |
-|------|-----------------|--------|
+| ---- | --------------- | ------ |
 | LTE  | lte-softmodem   | (none) |
 |      | lte-uesoftmodem | (none) |
 | NSA  | lte-softmodem   | --nsa  |
@@ -180,6 +184,8 @@ sudo -E ./ran_build/build/nr-softmodem -O ../ci-scripts/conf_files/episci/proxy_
 
 ### 3. Open a terminal and launch proxy ###
 
+#### 3.a Running UEs on the same host ####
+
 NUMBER_OF_UES is the total number of UEs.
 
 ```shell
@@ -194,6 +200,18 @@ If you do not specify the parameters ending with ipaddr, the default IP addresse
 - gnb_ipaddr = 127.0.0.2
 - proxy_ipaddr = 127.0.0.1
 - ue_ipaddr = 127.0.0.1
+
+#### 3.b Running UEs on different hosts ####
+
+To run UEs on different hosts, a separate IP address must be provided for each UE. The example below shows 3 IP addresses.
+
+NUMBER_OF_UES is the total number of UEs.
+
+```shell
+cd .../oai-lte-multi-ue-proxy
+number_of_ues=3
+sudo -E ./build/proxy $number_of_ues --nsa enb_ipaddr gnb_ipaddr proxy_ipaddr ue1_ipaddr ue2_ipaddr ue3_ipaddr
+```
 
 ### 4. Open a terminal and launch nrUE ###
 

@@ -28,7 +28,7 @@ namespace
     Multi_UE_NR_Proxy *instance;
 }
 
-Multi_UE_NR_Proxy::Multi_UE_NR_Proxy(int num_of_ues,  std::string gnb_ip, std::string proxy_ip, std::string ue_ip)
+Multi_UE_NR_Proxy::Multi_UE_NR_Proxy(int num_of_ues,  std::string gnb_ip, std::string proxy_ip, std::vector<std::string> ue_ip)
 {
     assert(instance == NULL);
     instance = this;
@@ -63,7 +63,7 @@ void Multi_UE_NR_Proxy::start(softmodem_mode_t softmodem_mode)
     }
 }
 
-void Multi_UE_NR_Proxy::configure(std::string gnb_ip, std::string proxy_ip, std::string ue_ip)
+void Multi_UE_NR_Proxy::configure(std::string gnb_ip, std::string proxy_ip, std::vector<std::string> ue_ip)
 {
     oai_ue_ipaddr = ue_ip;
     vnf_ipaddr = gnb_ip;
@@ -74,13 +74,13 @@ void Multi_UE_NR_Proxy::configure(std::string gnb_ip, std::string proxy_ip, std:
 
     std::cout<<"VNF is on IP Address "<<vnf_ipaddr<<std::endl;
     std::cout<<"PNF is on IP Address "<<pnf_ipaddr<<std::endl;
-    std::cout<<"OAI-UE is on IP Address "<<oai_ue_ipaddr<<std::endl;
-
+    
     for (int ue_idx = 0; ue_idx < num_ues; ue_idx++)
     {
+        std::cout<<"OAI-UE "<<ue_idx<<" is on IP Address "<<oai_ue_ipaddr[ue_idx]<<std::endl;
         int oai_rx_ue_port = 3611 + ue_idx * port_delta;
         int oai_tx_ue_port = 3612 + ue_idx * port_delta;
-        init_oai_socket(oai_ue_ipaddr.c_str(), oai_tx_ue_port, oai_rx_ue_port, ue_idx);
+        init_oai_socket(oai_ue_ipaddr[ue_idx].c_str(), oai_tx_ue_port, oai_rx_ue_port, ue_idx);
     }
 }
 
@@ -202,6 +202,7 @@ void Multi_UE_NR_Proxy::oai_gnb_downlink_nfapi_task(void *msg_org)
 
     for(int ue_idx = 0; ue_idx < num_ues; ue_idx++)
     {
+        inet_aton(oai_ue_ipaddr[ue_idx].c_str(), &address_tx_.sin_addr);
         address_tx_.sin_port = htons(3612 + ue_idx * port_delta);
         switch (msg.header.message_id)
         {
@@ -275,6 +276,7 @@ void Multi_UE_NR_Proxy::pack_and_send_downlink_sfn_slot_msg(uint16_t sfn_slot)
 
     for(int ue_idx = 0; ue_idx < num_ues; ue_idx++)
     {
+        inet_aton(oai_ue_ipaddr[ue_idx].c_str(), &address_tx_.sin_addr);
         address_tx_.sin_port = htons(3612 + ue_idx * port_delta);
         assert(ue_tx_socket[ue_idx] > 2);
         if (sendto(ue_tx_socket[ue_idx], &sfn_slot, sizeof(sfn_slot), 0, (const struct sockaddr *) &address_tx_, sizeof(address_tx_)) < 0)
