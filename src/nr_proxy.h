@@ -46,9 +46,9 @@
 class Multi_UE_NR_Proxy
 {
 public:
-    Multi_UE_NR_Proxy(int num_of_ues, std::string gnb_ip, std::string proxy_ip, std::string ue_ip);
+    Multi_UE_NR_Proxy(int num_of_ues, std::string gnb_ip, std::string proxy_ip, std::vector<std::string> ue_ip);
     ~Multi_UE_NR_Proxy() = default;
-    void configure(std::string gnb_ip, std::string proxy_ip, std::string ue_ip);
+    void configure(std::string gnb_ip, std::string proxy_ip, std::vector<std::string> ue_ip);
     int init_oai_socket(const char *addr, int tx_port, int rx_port, int ue_idx);
     void oai_gnb_downlink_nfapi_task(void *msg);
     void testcode_tx_packet_to_UE( int ue_tx_socket_);
@@ -59,7 +59,7 @@ public:
     void send_uplink_oai_msg_to_proxy_queue(void *buffer, size_t buflen);
     void start(softmodem_mode_t softmodem_mode);
 private:
-    std::string oai_ue_ipaddr;
+    std::vector<std::string> oai_ue_ipaddr;
     std::string vnf_ipaddr;
     std::string pnf_ipaddr;
     int vnf_p5port = -1;
