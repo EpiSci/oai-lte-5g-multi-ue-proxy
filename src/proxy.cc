@@ -128,7 +128,7 @@ int main(int argc, char *argv[])
         enb_ipaddr = ipaddrs[0];
         gnb_ipaddr = ipaddrs[0];
         proxy_ipaddr = ipaddrs[1];
-        ue_ipaddr[0] = ipaddrs[2];
+        ue_ipaddr.push_back(ipaddrs[2]);
         break;
     case 4:
         if (softmodem_mode == SOFTMODEM_NSA)
